@@ -47,6 +47,10 @@
       speech.pitch = 1.0;
       speech.volume = 1.0;
 
+      const voices = speechSynthesis.getVoices();
+      speech.voice = voices.find(
+      v => v.name === "Google UK English Male"
+);
       speechSynthesis.speak(speech);
     }
   </script>
