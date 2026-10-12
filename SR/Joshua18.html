@@ -1,0 +1,55 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Joshua 1:8 - Speech Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 650px;
+      margin: 60px auto;
+      padding: 20px;
+      line-height: 1.7;
+    }
+    button {
+      padding: 12px 20px;
+      font-size: 16px;
+      margin-right: 10px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Joshua 1:8 (KJV)</h2>
+
+  <p id="verse">
+    This book of the law shall not depart out of thy mouth;
+    but thou shalt meditate therein day and night,
+    that thou mayest observe to do according to all
+    that is written therein: for then thou shalt make
+    thy way prosperous, and then thou shalt have good success.
+  </p>
+
+  <button onclick="readVerse()">Read Verse</button>
+  <button onclick="speechSynthesis.cancel()">Stop</button>
+
+  <script>
+    function readVerse() {
+      speechSynthesis.cancel();
+
+      const text = document.getElementById("verse").innerText;
+      const speech = new SpeechSynthesisUtterance(text);
+
+      speech.lang = "en-US";
+      speech.rate = 0.9;
+      speech.pitch = 1.0;
+      speech.volume = 1.0;
+
+      speechSynthesis.speak(speech);
+    }
+  </script>
+
+</body>
+</html>
