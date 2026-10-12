@@ -26,7 +26,7 @@
 
 <body>
 
-  <h2>Joshua 1:8 (KJV) US</h2>
+  <h2>Joshua 1:8 (KJV) UK</h2>
 
   <p id="verse">
     This book of the law shall not depart out of thy mouth;
@@ -59,18 +59,15 @@
       const text = document.getElementById("verse").innerText;
       const speech = new SpeechSynthesisUtterance(text);
 
-      // speech.lang = "en-GB";
-      speech.lang = "en-US";
+      speech.lang = "en-GB";
+      // speech.lang = "en-US";
       speech.rate = 0.9;
       speech.pitch = 1.0;
       speech.volume = 1.0;
 
       // Preferred voice.
-      // const selectedVoice = voices.find(v => v.name === "Google UK English Male");
-      
-      const selectedVoice = voices.find(
-        v => v.name === "Google US English"
-      );
+      const selectedVoice = voices.find(v => v.name === "Google UK English Male");
+      // const selectedVoice = voices.find(v => v.name === "Google US English");
 
       // Use preferred voice if available.
       if (selectedVoice) {
