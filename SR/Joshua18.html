@@ -3,7 +3,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Joshua 1:8 - Speech Test (UK Voice) </title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Joshua 1:8 - UK Voice</title>
+
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -12,6 +14,7 @@
       padding: 20px;
       line-height: 1.7;
     }
+
     button {
       padding: 12px 20px;
       font-size: 16px;
@@ -20,9 +23,10 @@
     }
   </style>
 </head>
+
 <body>
 
-  <h2>Joshua 1:8 (KJV)</h2>
+  <h2>Joshua 1:8 (KJV) UK</h2>
 
   <p id="verse">
     This book of the law shall not depart out of thy mouth;
@@ -33,25 +37,48 @@
   </p>
 
   <button onclick="readVerse()">Read Verse</button>
-  <button onclick="speechSynthesis.cancel()">Stop</button>
+  <button onclick="stopReading()">Stop</button>
 
   <script>
+    const synth = window.speechSynthesis;
+    let voices = [];
+
+    // Load available voices.
+    function loadVoices() {
+      voices = synth.getVoices();
+    }
+
+    loadVoices();
+
+    // Chrome sometimes loads voices asynchronously.
+    synth.addEventListener("voiceschanged", loadVoices);
+
     function readVerse() {
-      speechSynthesis.cancel();
+      synth.cancel();
 
       const text = document.getElementById("verse").innerText;
       const speech = new SpeechSynthesisUtterance(text);
 
-      speech.lang = "en-US";
+      speech.lang = "en-GB";
       speech.rate = 0.9;
       speech.pitch = 1.0;
       speech.volume = 1.0;
 
-      const voices = speechSynthesis.getVoices();
-      speech.voice = voices.find(
-      v => v.name === "Google UK English Male"
-);
-      speechSynthesis.speak(speech);
+      // Preferred voice.
+      const selectedVoice = voices.find(
+        v => v.name === "Google UK English Male"
+      );
+
+      // Use preferred voice if available.
+      if (selectedVoice) {
+        speech.voice = selectedVoice;
+      }
+
+      synth.speak(speech);
+    }
+
+    function stopReading() {
+      synth.cancel();
     }
   </script>
 
