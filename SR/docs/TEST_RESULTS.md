@@ -1,4 +1,4 @@
-# SR — Stage 1 and Stage 2 test results
+# SR — Test results
 
 ## Stage 3 — storage implementation, 2026-10-13
 
@@ -40,8 +40,10 @@ Windows, Node v24.19.0; Chrome headless 154.0.0.0; available bundled Playwright 
 | Offline storage | PASS | Browser context networking disabled; read, individual progress write, export and restore succeed. Cold offline website launch is not claimed |
 | Data file UI | PASS | Real download, file reselection, preview, disabled replacement without prerequisites, explicit confirmation, replacement, recovery download and page reload in an isolated test database |
 | Page destruction during import | PASS | Held an actual replacement transaction active; closed its page; reopened and confirmed old content survived |
-| 1,000 cards × 10 steps | PASS | Five export+restore runs; all 10,000 steps validated each time; indexed ID lookup and reopen retained 1,000 cards. Example timings: 212.6, 382.2, 365.0, 393.1, 377.0 ms; median 377.0 ms, slowest 393.1 ms (before the final documentation-only review) |
+| 1,000 cards × 10 steps | PASS | Five export+restore runs; all 10,000 steps validated each time; indexed ID lookup and reopen retained 1,000 cards. Final local timings: 215.1, 371.8, 361.7, 375.1, 366.7 ms; median 366.7 ms, slowest 375.1 ms |
 | Android API compilation | PASS | All production Java sources compile against SDK 35; existing deprecated API note only |
+| GitHub browser tests, APK build/lint, signing/publication | PASS | [Run 38397826169](https://github.com/twpaige/CCTTRPG/actions/runs/38397826169), implementation commit `a3a805728dfe7f5e40c54f2c54b3da65c75396bd`: build and publish both succeeded. Existing signing/identity/version/download guards passed. Signed [SR.apk, version 0.2.100301](https://github.com/twpaige/CCTTRPG/releases/download/sr-android-100301/SR.apk) is published |
+| Deployed website | PASS | Pages [run 38397825052](https://github.com/twpaige/CCTTRPG/actions/runs/38397825052) succeeded; Data/test URLs return HTTP 200; all 38 storage tests passed on the actual crownandcall.com origin in a disposable Chrome profile; Data panel opened successfully and was visually inspected |
 | Android file transfer, restart and update | BLOCKED | Requires owner Samsung/WebView and installed signed APK; no emulator or physical-device result inferred |
 
 Storage tests are separate from the 61 regression tests; the lifecycle/UI scenarios are additional integration assertions, not inflated into independent unit-test counts. Browser databases are disposable `SRLearning-test-*`; no personal library is reset. The tests use synthetic text only.
