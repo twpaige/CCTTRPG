@@ -4,7 +4,13 @@
 
 **G4: PASS for the implemented desktop authoring gate, verified by real Chrome UI automation. Owner manual usability verification remains pending.** The owner's Stage 4 assignment explicitly authorizes this stage despite the outstanding G3 Android checks. It does not close those checks or authorize Stage 5. Earlier Stage 1, 2, 2.5 and 3 evidence below is preserved; statements about unavailable later stages describe their historical delivery dates.
 
-Editor: **https://crownandcall.com/SR/**. [Authoring guide](AUTHORING.md). Source baseline: `0e25f07e7d0f3256ead1d1904f31ed44de5082d3`, freshly checked against `origin/main`. Deployment/cloud results are recorded separately below once observed.
+Editor: **https://crownandcall.com/SR/**. [Authoring guide](AUTHORING.md). Source baseline: `0e25f07e7d0f3256ead1d1904f31ed44de5082d3`, freshly checked against `origin/main`. Implementation committed and pushed to `main` as **`fb5633071e5a96a10e87af0ea0956ccc49bf4fd3`**.
+
+### Cloud and deployed verification
+
+- Pages [run 38406118445](https://github.com/twpaige/CCTTRPG/actions/runs/38406118445): **SUCCESS**. The exact root URL `https://crownandcall.com/SR/` returns HTTP 200 and serves the editor.
+- All **17/17 editor acceptance scenarios also passed against deployed crownandcall.com assets**, in a disposable Chrome profile with isolated test databases. This includes real browser-process restart and exported record comparison; it is not just an HTTP/source check and does not touch the owner's browser library.
+- Android workflow [run 38406119712](https://github.com/twpaige/CCTTRPG/actions/runs/38406119712), implementation commit above: **build SUCCESS; publish SUCCESS**. The hosted run passed existing regressions, storage and editor browser tests, then release compilation/lint and the unchanged signing/publication guards. This does not establish physical-phone acceptance or close the remaining G3 checks.
 
 ### Delivered functionality and files
 
