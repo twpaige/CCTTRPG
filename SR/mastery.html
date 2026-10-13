@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; base-uri 'none'">
+<title>SR — Knowledge Mastery</title><link rel="stylesheet" href="styles.css"></head>
+<body><header><p class="eyebrow">SR · LEARNER-CONTROLLED MASTERY</p><h1>Knowledge Mastery</h1>
+<nav><a id="library-link" href="index.html">Library editor</a><a id="data-link" href="data/index.html">Data &amp; recovery</a></nav>
+<p>Each step has its own mastery and due date. The final step determines whether its flashcard qualifies for REVIEW. Playing never raises mastery.</p></header>
+<main><p id="status" role="status">Opening local storage…</p><p id="error" role="alert"></p>
+<fieldset id="workspace" disabled><legend class="sr-only">Mastery management</legend>
+<div class="toolbar"><button id="reload">Reload saved library</button></div>
+<div class="mastery-layout"><section><h2>Adjust a step</h2>
+<label>Series<select id="series"></select></label><label>Flashcard<select id="card"></select></label><label>Step<select id="step"></select></label>
+<p id="question" class="verbatim"></p><p id="answer" class="verbatim"></p><p id="current"></p>
+<label>Mastery level<select id="level"></select></label><p id="interval"></p><p id="new-due"></p>
+<button id="apply" class="primary">Apply step mastery</button>
+<div class="toolbar"><button id="reset">Reset FC</button><button id="known">I know this for sure</button></div>
+<p>Reset FC schedules every step at mastery 0, due in 15 minutes. KNOWN excludes content from normal REVIEW without deleting it.</p>
+</section><section><h2>REVIEW / AUDIT preview</h2><p>This is a selection preview, not an audio session. Player integration comes in Stage 6.</p>
+<label>Mode<select id="mode"><option>REVIEW</option><option>AUDIT</option></select></label>
+<label>Selection<select id="scope"><option value="all">ALL series</option><option value="series">Selected series only</option></select></label>
+<div id="review-options"><label>Review window<select id="window"><option value="now">Due now</option><option value="days">Due within days</option><option value="max">Max Deferred</option></select></label>
+<label>Days of lookahead<input id="days" type="number" min="1" step="1" value="7"></label><label><input id="random" type="checkbox"> Randomize unbound flashcards</label></div>
+<p id="audit-policy" hidden>AUDIT tests KNOWN material only, using final steps. A completely KNOWN BOUND series uses its final comprehensive flashcard. Future AUDIT playback repeats continuously until stopped. Success or failure alone changes nothing.</p>
+<button id="preview">Refresh preview</button><p id="preview-count" role="status"></p><div id="preview-list"></div>
+<button id="more" hidden>Show more</button>
+</section></div></fieldset></main><script type="module" src="js/mastery-panel.js"></script></body></html>

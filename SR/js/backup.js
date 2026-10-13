@@ -1,15 +1,15 @@
 import { DATA_STORES, ALL_STORES, request, transaction } from './db.js';
-import { FORMAT, parseSnapshot, validateSnapshot, requireValue } from './validation.js';
+import { FORMAT, parseSnapshot, validateSnapshot, migrateSnapshot, requireValue } from './validation.js';
 
 export async function readSnapshot(tx) {
-  const [series, flashcards, progress, presets, settings, reviewEvents, meta] = await Promise.all(DATA_STORES.map(name => request(tx.objectStore(name).getAll())));
+  const [series, flashcards, progress, presets, settings, reviewEvents, meta, stepProgress, stepEvents] = await Promise.all(DATA_STORES.map(name => request(tx.objectStore(name).getAll())));
   const identity = meta.find(row => row.key === 'library');
   requireValue(identity, 'Library metadata is missing; no data was reset.');
-  return validateSnapshot({ format: FORMAT, formatVersion: 1, schemaVersion: 1, appVersion: '0.3', exportedAt: new Date().toISOString(),
+  return validateSnapshot({ format: FORMAT, formatVersion: 2, schemaVersion: 2, appVersion: '0.5', exportedAt: new Date().toISOString(),
     libraryId: identity.libraryId, libraryGeneration: identity.libraryGeneration,
     series: series.sort((a, b) => a.position - b.position),
     flashcards: flashcards.sort((a, b) => a.seriesId < b.seriesId ? -1 : a.seriesId > b.seriesId ? 1 : a.position - b.position),
-    progress, presets, settings: Object.fromEntries(settings.map(row => [row.key, row.value])), reviewEvents });
+    progress, presets, settings: Object.fromEntries(settings.map(row => [row.key, row.value])), reviewEvents, stepProgress, stepEvents });
 }
 export const exportSnapshot = db => transaction(db, DATA_STORES, 'readonly', readSnapshot);
 export async function exportJSON(db) { return JSON.stringify(await exportSnapshot(db), null, 2); }
@@ -21,8 +21,8 @@ function canonical(value) {
 export function contentKey(snapshot) {
   const copy = structuredClone(snapshot);
   delete copy.exportedAt; delete copy.appVersion;
-  for (const name of ['series', 'flashcards', 'progress', 'presets', 'reviewEvents']) copy[name].sort((a, b) => {
-    const x = a.id ?? a.flashcardId, y = b.id ?? b.flashcardId; return x < y ? -1 : x > y ? 1 : 0;
+  for (const name of ['series', 'flashcards', 'progress', 'presets', 'reviewEvents', 'stepProgress', 'stepEvents'].filter(name => copy[name])) copy[name].sort((a, b) => {
+    const x = name === 'stepProgress' ? JSON.stringify([a.flashcardId, a.stepId]) : a.id ?? a.flashcardId, y = name === 'stepProgress' ? JSON.stringify([b.flashcardId, b.stepId]) : b.id ?? b.flashcardId; return x < y ? -1 : x > y ? 1 : 0;
   });
   return JSON.stringify(canonical(copy));
 }
@@ -33,9 +33,9 @@ export function previewImport(json) {
 }
 export async function restoreJSON(db, json, { confirmed = false, safetyJSON } = {}) {
   // Copy/validate both files before acquiring a write transaction.
-  const incoming = parseSnapshot(json);
+  const incoming = migrateSnapshot(parseSnapshot(json));
   requireValue(confirmed === true, 'Explicit Replace confirmation is required.');
-  const safety = parseSnapshot(safetyJSON);
+  const safety = migrateSnapshot(parseSnapshot(safetyJSON));
   const expected = contentKey(safety);
   return transaction(db, ALL_STORES, 'readwrite', async tx => {
     const current = await readSnapshot(tx);
@@ -43,7 +43,7 @@ export async function restoreJSON(db, json, { confirmed = false, safetyJSON } = 
     // Recovery and replacement commit together; quota/abort retains the previous library and recovery copy.
     await request(tx.objectStore('recovery').put({ key: 'pre-import', snapshot: current }));
     for (const name of DATA_STORES) tx.objectStore(name).clear();
-    for (const name of ['series', 'flashcards', 'progress', 'presets', 'reviewEvents'])
+    for (const name of ['series', 'flashcards', 'progress', 'presets', 'reviewEvents', 'stepProgress', 'stepEvents'])
       for (const row of incoming[name]) tx.objectStore(name).add(row);
     for (const [key, value] of Object.entries(incoming.settings)) tx.objectStore('settings').add({ key, value });
     const libraryGeneration = crypto.randomUUID();
@@ -51,8 +51,8 @@ export async function restoreJSON(db, json, { confirmed = false, safetyJSON } = 
     return { libraryGeneration, cards: incoming.flashcards.length };
   });
 }
-export async function recoveryJSON(db) {
-  const row = await transaction(db, ['recovery'], 'readonly', tx => request(tx.objectStore('recovery').get('pre-import')));
-  requireValue(row, 'No pre-import recovery copy exists yet.');
+export async function recoveryJSON(db, key = 'pre-import') {
+  const row = await transaction(db, ['recovery'], 'readonly', tx => request(tx.objectStore('recovery').get(key)));
+  requireValue(row, `No ${key} recovery copy exists yet.`);
   return JSON.stringify(validateSnapshot(row.snapshot), null, 2);
 }

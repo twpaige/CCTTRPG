@@ -1,4 +1,4 @@
-import { openDatabase, request, transaction, ALL_STORES } from '../js/db.js';
+import { openDatabase, request, transaction, ALL_STORES, DB_VERSION } from '../js/db.js';
 import { Repository } from '../js/repository.js';
 import { exportJSON, exportSnapshot, restoreJSON, recoveryJSON, contentKey, previewImport } from '../js/backup.js';
 import { parseSnapshot } from '../js/validation.js';
@@ -20,8 +20,8 @@ async function seed(f, count = 2) {
   for (let i = 0; i < count; i++) cards.push(await f.repo.createCard({ seriesId: series.id, name: `Card ${i}`, steps: [step, { question: 'Second?', answer: 'Yes' }] }));
   return { series, cards };
 }
-test('Initialization creates version 1 stores/indexes and stable library identity', async () => {
-  const f = await fixture(); equal(f.db.version, 1); equal([...f.db.objectStoreNames].sort(), [...ALL_STORES].sort());
+test('Initialization creates current-version stores/indexes and stable library identity', async () => {
+  const f = await fixture(); equal(f.db.version, DB_VERSION); equal([...f.db.objectStoreNames].sort(), [...ALL_STORES].sort());
   const first = await exportSnapshot(f.db); f.db.close(); const reopened = await openDatabase({ name: f.name }); databases.push({ db: reopened });
   equal((await exportSnapshot(reopened)).libraryId, first.libraryId);
   const tx = reopened.transaction(['progress', 'flashcards', 'reviewEvents']);
@@ -128,7 +128,7 @@ test('Pre-import backup restores the previous library after a successful replace
 });
 const invalid = [
   ['malformed JSON', () => '{truncated'],
-  ['future format', s => { s.formatVersion = 99; }], ['future schema', s => { s.schemaVersion = 2; }],
+  ['future format', s => { s.formatVersion = 99; }], ['future schema', s => { s.schemaVersion = 99; }],
   ['duplicate IDs', s => { s.flashcards.push(s.flashcards[0]); }], ['missing ID', s => { delete s.series[0].id; }],
   ['missing progress', s => { s.progress.pop(); }], ['dangling series', s => { s.flashcards[0].seriesId = 'absent'; }],
   ['invalid mastery', s => { s.progress[0].mastery = 10.5; }], ['negative timestamp', s => { s.progress[0].lastReviewedAt = -1; }],
@@ -163,13 +163,13 @@ test('Mid-restore write failure after clears rolls back library and prior recove
 });
 test('Blocked upgrade waits for old connection; aborted upgrade preserves version/data', async () => {
   const f = await fixture(); await seed(f); const safe = await exportJSON(f.db); f.db.close();
-  const blocker = await request(indexedDB.open(f.name, 1));
+  const blocker = await request(indexedDB.open(f.name, DB_VERSION));
   let blocked = false;
-  const opening = indexedDB.open(f.name, 2);
+  const opening = indexedDB.open(f.name, DB_VERSION + 1);
   opening.onblocked = () => { blocked = true; blocker.close(); };
   opening.onupgradeneeded = () => { opening.result.createObjectStore('temporary'); opening.transaction.abort(); };
   await rejects(() => request(opening)); check(blocked, 'Upgrade was not blocked');
-  const db = await openDatabase({ name: f.name }); databases.push({ db }); equal(db.version, 1);
+  const db = await openDatabase({ name: f.name }); databases.push({ db }); equal(db.version, DB_VERSION);
   equal(contentKey(await exportSnapshot(db)), contentKey(parseSnapshot(safe)));
 });
 test('Asynchronous constraint failure during replacement rolls back all stores', async () => {
@@ -186,7 +186,7 @@ test('Asynchronous constraint failure during replacement rolls back all stores',
 });
 test('Versionchange closes old connection; future database version is rejected without deleting data', async () => {
   const f = await fixture(); await seed(f);
-  const opening = indexedDB.open(f.name, 2); opening.onupgradeneeded = () => opening.result.createObjectStore('future');
+  const opening = indexedDB.open(f.name, DB_VERSION + 1); opening.onupgradeneeded = () => opening.result.createObjectStore('future');
   const future = await request(opening); databases.push({ db: future });
   await rejects(() => openDatabase({ name: f.name }));
   equal(await request(future.transaction('flashcards').objectStore('flashcards').count()), 2);
@@ -196,6 +196,7 @@ test('1,000 cards × 10 steps export/restore/reopen works for five measured runs
   base.flashcards = Array.from({ length: 1000 }, (_, i) => ({ ...cards[0], id: `card-${i}`, position: i,
     steps: Array.from({ length: 10 }, (_, j) => ({ id: `step-${j}`, position: j, ...step })) }));
   base.progress = base.flashcards.map(card => ({ flashcardId: card.id, mastery: 5, lastReviewedAt: null, nextDueAt: 0, revision: 1 }));
+  base.stepProgress = base.flashcards.flatMap(card => card.steps.map(step => ({ flashcardId: card.id, stepId: step.id, mastery: 5, lastReviewedAt: null, nextDueAt: 0, revision: 1 })));
   const timings = [];
   for (let i = 0; i < 5; i++) {
     const safetyJSON = await exportJSON(f.db), start = performance.now();

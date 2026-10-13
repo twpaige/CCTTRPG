@@ -31,6 +31,12 @@ input[type=checkbox] { width: 1.2rem; height: 1.2rem; vertical-align: middle; }
 #error:empty { display: none; } #error { color: #852719; background: #ffede6; padding: .8rem; border-left: 4px solid #a13524; }
 #draft-state { font-weight: 600; }
 .editor-actions { position: sticky; top: 0; z-index: 1; padding: .6rem 0; background: #fff; border-bottom: 1px solid #d5ddd1; }
+.mastery-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+.mastery-layout section { background: white; padding: 1rem; border: 1px solid #d5ddd1; border-radius: .6rem; min-width: 0; }
+.mastery-layout details { border-bottom: 1px solid #d5ddd1; padding: .8rem 0; }
+.mastery-layout summary { cursor: pointer; overflow-wrap: anywhere; }
+.verbatim { white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 800px) { .mastery-layout { grid-template-columns: 1fr; } }
 dialog { border: 1px solid #899f8b; border-radius: .6rem; max-width: min(650px, 95vw); max-height: 90vh; overflow: auto; padding: 1.5rem; }
 dialog::backdrop { background: #16271d99; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }

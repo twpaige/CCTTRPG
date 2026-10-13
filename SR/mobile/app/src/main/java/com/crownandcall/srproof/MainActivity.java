@@ -16,7 +16,7 @@ import java.util.*;
 public final class MainActivity extends Activity {
     private static final String ORIGIN = "https://sr.invalid/";
     private static final Set<String> ASSETS = new HashSet<>(Arrays.asList("index.html", "mobile.js", "shared/sample.js", "shared/speech.css", "shared/playback-plan.js",
-        "data/index.html", "data/panel.js", "poc/speech.css", "js/db.js", "js/repository.js", "js/validation.js", "js/backup.js"));
+        "data/index.html", "data/panel.js", "poc/speech.css", "js/db.js", "js/repository.js", "js/validation.js", "js/backup.js", "js/scheduler.js"));
     private static final int OPEN_BACKUP = 30, SAVE_BACKUP = 31, MAX_BACKUP = 32 * 1024 * 1024;
     private String pendingBackup;
     private boolean filePending;

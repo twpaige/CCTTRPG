@@ -1,5 +1,6 @@
 import { request, transaction } from './db.js';
 import { fields, requireValue, timestamp, validateSeries, validateCard, validateProgress, validatePreset, validateSetting } from './validation.js';
+import { nextDue } from './scheduler.js';
 
 const sorted = rows => rows.sort((a, b) => a.position - b.position);
 const clone = value => structuredClone(value);
@@ -29,6 +30,7 @@ export class Repository {
   getSeries(id) { return this.get('series', id); }
   getCard(id) { return this.get('flashcards', id); }
   getProgress(id) { return this.get('progress', id); }
+  getStepProgress(cardId, stepId) { return this.get('stepProgress', [cardId, stepId]); }
   getPreset(id) { return this.get('presets', id); }
   get(store, id) { return transaction(this.db, [store], 'readonly', tx => request(tx.objectStore(store).get(id))); }
   listSeries() { return transaction(this.db, ['series'], 'readonly', tx => request(tx.objectStore('series').index('byPosition').getAll())); }
@@ -61,7 +63,7 @@ export class Repository {
   }
   async createCard(input) {
     input = clone(input); fields(input, ['seriesId', 'name', 'steps'], ['id', 'position', 'recitationStepIds']);
-    return this.write(['series', 'flashcards', 'progress'], async tx => {
+    return this.write(['series', 'flashcards', 'progress', 'stepProgress'], async tx => {
       existing(await request(tx.objectStore('series').get(input.seriesId)));
       const store = tx.objectStore('flashcards'), rows = sorted(await request(store.index('bySeries').getAll(input.seriesId)));
       const row = fresh(input);
@@ -69,12 +71,13 @@ export class Repository {
       row.position = insert(rows, row, input.position); validateCard(row);
       await request(store.add(row));
       await request(tx.objectStore('progress').add({ flashcardId: row.id, mastery: 0, lastReviewedAt: null, nextDueAt: 0, revision: 1 }));
+      for (const step of row.steps) tx.objectStore('stepProgress').add({ flashcardId: row.id, stepId: step.id, mastery: 0, lastReviewedAt: null, nextDueAt: nextDue(0, row.createdAt), revision: 1 });
       reorder(store, rows); return row;
     });
   }
   async updateCard(id, patch, expectedRevision) {
     patch = clone(patch); fields(patch, [], ['seriesId', 'name', 'position', 'steps', 'recitationStepIds']);
-    return this.write(['series', 'flashcards'], async tx => {
+    return this.write(['series', 'flashcards', 'stepProgress'], async tx => {
       const store = tx.objectStore('flashcards'), old = existing(await request(store.get(id))); revision(old, expectedRevision);
       const row = changed(old, patch);
       existing(await request(tx.objectStore('series').get(row.seriesId)));
@@ -82,13 +85,16 @@ export class Repository {
       const rows = sorted(await request(store.index('bySeries').getAll(row.seriesId))).filter(item => item.id !== id);
       row.position = insert(rows, row, patch.position ?? (old.seriesId === row.seriesId ? old.position : rows.length));
       validateCard(row); await request(store.put(row)); reorder(store, rows);
+      const kept = new Set(row.steps.map(step => step.id)), previous = new Set(old.steps.map(step => step.id));
+      for (const step of old.steps) if (!kept.has(step.id)) tx.objectStore('stepProgress').delete([id, step.id]);
+      for (const step of row.steps) if (!previous.has(step.id)) tx.objectStore('stepProgress').add({ flashcardId: id, stepId: step.id, mastery: 0, lastReviewedAt: null, nextDueAt: nextDue(0, row.updatedAt), revision: 1 });
       if (old.seriesId !== row.seriesId) reorder(store, sorted(await request(store.index('bySeries').getAll(old.seriesId))));
       return row;
     });
   }
   async updateProgress(id, patch, expectedRevision) {
     patch = clone(patch); fields(patch, [], ['mastery', 'lastReviewedAt', 'nextDueAt']);
-    // No scheduling policy: this changes only explicitly supplied values.
+    // Legacy v1 archive API, retained for compatibility/tests. Active learning uses stepProgress.
     return this.write(['progress'], async tx => {
       const store = tx.objectStore('progress'), old = existing(await request(store.get(id))); revision(old, expectedRevision);
       const row = { ...old, ...patch, revision: old.revision + 1 }; validateProgress(row);
@@ -126,11 +132,14 @@ export class Repository {
     return this._delete('series', id, expectedRevision);
   }
   _delete(kind, id, expectedRevision) {
-    return this.write(['series', 'flashcards', 'progress', 'presets'], async tx => {
+    return this.write(['series', 'flashcards', 'progress', 'presets', 'stepProgress'], async tx => {
       const store = tx.objectStore(kind), old = existing(await request(store.get(id))); revision(old, expectedRevision);
       const cards = kind === 'series' ? await request(tx.objectStore('flashcards').index('bySeries').getAll(id)) : [old];
       const removed = new Set(cards.map(card => card.id));
-      for (const card of cards) { tx.objectStore('flashcards').delete(card.id); tx.objectStore('progress').delete(card.id); }
+      for (const card of cards) {
+        tx.objectStore('flashcards').delete(card.id); tx.objectStore('progress').delete(card.id);
+        for (const step of card.steps) tx.objectStore('stepProgress').delete([card.id, step.id]);
+      }
       if (kind === 'series') { await request(store.delete(id)); reorder(store, sorted(await request(store.getAll()))); }
       else reorder(store, sorted(await request(store.index('bySeries').getAll(old.seriesId))));
       for (const preset of await request(tx.objectStore('presets').getAll())) {

@@ -1,3 +1,47 @@
+# Dex — SR implementation plan
+Current Stage 5 contract · 2026-10-13
+
+## Current authority and gates
+
+The owner's Stage 5 assignment and approved migration mapping supersede the original mastery bands, card-level schedules, L10 90-day interval, whole-unit completion credit and proposed bound recitation grouping. [SPECIFICATION.md](SPECIFICATION.md) is the current rule set. Stage 4 is formally CLOSED/PASS; earlier Android checks remain separately open. Stage 5 is authorized; **Stage 6 is not authorized by its completion**. Empirical results belong in [docs/TEST_RESULTS.md](docs/TEST_RESULTS.md).
+
+## Architecture
+
+Keep plain HTML/CSS/ES modules, native IndexedDB and the existing static site. Content remains in series/flashcards, with steps embedded in authored order. Independent active step progress lives in schema-2 stepProgress; legacy progress remains a recovery archive. Use atomic transactions, revision/generation checks, explicit Save and confirmations. No server, framework, account system or synchronization service.
+
+Desktop authoring remains at /SR/; /SR/mastery.html manages mastery and previews REVIEW/AUDIT. Native Android listening remains the existing fixed-sample proof. Only the shared storage dependency allowlist changes for schema-2 compatibility; no playback/service policy is changed.
+
+## Stage 5 — implementation and G5
+
+1. **Migration and recovery:** validate version-1 data, retain pre-migration and pre-import recovery separately, copy each card's progress to every step atomically. Preserve mastery/last-reviewed/due/revision; 10 gets null due. Never propagate across cards during migration. Keep identifiers, wording and order exactly. Test aborts, malformed data, reopening/idempotence and legacy JSON import. Export version 2; older applications reject it safely.
+2. **Scheduling:** pure clock-injected functions for 0–9 = 15 min / 3 h / 6 h / 1 d / 2 d / 3 d / 1 wk / 2 wk / 1 calendar month / 3 calendar months. 10 = KNOWN, never normal REVIEW. Elapsed days/weeks, clamped UTC calendar months. Explicit changes schedule from change time; no playback-based mastery increase.
+3. **Selection:** final-step eligibility anchor and identical window cutoff for all retained steps. Due now, N-day lookahead or Max Deferred. Preserve BOUND card order and all step order; optionally shuffle UNBOUND cards only. AUDIT ALL/one series selects KNOWN final steps; a wholly KNOWN BOUND series contributes only its last card. Continuous AUDIT cursor stops on request or empty eligibility and refreshes targets each cycle.
+4. **Mastery actions:** individual steps; confirmed final-step/KNOWN propagation to the card or final BOUND series; lowering final mastery preserves earlier KNOWN steps. Confirm Reset FC, reset final only and audited final BOUND objective reset. Stage 5 does not implement role-based cue bands or infer missing author text.
+5. **Completion foundation:** prepare/capture step identity, content/progress revisions, library generation and due-at-step-start status. Successful due REVIEW writes the current interval and a unique receipt in one transaction. Early/FOCUSED/AUDIT do not schedule automatically. Queue manual changes until successful step completion. Skip/Stop discard pending changes; special actions invoke pause and confirmation. Test retries, duplicate callbacks, stale edits, storage failure and restored generations without adding a full player.
+6. **Desktop UI:** per-step level/interval/date display; explicit Apply; consequences before confirmation; REVIEW/AUDIT selection preview; optional recall seconds in the existing editor; retained selections on errors; keyboard and narrow-screen usability. New steps start at mastery 0 due in 15 minutes. Imported optional annotations remain recoverable.
+7. **Verification:** real Chrome and real IndexedDB in isolated test databases, all prior suites, 1,000 cards × 10 steps, original-content equality, legacy/new backup round-trip, original recovery download and actual browser restart regression. Keep owner/device observations separate from automation.
+
+**G5 passes** when the approved rules, atomic migration/recovery and desktop controls match these tests without losing content or silently altering other steps. Report unsupported physical-device claims and any open owner verification explicitly.
+
+## Stage 6 handoff — not implemented here
+
+On separate authorization, connect authored content to the desktop speech controller using the Stage 5 policy APIs. Keep each card indivisible and selected steps ascending. REVIEW/AUDIT must remain visibly distinct. Integrate real question → recall → answer success boundaries, pause/resume/skip/stop, session ownership and receipt retries. Refresh AUDIT eligibility between repeated cycles. No automatic grading or schedule updates from unsuccessful speech.
+
+Qualify Android per-step completion journaling and long recitations before using stored long overrides: current shared/native plan waits cap at 120 seconds, text at 2,000 characters/action, actions at 100/unit, and the native service uses a 120-second speech watchdog and 150-second wake lock. Stage 5 deliberately does not change these. Preserve app origin/ID/signing and existing audio behavior.
+
+Stage 6 must also handle browser timer/utterance limits, safe long text segmentation without rewriting words, duplicate/late callbacks, and pending mastery confirmations while listening. Do not treat a stored long duration as verified native support.
+
+## Later stages
+
+Stage 7 passage features, Stage 8 expanded selections/presets, Stage 9 offline/recovery/scale qualification, Stage 10 complete Android listening qualification and Stage 11 optional Drive require their own authorization and must follow the current Stage 5 rules. The old automatic 1/2/4/full grouping and mastery bands below are historical proposals, not an approved implementation instruction. No AUDIT is a REVIEW and no KNOWN item becomes normally due again without explicit reduction/reset.
+
+## Historical planning baseline
+
+The original 2026-10-12 plan is retained below for investigation/history. Its statements about proposed/unimplemented stages, old data models, mastery bands/intervals, date rules, completion units, grouping and initial permission status are **superseded by the current specification and Stage 5 contract above**. Preserve useful platform investigation and later-stage risks without reinstating conflicting old policies.
+
+<details>
+<summary>Original planning document — historical, not current Stage 5 requirements</summary>
+
 # Dex — SR Memorization System Build Plan
 
 Planning baseline: 2026-10-12. Specification: `SR/SPECIFICATION.md`, v0.1. Repository inspected: `twpaige/CCTTRPG`, `main` at `5f6f7b520584600344aa03c3ebd95a397f69bdb6`.
@@ -572,3 +616,6 @@ After the owner authorizes implementation, begin **stage 1: desktop narration pr
 Close G1 with audible desktop evidence, then move immediately to stage 2's real-phone/native-TTS feasibility proof. Guide Android Studio installation only then and retain the owner's clarified native option. Do not spend weeks building editors before confirming that the intended locked-screen walking experience has a plausible, demonstrated execution path.
 
 For the next session: read this plan and the unchanged specification, incorporate the explicit owner clarification at the top, verify repository instructions/current changes, obtain implementation authorization, resolve only the decisions required by the selected stage, implement that stage, run its acceptance gate and relevant earlier regressions, and report evidence before advancing. **This planning assignment ends with this document committed and pushed; no application implementation is authorized by its completion.**
+
+
+</details>

@@ -10,6 +10,7 @@ on:
       - '!SR/mobile/**/*.md'
       - 'SR/js/**'
       - 'SR/index.html'
+      - 'SR/mastery.html'
       - 'SR/styles.css'
       - 'SR/data/**'
       - 'SR/poc/sample.js'
@@ -67,6 +68,7 @@ jobs:
           done
           SR_PLAYWRIGHT="$RUNNER_TEMP/sr-browser-tests/node_modules/playwright" node SR/tests/browser.mjs
           SR_PLAYWRIGHT="$RUNNER_TEMP/sr-browser-tests/node_modules/playwright" node SR/tests/editor.mjs
+          SR_PLAYWRIGHT="$RUNNER_TEMP/sr-browser-tests/node_modules/playwright" node SR/tests/mastery.mjs
       - name: Build and lint release (no signing credentials)
         working-directory: SR/mobile
         env:

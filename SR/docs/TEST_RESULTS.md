@@ -1,5 +1,73 @@
 # SR — Test results
 
+## Stage 5 — step mastery, migration, REVIEW and AUDIT, 2026-10-13
+
+**G5: PASS for implemented policy, migration and desktop UI automated acceptance. Owner verification of the private live library and physical Android upgrade remains pending. Stage 6 has not started.** Stage 4 remains formally CLOSED/PASS. Earlier test evidence below is preserved without reclassifying unperformed device checks.
+
+Source baseline: `32cdd78c69aa0eb59d805696ba4ee9910dfe3706`, fetched and fast-forwarded from `origin/main`. The owner explicitly approved copying existing card progress to **every step**, preserving mastery, last-reviewed and next-due values, making level 10 KNOWN with null due, and **not** propagating KNOWN across cards during migration. That decision supersedes the older card-level/mastery-band/90-day-L10 proposals. The current specification/build plan document the new policy; the original build plan is retained as clearly superseded historical material.
+
+Desktop entry points: **https://crownandcall.com/SR/** and **https://crownandcall.com/SR/mastery.html**. Cloud/deployed results will be recorded separately after publication.
+
+### Implementation and data protection
+
+- Added `js/scheduler.js`, `js/mastery.js`, `js/mastery-panel.js`, `mastery.html`: exact intervals, UTC clamped calendar months, final-step REVIEW anchoring and same-window filtering, BOUND ordering/UNBOUND shuffle, final-only AUDIT ALL/single-series selection and repeat-until-stopped policy, confirmed propagation/resets, independent progress writes, learner-facing intervals/dates and selection previews. No authored-card audio player was connected.
+- Updated `js/db.js`, `js/validation.js`, `js/backup.js`, `js/repository.js`: schema/format 2, compound-key step progress, idempotent receipt storage, validated atomic v1→v2 migration, preserved legacy card-progress archive and separate original pre-migration recovery. Version-1 snapshots remain importable; version-2 snapshots preserve independent steps and receipts. Existing content/IDs/order are not rewritten during migration. No migration from arbitrary illustrative JSON is invented.
+- Updated `index.html`, `js/editor.js`, `styles.css`: mastery navigation, per-step read-only context and optional recall seconds (including zero and long values), progress-preserving step edits and accurate deletion wording. The full mastery panel is desktop-only.
+- Updated `data/index.html`, `data/panel.js`: actual format-version/conversion preview, safety verification across supported conversion, original pre-migration backup download. Existing replacement confirmation, safety match and previous pre-import recovery remain required.
+- Updated `mobile/app/build.gradle` and `MainActivity.java` **only** to package/allowlist the shared `scheduler.js` dependency of the repository. No native engine, plan builder/parser, service, Bluetooth, notification, signing identity or version-allocation behavior changed.
+- Added `tests/mastery.test.js`, `tests/mastery.html`, `tests/mastery-runner.js`, `tests/mastery.mjs`; updated the existing workflow to run the new suite and trigger on mastery HTML. Existing persistence tests use the current schema version and valid step-progress scale fixtures; editor tests account for the new recall field in keyboard order and updated deletion wording. Their regression coverage/counts are preserved.
+- Updated `SPECIFICATION.md`, `BUILD_PLAN.md`, `docs/STORAGE.md`, `docs/AUTHORING.md` and this report. Storage docs specify APIs, legacy archives, recovery compatibility and the Stage 6 boundary.
+
+### Executed evidence
+
+Windows, Node **24.19.0**, Google Chrome **154.0.0.0** headless, Playwright **1.62.1**, Temurin JDK **17.0.20.1**. All destructive tests use fresh disposable profiles and `SRLearning-test-*` databases. All Q/A fixtures are synthetic; the fixture named States/Delaware is **not the owner's private card text**.
+
+| Check | Result | Evidence |
+|---|---|---|
+| Earlier speech/shared/native/release regressions | PASS | **61/61**: 33 desktop, 6 shared plans, 16 native executor, 6 release safety; desktop 33 also run in Chrome |
+| Existing persistence/backup regressions | PASS | **38/38**, plus browser-process restart, offline storage, Data download/reselection/recovery, interrupted import rollback |
+| Existing editor acceptance | PASS | **17/17** Chrome UI scenarios, including 100-step creation/reopen, restart, ordering, stable IDs, progress retention, cascades, backups and stale writes |
+| Stage 5 domain/storage | PASS | **39/39** scenarios; grouped assertions, not inflated independent test counts |
+| Stage 5 Chrome UI | PASS | **7/7** scenarios; actual controls/downloads/IndexedDB, not owner manual observation |
+| All 11 levels and dates | PASS | Exact intervals including L0 15 minutes and L10 null; leap/nonleap month ends, three-month/year boundary, retained UTC time, elapsed days through DST, invalid/overflow rejection |
+| REVIEW selection | PASS | Final anchor; earlier overdue step cannot select a card; seven-day example yields steps 1/4/5; inclusive boundaries, Max Deferred excludes KNOWN, BOUND sequence and deterministic UNBOUND shuffle preserve step order |
+| AUDIT policy | PASS | ALL/one-series, KNOWN-only final steps, fully KNOWN BOUND final-card collapse, continuous cursor/repeated cycles until Stop or empty eligibility. This is policy verification, not continuous audio |
+| KNOWN/reset controls | PASS | Shared final-step and I-know scopes, card/whole-bound-series confirmation, cancellation, lower-final-only behavior, reset-final/card/objective distinctions, unchanged content |
+| Scheduling/completion | PASS | Due/overdue REVIEW restarts timer; early lookahead preserves original dates even when due passes while speaking; FOCUSED/AUDIT automatic isolation; no mastery increase; pending choices wait for successful step completion and disappear on interruption; duplicate/stale/restored/backwards-time rejection |
+| Atomic action failure | PASS | Failure during multi-step propagation retains all prior levels; receipt insertion failure rolls back the progress update and allows exactly-once retry |
+| Actual version-1 migration | PASS | Independent old-schema fixture upgrades through production IndexedDB code; all content/IDs/ordering and legacy progress compare equal; every step inherits its card; KNOWN null due; no cross-card propagation; original pre-import and pre-migration backups retained |
+| Migration failure/idempotence | PASS | Missing legacy progress and actual asynchronous constraint failure abort versionchange, retaining version 1, original records and stores; second open/conversion preserves independent edits and original recovery |
+| JSON compatibility | PASS | Version-1 import through approved conversion; complete version-2 round-trip including receipts and long recall overrides; missing/duplicate/dangling/invalid KNOWN progress and malformed receipts reject without mutation |
+| Desktop controls | PASS (automated) | Per-step level/interval save, confirmation dismiss/accept, final-only AUDIT preview, all reset scopes, stale selection retained, keyboard activation and 390px layout; one-hour recall override saves/reopens; original v1 recovery actually downloads |
+| Visual review | PASS (agent inspection) | Screenshot inspected for legible selectors, exact text, saved/proposed dates and clear REVIEW/AUDIT separation. This is not owner usability approval |
+| 1,000 cards / 10,000 steps | PASS | Version-1 conversion/import, content equality, REVIEW selection and isolated step change. Latest local aggregate operation 1,284.4 ms; selection 5.6 ms. One measured Stage 5 sample, not a performance guarantee |
+
+The existing five-run Stage 3 scale regression also passed under schema 2: 1,076.8, 1,521.3, 1,582.2, 1,581.2 and 1,568.9 ms (median 1,568.9 ms; slowest 1,582.2 ms). Extra step records/validation increase work relative to the historical v1 timings; all remain below the prior five-second export/restore target on this machine. The first UI run exposed a test assertion that did not wait for the browser's asynchronous details-toggle event; the corrected complete suite passed. The old editor keyboard assertion was extended for the new recall input, preserving its check that step controls are reachable.
+
+### Reproduce
+
+Run the prior regression commands and static server documented below, then with the existing Playwright/Chrome environment:
+
+```powershell
+node SR/tests/browser.mjs
+node SR/tests/editor.mjs
+node SR/tests/mastery.mjs
+```
+
+Browser-only runner: `/SR/tests/mastery.html`. Optional `SR_TEST_URL=https://crownandcall.com/SR` tests deployed assets in a disposable profile. No test targets the owner's live `SRLearning` database. CI runs the same three browser scripts before Android build/lint/publication.
+
+### Remaining owner checks and Stage 6 dependencies
+
+The owner should verify their **actual States series and Delaware card** in the same desktop profile after upgrade: exact wording/order, IDs via export, and the copied per-step mastery/timestamps. Download the original pre-migration backup and a new v2 export. The agent verified preservation for complete synthetic libraries, not by reading or mutating the owner's private browser data; no owner-specific migration observation is claimed.
+
+Install the newly built Android update over the existing app without uninstalling, then verify schema-2 export/import, exact records, offline force-stop/reopen and retention across the update. Recheck existing audio/Bluetooth/locked-screen/notification behavior as needed. No physical Android test is claimed; previous G2/G3 gaps remain open. Version-2 files require the updated APK; old APKs reject them rather than dropping step progress.
+
+Stored recall overrides are not limited to the old player's two-minute window. However, the unchanged native parser/shared plan caps waits at 120 seconds, speech text at 2,000 characters/action and actions at 100/unit; the service has a 120-second watchdog and 150-second wake lock. Stage 6 must qualify longer waits/recitations, step-success callbacks and native receipt reconciliation before audio integration. Full REVIEW/AUDIT playback, continuous audio, player UI mastery adjustment and cold offline launch are not implemented here.
+
+Stage 5 provides the completion/controller API and repeat policy only. UI selectors read the complete personal-library snapshot; expanded preview text is lazy and preview lists page at 50. Browser drafts are not crash-persistent. Legacy card progress/preferences are retained for recovery but are not active scheduling authority. No Stage 6 work or new scheduling policy is implied by older archived planning text.
+
+---
+
 ## Stage 4 — desktop authoring, 2026-10-13
 
 **G4: CLOSED / PASS — desktop authoring automation and owner hands-on acceptance completed on 2026-10-13.** The owner's Stage 4 assignment explicitly authorizes this stage despite the outstanding G3 Android checks. It does not close those checks or authorize Stage 5. Earlier Stage 1, 2, 2.5 and 3 evidence below is preserved; statements about unavailable later stages describe their historical delivery dates.

@@ -1,5 +1,5 @@
 export const FORMAT = 'sr-learning-backup';
-export const FORMAT_VERSION = 1;
+export const FORMAT_VERSION = 2;
 export function requireValue(ok, message) { if (!ok) throw new Error(message); }
 export const text = value => typeof value === 'string' && value.trim().length > 0;
 export const timestamp = value => Number.isSafeInteger(value) && value >= 0 && value <= 8640000000000000;
@@ -39,8 +39,7 @@ export function validateCard(row) {
     if ('directQuestion' in step) requireValue(text(step.directQuestion), 'Invalid direct question.');
     if ('recallSeconds' in step) requireValue(Number.isFinite(step.recallSeconds) && step.recallSeconds >= 0, 'Invalid step recall duration.');
   });
-  // Unannotated steps are retained as targets; playback policy is a later stage.
-  requireValue(row.steps.some(step => !step.role || step.role === 'target'), 'A card must retain at least one target.');
+  // Stage 5 uses the final step as the eligibility anchor, irrespective of old role annotations.
   if ('recitationStepIds' in row) {
     ids(row.recitationStepIds);
     const selected = row.steps.filter(step => row.recitationStepIds.includes(step.id)).map(step => step.id);
@@ -52,6 +51,12 @@ export function validateProgress(row) {
   requireValue(text(row.flashcardId) && Number.isInteger(row.mastery) && row.mastery >= 0 && row.mastery <= 10, 'Invalid progress ID/mastery.');
   requireValue((row.lastReviewedAt === null || timestamp(row.lastReviewedAt)) && timestamp(row.nextDueAt), 'Invalid review timestamps; nextDueAt must be numeric.');
   requireValue(integer(row.revision) && row.revision >= 1, 'Invalid progress revision.');
+}
+export function validateStepProgress(row) {
+  fields(row, ['flashcardId', 'stepId', 'mastery', 'lastReviewedAt', 'nextDueAt', 'revision']);
+  requireValue(text(row.flashcardId) && text(row.stepId) && Number.isInteger(row.mastery) && row.mastery >= 0 && row.mastery <= 10, 'Invalid step progress identity/mastery.');
+  requireValue((row.lastReviewedAt === null || timestamp(row.lastReviewedAt)) && (row.mastery === 10 ? row.nextDueAt === null : timestamp(row.nextDueAt)), 'KNOWN must have no due date; other steps require a numeric due date.');
+  requireValue(integer(row.revision) && row.revision >= 1, 'Invalid step progress revision.');
 }
 export function validatePreset(row) {
   fields(row, ['id', 'name', 'seriesIds', 'cardIds', 'mode', 'order', 'grouping', 'createdAt', 'updatedAt', 'revision']);
@@ -75,8 +80,9 @@ function positions(rows) {
   requireValue(rows.every((row, index) => row.position === index), 'Array order and contiguous positions must agree.');
 }
 export function validateSnapshot(snapshot) {
-  fields(snapshot, ['format', 'formatVersion', 'schemaVersion', 'appVersion', 'exportedAt', 'libraryId', 'libraryGeneration', 'series', 'flashcards', 'progress', 'presets', 'settings', 'reviewEvents']);
-  requireValue(snapshot.format === FORMAT && snapshot.formatVersion === 1 && snapshot.schemaVersion === 1, 'Unsupported backup format/schema version.');
+  const v2 = snapshot?.formatVersion === 2 && snapshot?.schemaVersion === 2;
+  fields(snapshot, ['format', 'formatVersion', 'schemaVersion', 'appVersion', 'exportedAt', 'libraryId', 'libraryGeneration', 'series', 'flashcards', 'progress', 'presets', 'settings', 'reviewEvents', ...(v2 ? ['stepProgress', 'stepEvents'] : [])]);
+  requireValue(snapshot.format === FORMAT && (v2 || snapshot.formatVersion === 1 && snapshot.schemaVersion === 1), 'Unsupported backup format/schema version.');
   requireValue(text(snapshot.appVersion) && text(snapshot.libraryId) && text(snapshot.libraryGeneration), 'Invalid backup identity.');
   requireValue(typeof snapshot.exportedAt === 'string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(snapshot.exportedAt)
     && Number.isFinite(Date.parse(snapshot.exportedAt)) && new Date(snapshot.exportedAt).toISOString() === snapshot.exportedAt, 'Invalid export timestamp.');
@@ -99,7 +105,32 @@ export function validateSnapshot(snapshot) {
   for (const [key, value] of Object.entries(snapshot.settings)) validateSetting(key, value);
   // Reserved store, no scheduled-completion writer until Stage 6. Do not invent its contract here.
   requireValue(snapshot.reviewEvents.length === 0, 'Scheduled review events are not supported by this Stage 3 format.');
+  if (v2) {
+    requireValue(Array.isArray(snapshot.stepProgress) && Array.isArray(snapshot.stepEvents), 'Missing step progress/events.');
+    const expected = new Set(snapshot.flashcards.flatMap(card => card.steps.map(step => JSON.stringify([card.id, step.id]))));
+    const actual = snapshot.stepProgress.map(row => { validateStepProgress(row); return JSON.stringify([row.flashcardId, row.stepId]); });
+    requireValue(actual.length === expected.size && new Set(actual).size === actual.length && actual.every(key => expected.has(key)), 'Every live step needs exactly one progress record.');
+    unique(snapshot.stepEvents, 'id');
+    for (const event of snapshot.stepEvents) {
+      fields(event, ['id', 'libraryGeneration', 'sessionId', 'occurrenceId', 'flashcardId', 'stepId', 'completedAt']);
+      requireValue(['id', 'libraryGeneration', 'sessionId', 'occurrenceId', 'flashcardId', 'stepId'].every(key => text(event[key])) && timestamp(event.completedAt), 'Invalid step completion receipt.');
+      requireValue(event.id === JSON.stringify([event.libraryGeneration, event.sessionId, event.occurrenceId, event.flashcardId, event.stepId]), 'Invalid step receipt identity.');
+    }
+  }
   return snapshot;
+}
+// Pure, validated and idempotent; never mutates the incoming object or propagates across cards.
+export function migrateSnapshot(snapshot) {
+  validateSnapshot(snapshot);
+  if (snapshot.formatVersion === 2) return structuredClone(snapshot);
+  const copy = structuredClone(snapshot), progress = new Map(copy.progress.map(row => [row.flashcardId, row]));
+  copy.formatVersion = copy.schemaVersion = 2;
+  copy.stepProgress = copy.flashcards.flatMap(card => card.steps.map(step => {
+    const old = progress.get(card.id);
+    return { ...old, stepId: step.id, nextDueAt: old.mastery === 10 ? null : old.nextDueAt };
+  }));
+  copy.stepEvents = [];
+  return validateSnapshot(copy);
 }
 export function parseSnapshot(json) {
   requireValue(typeof json === 'string', 'Select a JSON text file.');

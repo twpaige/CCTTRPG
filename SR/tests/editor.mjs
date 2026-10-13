@@ -120,7 +120,7 @@ try {
   passed('Imported annotations retained; destructive recitation-reference changes fail closed');
   // Confirmation race: another writer adds content after the shown count.
   await press('Edit series'); await press('Delete series');
-  assert.match(await page.locator('#delete-detail').textContent(), /1 flashcards, 6 steps and 1 mastery/);
+  assert.match(await page.locator('#delete-detail').textContent(), /1 flashcards, 6 steps and their independent mastery/);
   await data(async (repo, db, backup, id) => repo.createCard({ seriesId: id, name: 'Arrived after confirmation', steps: [{ question: 'Q', answer: 'A' }] }), annotated.seriesId);
   await press('Delete permanently'); await ready(); assert.match(await page.locator('#error').textContent(), /changed/);
   assert.equal((await snapshot()).flashcards.filter(row => row.seriesId === annotated.seriesId).length, 2);
@@ -151,7 +151,8 @@ try {
   passed('Complete exported library restores with record-level equality into isolated database');
   if (process.env.SR_SCREENSHOT) await page.screenshot({ path: process.env.SR_SCREENSHOT });
   await page.setViewportSize({ width: 390, height: 844 }); assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-  await page.locator('#answer-99').focus(); await page.keyboard.press('Tab'); assert.equal(await page.evaluate(() => document.activeElement.tagName), 'BUTTON');
+  await page.locator('#answer-99').focus(); await page.keyboard.press('Tab'); assert.equal(await page.evaluate(() => document.activeElement.id), 'recall-99');
+  await page.keyboard.press('Tab'); assert.equal(await page.evaluate(() => document.activeElement.tagName), 'BUTTON');
   if (process.env.SR_SCREENSHOT) await page.screenshot({ path: join(dirname(process.env.SR_SCREENSHOT), 'editor-small.png') });
   assert.deepEqual(pageErrors, []); passed('Responsive layout has no horizontal overflow; keyboard step controls reachable; no uncaught page errors');
   await page.setViewportSize({ width: 1440, height: 1000 }); await press('Cancel');

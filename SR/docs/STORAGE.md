@@ -1,18 +1,20 @@
-# Stage 3 storage and JSON recovery
+# SR storage, Stage 5 migration and JSON recovery
 
-The same native ES modules run on the website and in the existing Android WebView. There is no application server, database package or native learning database. Stage 4 adds a [desktop editor](AUTHORING.md) at `https://crownandcall.com/SR/`; Android continues to package only the existing listening/Data assets. Sample playback remains independent of this library; later stages integrate scheduling. The specification and build plan remain unchanged.
+The same native ES modules run on the website and in the existing Android WebView. There is no application server, database package or native learning database. The [desktop editor](AUTHORING.md) is at `https://crownandcall.com/SR/`; Stage 5 mastery is at `https://crownandcall.com/SR/mastery.html`. Android packages the existing listening/Data assets plus their shared storage dependencies, not the authoring/mastery UI. Sample playback remains independent of the library. Stage 6 will connect audio to the Stage 5 scheduling foundation.
 
 ## Locations and identity
 
 - Data panel: `https://crownandcall.com/SR/data/index.html`
 - Isolated real-IndexedDB tests: `https://crownandcall.com/SR/tests/persistence.html`
-- Desktop database: `SRLearning`, internal version 1, scoped to the website origin/browser profile.
+- Desktop database: `SRLearning`, internal version 2, scoped to the website origin/browser profile.
 - Android database: the same name and modules, scoped to the existing `https://sr.invalid/` bundled origin and app ID. Do not change that origin, app ID, or signing identity during updates.
 - Tests create only `SRLearning-test-*` databases. Browser automation uses an entirely disposable browser profile as well. `data/index.html?test=SRLearning-test-example` opens an explicitly named isolated test database; invalid test names fail closed.
 
 Local IndexedDB access needs no network. The desktop page must already be loaded before going offline; offline cold launch/service-worker caching is Stage 9. Android bundles its assets and retains its no-INTERNET-permission architecture. `setDomStorageEnabled(true)` enables WebView DOM storage; no deprecated Web SQL database setting or native database is added. The owner's October 13, 2026 phone test verified the successful file export/import/restore workflow and close/reopen export, with file sizes consistent with persistence; exact JSON equality, offline Android storage and retention across a subsequent APK update remain unverified. See [the owner evidence](TEST_RESULTS.md#stage-3-owner-verification--2026-10-13), [Android WebSettings](https://developer.android.com/reference/android/webkit/WebSettings#setDomStorageEnabled(boolean)) and [IndexedDB transactions/upgrades](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API/Using_IndexedDB).
 
 ## Repository API
+
+Active learning uses `stepProgress`. The `progress` store and `getProgress`/`updateProgress`/`listDue` methods are retained **only for legacy archive compatibility**, not current scheduling. Existing archive values remain available for recovery and regression checks; changing one does not change step mastery. New application code must use the Stage 5 APIs below. A new card gets independent mastery-0 step records due in 15 minutes; adding a step does the same. Reordering/editing keeps existing step progress; deleting a step/card removes its corresponding live progress. Receipts remain historical.
 
 ```js
 import { openDatabase } from './js/db.js';
@@ -24,8 +26,7 @@ const card = await repository.createCard({
   seriesId: series.id, name: 'My card',
   steps: [{ question: 'My question', answer: 'My exact authored answer' }]
 });
-const progress = await repository.getProgress(card.id);
-await repository.updateProgress(card.id, { mastery: 3 }, progress.revision);
+const progress = await repository.getStepProgress(card.id, card.steps[0].id);
 db.close();
 ```
 
@@ -43,6 +44,7 @@ The desktop editor uses this API. The Data panel itself has no authoring control
 | `updateCard(id, patch, expectedRevision)` | Patch name/series/position/steps/recitation references; moving normalizes both series; existing supplied step IDs remain unchanged |
 | `deleteCard(id, expectedRevision)` | Removes progress/direct preset references and normalizes siblings atomically |
 | `getProgress(id)`, `updateProgress(id, patch, expectedRevision)` | Patch only mastery/lastReviewedAt/nextDueAt; only this progress record is written. No automatic mastery or date calculations |
+| `getStepProgress(cardId,stepId)` | Read the independent active step record; use `changeMastery` for learner changes |
 | `listDue(timestamp)` | Inclusive numeric `byDue` query; default timestamp is now; zero dates are included |
 | `savePreset(input, expectedRevision?)` | Create or update name, unique seriesIds/cardIds, mode, order, grouping; references must exist; existing preset requires current revision |
 | `getPreset(id)`, `listPresets()`, `deletePreset(id, expectedRevision)` | Preset retrieval/removal; empty selections are permitted |
@@ -52,31 +54,59 @@ Every mutation resolves after transaction `complete`. Any exception, request err
 
 Revision checks protect concurrent edits to content/progress/presets. Replacement also checks an exact logical safety-backup match inside its write transaction, detecting any intervening write or earlier replacement. The sample speech proof neither reads nor writes learning data. Stop it before file transfer; Android enforces stopping its native service. Full cross-tab playback ownership and session-generation checks belong to the later review integration, which must not treat a revision number alone as authority across restoration.
 
-Stage 4 adds an optional `new Repository(db, {guardStores, writeGuard})` constructor hook. Every mutation invokes the guard inside its write transaction, including the declared guard stores. Existing callers need no changes. The desktop editor captures a validated snapshot when loading its view and compares its canonical content (including library generation) against `readSnapshot(tx)` before writing. Any intervening library change rejects the operation and retains the draft. This deliberately conservative whole-library check also protects deletion counts and sibling ordering; it does not merge unrelated concurrent changes. Where available, an origin-scoped Web Lock serializes editor writes, with the transaction guard remaining authoritative even without Web Locks or against other writers. Guard callbacks may await only IndexedDB requests. No schema, backup format or Android asset-list change is made.
+The optional `new Repository(db, {guardStores, writeGuard})` constructor hook invokes a guard inside each write transaction. The editor compares its displayed canonical snapshot, including independent progress and library generation, before writes. Intervening changes reject the operation and retain the draft. This conservative whole-library check protects deletion counts and sibling ordering; it does not merge concurrent changes. Web Locks serialize editor writes where available; transaction checks remain authoritative. Guard callbacks may await only IndexedDB requests. Stage 5 upgrades the schema/format to 2 and adds only the required shared scheduler dependency to Android's asset list.
 
 This personal-library implementation reads the complete snapshot for the guard; it renders only 50 list summaries per page and the currently selected card's steps. Larger-library optimization and offline cold launch remain later acceptance work. Editing content never invokes the progress-writing API. Optional annotations and recitation references are preserved; the Stage 4 UI blocks deletion/reordering that would invalidate imported recitation references rather than silently rewriting them.
 
-## Version 1 data contract
+## Content contract retained from version 1
 
 IDs are nonempty strings; new IDs are UUIDs. Text is preserved verbatim, including whitespace, multiline text, Unicode and markup-looking characters. The UI renders with textContent. Names/questions/answers cannot be entirely whitespace. Positions are contiguous zero-based integers; step array order and positions agree, as do series order and card order within each series in a snapshot. There is no step-count limit. Record timestamps are nonnegative, safe-integer UTC epoch milliseconds in JavaScript's Date range; createdAt ≤ updatedAt. Content and presets have positive integer revisions.
 
-The `series`, `flashcards`, `progress`, `presets`, `settings` stores/indexes follow build-plan section 6. Optional step annotations (`role`, `directQuestion`, `recallSeconds`) and recitation references are preserved and structurally validated; no mastery-band/grouping policy is implemented. Unannotated steps remain available as targets. At least one explicit or implicit target is required.
+The original content stores/indexes remain. Optional step annotations (`role`, `directQuestion`, `recallSeconds`) and recitation references are preserved and structurally validated. Stage 5 uses the final authored step as the eligibility anchor rather than old cue/bridge/target bands. No role/target classification is required. The editor now exposes the optional recall override; blank means session default, zero is permitted, and long finite nonnegative durations remain storable. Existing recitation references still cannot be silently deleted/reordered by the editor.
 
-Progress uses `flashcardId`, integer mastery 0–10, nullable `lastReviewedAt`, numeric `nextDueAt` and a positive revision. Creation uses mastery 0, lastReviewedAt null, nextDueAt 0. Updating mastery alone deliberately does not select the unapproved Stage 5 date policy. Presets store mode `focused|due`, order `sequential|random`, grouping `auto|individual|full`; storing one never schedules or plays anything.
+Legacy archive progress uses `flashcardId`, integer mastery 0–10, nullable `lastReviewedAt`, numeric `nextDueAt` and a positive revision. Old values remain unchanged during migration, including old numeric level-10 dates. For compatibility, newly authored cards also have an inert archive record (0/null/0/revision 1); it is not active progress. Presets retain mode `focused|due`, order `sequential|random`, grouping `auto|individual|full`; storing one never schedules or plays anything. These legacy preset enums are not labels for the new REVIEW/AUDIT distinction.
 
-Settings are a JSON object in snapshots and key/value records in IndexedDB. Allowed keys: `desktopVoice`, `androidVoice` (name/language, optional voiceURI); `rate` (0.1–10), `pitch` (0–2), `volume` (0–1); nonnegative `recallSeconds`/`passageMarginSeconds`; positive `passageWordsPerMinute`; and an optional 11-entry nonnegative `intervalDays` array. No interval defaults are imposed. Unknown keys, tokens, arbitrary sync metadata and platform voice objects are rejected. The speech proofs keep their current controls; these stored settings are a foundation for later integration.
+Settings remain a JSON object in snapshots and key/value records in IndexedDB. Allowed keys: `desktopVoice`, `androidVoice` (name/language, optional voiceURI); `rate` (0.1–10), `pitch` (0–2), `volume` (0–1); nonnegative `recallSeconds`/`passageMarginSeconds`; positive `passageWordsPerMinute`; and the legacy 11-entry `intervalDays` array. That legacy array is preserved but does not override the owner-approved Stage 5 intervals. Unknown keys, tokens, arbitrary sync metadata and platform voice objects are rejected. Sample speech controls remain independent.
 
-`reviewEvents` and its unique session/unit index are reserved but empty in Stage 3. Nonempty history is rejected, never silently discarded or credited. The native Stage 2 diagnostic journal is separate and is neither imported nor erased. The actual scheduled-completion contract/writer remains Stage 6 work. A future change to the public contract must explicitly preserve/migrate version-1 snapshots; do not reinterpret this reservation as an approved scheduling policy.
+The legacy `reviewEvents` store/index remains reserved/empty; nonempty unsupported history is rejected, never silently discarded. Stage 5 adds the separately defined `stepEvents` receipt contract below. The native Stage 2 diagnostic journal remains separate and untouched. Stage 6 must integrate real audio callbacks/journals with the new completion API.
 
 Two private support stores hold library identity (`meta`) and the last successful pre-import snapshot (`recovery`). They contain no credentials. Recovery copies are not recursively embedded in portable backups. The library ID survives transfer; each successful restore generates a new active libraryGeneration UUID, as the plan requires to distinguish stale sessions. No device installation identity is cloned.
+
+## Schema 2 migration and active progress
+
+The owner approved copying existing flashcard progress to **every step**, retaining mastery, lastReviewedAt, nextDueAt and revision. Mastery 10 becomes KNOWN with null active due. Migration must not propagate to other cards in a BOUND series. All series/card/step text, IDs, ordering, timestamps, optional fields, archive progress, settings and presets remain untouched.
+
+`openDatabase` upgrades 1→2 in one `versionchange` transaction: create `stepProgress` and `stepEvents`, read/validate the complete old snapshot, save `recovery['pre-migration']`, then add each independent step record. The existing `pre-import` copy remains intact. A validation/request/quota/constraint failure aborts the entire upgrade, leaving the old version/data/stores intact. Never delete the database to recover. A fresh installation performs initialization and the same validated conversion; reopening version 2 does not recopy or reset step progress. The pure `migrateSnapshot` converter is idempotent and does not mutate its input.
+
+| Store | Contract |
+|---|---|
+| `stepProgress` | Compound key `[flashcardId,stepId]`; mastery, nullable lastReviewedAt, nextDueAt, positive revision. `byCard` and numeric `byDue` indexes. Every live step has exactly one row; IDs need only be unique within a card. KNOWN requires null due, other levels numeric due |
+| `stepEvents` | Stable receipt id = JSON array encoding `[libraryGeneration,sessionId,occurrenceId,flashcardId,stepId]`; same identity fields plus completedAt. Atomically saved with affected progress, never with unfinished/early/AUDIT-only/FOCUSED-only completion. Explicit pending mastery changes may create a receipt in those modes to prevent duplicate application. Deleted content may remain referenced historically |
+| `recovery` | Separate `pre-import` and `pre-migration` snapshots. **Save original pre-migration backup** downloads the original validated version-1 library; **Save previous pre-import backup** downloads the last replacement's prior library. Keep both externally if useful |
+
+Migration preserves due dates exactly (except KNOWN null), even if they reflect the older policy or are zero/overdue. Do not recompute them from the new table. Subsequent individual changes use the new intervals. Upgrading does not mark anything newly KNOWN across cards.
+
+## Stage 5 policy and completion APIs
+
+`scheduler.js` exports `nextDue(level,from)`, `cutoff(now,window)`, `selectReview(snapshot,options)`, `selectAudit(snapshot,{seriesId?})`, `auditCursor()` and `recallSeconds(step,sessionDefault)`. All policy functions accept explicit time/random inputs where applicable. See the current specification for the exact intervals, UTC month clamping, final-step anchor and same-cutoff filtering. Selectors return indivisible card units with ascending step IDs; AUDIT returns final steps only. The cursor repeats until stopped and accepts a refreshed eligibility list each cycle.
+
+`mastery.js` exports:
+
+- `planMastery(snapshot,action)`: compute affected members and the exact confirmation message. Actions: `step` with cardId/stepId/level; `known`, `resetCard`, `resetFinal`, `resetObjective` with cardId. Final-step level 10 and `known` have identical card/series scope. `resetCard` always means that card; audited `resetObjective` includes the whole BOUND series when targeting its final card.
+- `changeMastery(db,{action,expectedKey,confirmed,now})`: compare canonical displayed library inside the same transaction; enforce confirmation; update only affected active progress. No content/legacy progress rewrite. Manual changes preserve last-reviewed and schedule from change time.
+- `prepareCompletion(db,{cardId,stepId,mode,sessionId,occurrenceId,startedAt,window})`: validate REVIEW/AUDIT eligibility and capture content/progress revisions, library generation and due-at-step-start status. Mode is exactly `REVIEW`, `AUDIT` or `FOCUSED`.
+- `completeStep(db,prepared,{successful,completedAt,pending})`: reject unsuccessful, stale or backwards-time work. Due REVIEW restarts the step timer from actual completion without raising mastery; early/focused/audit leaves progress unchanged unless a manual pending choice exists. Receipt lookup precedes revision checks, enabling exactly-once retry. Imported generations reject old callbacks.
+- `StepCompletionController`: `begin` returns an occurrence token; `pendingMastery` queues a choice; `finish(token,time)` commits only after the caller reports genuine successful step completion; `interrupt` discards unfinished tokens/choices. `special(action,{pause,confirm,now})` requires playback pause and confirmation callbacks. A completion transaction already started after success may finish after Stop; no new completion starts for an invalidated token. Full speech integration is Stage 6.
+
+The current Android plan parser/shared builder cap recall at 120 seconds; native speech has a 120-second watchdog, 150-second wake lock, 2,000-character/action and 100-action/unit limits. Stored long overrides do not change these. Stage 6 must adapt/test long recitations and per-step completion before connecting real content. Stage 5 only adds `scheduler.js` to the existing storage dependency allowlist; no native engine/service behavior changes.
 
 ## Backup API and procedure
 
 `exportSnapshot(db)` returns a validated object; `exportJSON(db)` serializes it. `previewImport(json)` validates without writes and returns `{snapshot, counts}`. `restoreJSON(db,json,{confirmed:true,safetyJSON})` requires a reselected, validated current backup. `recoveryJSON(db)` returns the last pre-import backup for downloading and ordinary confirmed restoration.
 
-Envelope fields: `format: "sr-learning-backup"`, `formatVersion: 1`, `schemaVersion: 1`, `appVersion`, UTC ISO `exportedAt` with milliseconds, `libraryId`, `libraryGeneration`, `series`, `flashcards`, `progress`, `presets`, `settings`, `reviewEvents`. The portable and database versions are independent constants even though both initially equal 1. All required fields, IDs, references, ordering, types, enums, timestamps and settings are checked. Unknown versions/fields and unsafe object keys fail closed. Export does not change record timestamps.
+New exports use `format: "sr-learning-backup"`, `formatVersion: 2`, `schemaVersion: 2`, `appVersion`, UTC ISO `exportedAt`, `libraryId`, `libraryGeneration`, `series`, `flashcards`, legacy `progress`, `presets`, `settings`, empty legacy `reviewEvents`, active `stepProgress` and `stepEvents`. Version-1 files retain their original contract and convert through `migrateSnapshot` on restore; preview identifies conversion. All required fields, IDs, references, ordering, enums, timestamps and settings are checked. Unknown versions/fields and unsafe keys fail closed. Export does not change record timestamps. Update an older Android APK before importing a version-2 file; no lossy version-1 downgrade is offered.
 
-The specification's example is explicitly illustrative, not a previously shipped backup format. Therefore unversioned illustrative JSON and null `nextDueAt` are rejected without mutation; no legacy converter is invented. The test suite includes this null-due rejection fixture. Conversion of a real older supported format needs a separately specified, validated migration and preview. The v0→v1 database initialization, blocked upgrade, aborted upgrade, automatic old-connection close and future-version refusal are tested; no fake production v2 migration is shipped merely for a test.
+Unversioned illustrative JSON and null **legacy card** due dates remain invalid. Active KNOWN step dates are null in format 2. The actual shipped version-1 format is now supported through the owner-approved converter. Tests cover old-version upgrade/abort, duplicate reopen, blocked upgrades, connection close and future-version refusal without deletion.
 
 1. Stop playback. Choose a complete JSON file and inspect replacement counts.
 2. Export the current library to an off-device file. Reselect that saved file using **Verify saved current backup**; both validation and exact current-content matching must pass.
@@ -94,7 +124,9 @@ If storage cannot open, or the current data is unreadable/invalid, the panel fai
 
 Run the browser test page, then use **Download synthetic storage-test backup**. Its two artificial cards are not a content library. To keep desktop tests separate, import it at `data/index.html?test=SRLearning-test-owner` after exporting/reselecting that empty test library's safety backup. Close all browser windows, reopen the same URL/profile, export, and verify the exact text/order. Do not test resets on personal data.
 
-On the updated Android app: stop audio; open Data; export/reselect the current library; preview/import the synthetic file; verify 1 series/2 cards/4 steps. Export back to desktop, then close/force-stop/reopen Android with networking off and confirm counts/text via another export. Cancel both file pickers and reject malformed JSON. Verify the previous-library backup can be downloaded. Finally check the existing voice choice, Bluetooth, locked-screen progression and notification controls. Keep the fixture across the next APK update to verify IndexedDB retention without uninstalling or clearing app data. Record actual observations separately from automation.
+For Stage 5, preserve a dated pre-upgrade export, then reopen the same desktop profile and verify the owner's actual States series/Delaware wording, IDs, ordering and inherited step progress. Download the original pre-migration backup. Automated tests use synthetic content and do not constitute observation of the owner's private library.
+
+On the schema-2 Android update: install over the existing app without uninstalling, stop audio, open Data and verify/export the migrated library. Compare records after desktop→phone→desktop transfer and offline force-stop/relaunch. Cancel both file pickers and reject malformed JSON. Download both available recovery copies. Check voice choice, Bluetooth, locked-screen progression and notification controls. These physical-device checks remain owner work; installed version and approximate file sizes alone do not prove record equality.
 
 ## Deferred restore usability improvements
 

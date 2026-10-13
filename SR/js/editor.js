@@ -136,8 +136,7 @@ function renderEditor() {
       value.seriesId = select.value; value.position = cardsFor(select.value).filter(row => row.id !== original?.id).length;
       markDirty(); renderEditor(); $('card-series').focus();
     }; label.append(select); form.append(label, positionField(cardsFor(value.seriesId).filter(row => row.id !== original?.id).length + 1));
-    const progress = snapshot.progress.find(row => row.flashcardId === original?.id);
-    form.append(node('p', `Knowledge Mastery: ${progress?.mastery ?? 0}/10 · Read only. Editing preserves saved review progress.`));
+    form.append(node('p', 'Each step has independent mastery. Use Knowledge Mastery to adjust it. Content edits preserve saved step progress; new steps begin at 0, due in 15 minutes.'));
     if (value.recitationStepIds || value.steps.some(step => Object.hasOwn(step, 'role') || Object.hasOwn(step, 'directQuestion') || Object.hasOwn(step, 'recallSeconds')))
       form.append(node('p', 'This imported card has annotations. They are preserved. Referenced recitation steps cannot be deleted or reordered here; annotation management belongs to a later stage.'));
     const steps = node('div'); steps.id = 'steps';
@@ -146,6 +145,12 @@ function renderEditor() {
       section.append(node('legend', `Step ${index + 1}`),
         field('Question', `question-${index}`, step.question, text => { step.question = text; }, { tag: 'textarea' }),
         field('Answer', `answer-${index}`, step.answer, text => { step.answer = text; }, { tag: 'textarea' }));
+      const progress = snapshot.stepProgress.find(row => row.flashcardId === original?.id && row.stepId === step.id);
+      section.append(node('p', `Mastery: ${progress?.mastery ?? 0}/10${progress?.mastery === 10 ? ' — KNOWN' : ''}`),
+        field('Recall duration in seconds (blank uses session default)', `recall-${index}`, step.recallSeconds ?? '', text => {
+          if (text === '') delete step.recallSeconds; else step.recallSeconds = Number(text);
+        }, { type: 'number' }));
+      const recall = section.querySelector(`#recall-${index}`); recall.min = 0; recall.step = 'any';
       const bar = node('div', undefined, 'toolbar');
       const move = delta => {
         const reordered = [...value.steps]; [reordered[index], reordered[index + delta]] = [reordered[index + delta], reordered[index]];
@@ -195,7 +200,7 @@ function confirmDelete() {
   const presets = snapshot.presets.filter(preset => preset.cardIds.some(id => ids.has(id)) || kind === 'series' && preset.seriesIds.includes(original.id));
   $('delete-title').textContent = `Delete ${kind === 'series' ? 'series' : 'flashcard'} “${original.name}”?`;
   const list = node('ul'); cards.forEach(card => list.append(node('li', `${card.name} (${card.steps.length} steps)`)));
-  $('delete-detail').replaceChildren(node('p', `Permanently deletes ${kind === 'series' ? 'this series, ' : ''}${cards.length} flashcards, ${cards.reduce((n, card) => n + card.steps.length, 0)} steps and ${cards.length} mastery/review progress records. Removes references from ${presets.length} presets; the presets themselves remain.`), list);
+  $('delete-detail').replaceChildren(node('p', `Permanently deletes ${kind === 'series' ? 'this series, ' : ''}${cards.length} flashcards, ${cards.reduce((n, card) => n + card.steps.length, 0)} steps and their independent mastery/review progress records, plus ${cards.length} legacy progress records. Removes references from ${presets.length} presets; the presets themselves remain.`), list);
   pendingDelete = () => mutate(() => kind === 'series' ? repo.deleteSeries(original.id, original.revision, { confirmed: true }) : repo.deleteCard(original.id, original.revision), 'Deletion saved. Remaining positions and preset references updated.');
   $('delete-dialog').showModal(); $('delete-cancel').focus();
 }
@@ -222,7 +227,7 @@ window.addEventListener('pageshow', event => {
 await run(async () => {
   const testName = new URLSearchParams(location.search).get('test');
   if (testName !== null && !/^SRLearning-test-[a-zA-Z0-9-]+$/.test(testName)) throw new Error('Invalid isolated test database name.');
-  if (testName) { document.querySelector('h1').textContent = 'My library — disposable test database'; $('data-link').href += `?test=${encodeURIComponent(testName)}`; }
+  if (testName) { document.querySelector('h1').textContent = 'My library — disposable test database'; for (const id of ['data-link', 'mastery-link']) $(id).href += `?test=${encodeURIComponent(testName)}`; }
   databaseOptions = { name: testName || undefined, onBlocked: error, onVersionChange: reason => { db = undefined; controls(); error(reason); } };
   db = await openDatabase(databaseOptions);
   await load(); message('Library ready. Changes stay on this browser until you export a backup.');

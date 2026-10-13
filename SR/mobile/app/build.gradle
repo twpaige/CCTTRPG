@@ -23,7 +23,7 @@ tasks.register('prepareWebAssets', Sync) {
     from('../web')
     from('../../poc') { include 'sample.js', 'speech.css'; into 'shared' }
     from('../../js') { include 'playback-plan.js'; into 'shared' }
-    from('../../js') { include 'db.js', 'repository.js', 'validation.js', 'backup.js'; into 'js' }
+    from('../../js') { include 'db.js', 'repository.js', 'validation.js', 'backup.js', 'scheduler.js'; into 'js' }
     from('../../data') { into 'data' }
     from('../../poc') { include 'speech.css'; into 'poc' }
 }

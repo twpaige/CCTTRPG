@@ -1,19 +1,18 @@
 # SR — Audio Spaced Repetition System
-Specification v0.1 · 2026-10-12 · Proposed, not implemented
+Specification v0.5 · Owner-approved Stage 5 rules · 2026-10-13
 
-## Vision and scope
-Create a **local-first, audio-first** personal memorization system for Windows Chrome and Android. Its primary use is walking with Bluetooth earbuds and the phone locked: start a review once, then hear questions, recall pauses, answers, and subsequent cards automatically. Prioritize actually using the product over months of development.
+## Purpose and scope
 
-The learner authors their own mnemonic chains. Creating the cards is an essential part of learning; do not introduce public decks, sharing, accounts, passwords, AI-authored mnemonic content, or a server dependency. Preserve concise, idiosyncratic original imagery without embellishment. Desktop is the authoring/mastery authority; Android initially is a listening/review client.
+A personal, local-first audio memorization system for desktop Chrome and Android listening. The learner writes their own mnemonic associations; preserve every word, Unicode character, identifier and authored order. No AI-generated stories, subject-specific mandatory fields, accounts, public sharing, cloud database or backend. Desktop is the content/mastery authority. JSON file transfer remains independent of Google services.
 
-## Core concepts
-- **Series/deck:** named collection of flashcards, ordered and marked **bound** or **unbound**.
-- **Unbound:** presidents, states, commandments; cards can be shuffled/interleaved independently even though series order is meaningful.
-- **Bound:** e.g. Psalm 23; cards form an essential recitation sequence. Practice individual cards or contiguous groups, but preserve order for full recitation. A bound block can be shuffled as a whole among other reviews.
-- **Flashcard (FC):** stable ID, name, series ID, position, ordered variable-length **steps**, and manually set mastery 0–10. One FC may encode several facts.
-- **Step:** an explicit **question and answer** pair leading to the next association. Unlimited practical step count, add/insert/delete/reorder/edit. Do not automatically reorder steps.
-- **Review preset:** named reusable selection of one or more series and/or individual FCs, without duplicate selections.
-- **Progress:** separate from content: mastery, last scheduled review, next due date.
+Stage 4 is formally CLOSED/PASS. Stage 5 provides step mastery, scheduling policy, selection previews, migration and reusable completion APIs. It does **not** connect authored cards to an audio player. Stage 6 requires separate authorization. Historical evidence remains in [TEST_RESULTS.md](docs/TEST_RESULTS.md).
+
+## Hierarchy and ordering
+
+- **Series → Flashcards → Steps.** A BOUND series preserves card order. UNBOUND cards may be selected independently and shuffled. Both retain independent per-step progress.
+- A flashcard is an indivisible playback unit: finish its eligible steps in ascending authored order before starting another card. Never interleave, shuffle or reverse steps.
+- The final step represents complete retrieval by authoring convention. Do not inspect or restrict its wording. Old role/direct-question/recitation annotations remain stored but do not drive Stage 5 selection.
+- A step contains its stable ID, question, answer, position and optional nonnegative recall duration in seconds. There is no small passage-duration cap in storage. An absent override uses the session default; zero is a valid override.
 
 ### Example: 16th President
 FC name "16th President"; unbound series "Presidents".
@@ -36,88 +35,80 @@ Bound series "Psalm 23", with one FC per natural phrase/location, not necessaril
 
 Other intended content: Ten Commandments with number pegs **1 run, 2 zoo, 3 tree, 4 door, 5 dive, 6 sticks, 7 heaven, 8 gate, 9 dine, 10 den**; vocabulary ("reconcile"); presidents; states/capitals/admission order/date; Bible verses. Do not hardcode subject-specific fields into the engine.
 
-## Knowledge Mastery and review
-Every FC has manually adjustable integer mastery **0–10**. The **Knowledge Mastery** control on desktop lets users browse series/cards and change levels. Lower levels: easy step-by-step questions, pauses, full mnemonic/story and answer. Increasing levels: fewer intermediate cues, direct questions, and longer recall sequences. Highest levels: direct retrieval with answers spoken after a pause. The authored steps remain intact and can always be revisited. The learner controls mastery; merely playing a card never proves correctness or automatically raises mastery.
 
-Suggested initial due intervals, editable after testing: L0 every session, L1 1 day, L2 2 days, L3 4 days, L4 7 days, L5 14 days, L6 21 days, L7 30 days, L8 42 days, L9 60 days, **L10 ~90 days**. These are proposed heuristics, not validated scheduling constants. Store last/next scheduled review separately.
+## Learner-controlled mastery
 
-For Psalm 23, begin with phrase-by-phrase recall: allow ~3–5 seconds for a short phrase, speak correct phrase, continue. Progress to adjacent chunks, then prompt "Recite Psalm 23", wait an appropriate full-passage duration, and speak the whole passage for self-check. Allow recall time proportional to words and adjustable speaking rate/margin. Full-passage recitation can remain a single bound review unit, while weak segments can be practiced individually. No speech recognition or mandatory self-rating during a walk.
+Each step has integer mastery 0–10, a nullable last-reviewed timestamp, an independent due date and a revision. Playing never automatically increases mastery.
 
-### Review modes
-**General Review:** choose due FCs from all series, shuffle unbound cards and bound groups, preserve bound internal sequence, play without requiring user feedback, update last/next review on completed scheduled units. Do not automatically adjust mastery.
+| Level | Interval |
+|---|---|
+| 0 | 15 minutes |
+| 1 | 3 hours |
+| 2 | 6 hours |
+| 3 | 1 day |
+| 4 | 2 days |
+| 5 | 3 days |
+| 6 | 1 week |
+| 7 | 2 weeks |
+| 8 | 1 calendar month |
+| 9 | 3 calendar months |
+| 10 | KNOWN — never scheduled for normal REVIEW |
 
-**Review Setup:** select one/multiple whole series, specific FCs, or combinations; save as named presets. Choose a preset or General Review at session start.
+Minutes/hours/days/weeks use elapsed UTC milliseconds (one day = 86,400,000 ms). Calendar months use UTC date components, retain the time of day, and clamp to the destination month's last day (January 31 → February 28/29). Local time is for display. Level 10 uses a null active due date. Levels below 10 require numeric due dates. Manual changes calculate due from the time of the change and retain last-reviewed time. New cards/steps start at 0, due in 15 minutes. Migrated dates are preserved rather than recomputed. Historical intervalDays preferences remain recoverable but do not override this approved table.
 
-**Focused Review:** ignore due dates; play selected cards even if not due. **Never update normal last-reviewed, next-due, scheduling history, or mastery.** Overdue cards remain overdue. The same spoken question/pause/answer engine is used in all modes.
+## KNOWN propagation and explicit reset
 
-Desktop supports authoring, mastery adjustment, presets, and review. Android initially supports selecting review/presets, listening, pause/resume/skip/stop, import/sync; no card authoring or mastery editing in MVP. Both use the same review behavior. A Knowledge Mastery entry may be visible read-only on Android until editing is intentionally added.
+Setting a nonfinal step to 10 affects that step only. Setting the final step to 10 requires confirmation and makes all steps in that flashcard KNOWN. **I know this for sure** uses the same plan and confirmation. If that card is the final card of a BOUND series, explicitly confirm making every step of every card in the entire series KNOWN. No authored content is removed.
 
-## Native JavaScript text-to-speech — required
-Use **Web Speech API**, specifically `SpeechSynthesisUtterance`, `window.speechSynthesis.getVoices()`, and `speechSynthesis.speak()`. The user explicitly does **not** want prerecorded MP3 clips, audio timestamp indexes, cloud TTS APIs, Sherpa-ONNX, Piper or a native TTS bridge as the default design.
+The final step's mastery determines whether a card is KNOWN. Lowering a previously KNOWN final step below 10 leaves earlier KNOWN steps unchanged. They remain available in storage and can be explicitly reset.
 
-Preferred Chrome voice: **Google UK English Male**, `en-GB`, initial rate 0.9, pitch 1.0, volume 1.0. Populate voices on `voiceschanged` (asynchronous); match preferred voice by name; if absent use an available English voice with clear fallback/selection. Voice is supplied by the browser/platform, not Windows Settings. The exact Google voice is **not guaranteed on Android** and may not be available offline; provide an Android-available fallback, and do not promise identical voices across platforms.
+**Reset FC** confirms setting every step in the selected card to 0, due in 15 minutes. **Reset final step only** changes only the retrieval anchor to 0. When resetting an audited final comprehensive card's entire learning objective, **Reset entire flashcard / objective** confirms resetting the entire BOUND series; otherwise it resets that card. Resetting does not imply that speech was completed.
 
-A single JavaScript review controller loads a lightweight randomized queue of card IDs from IndexedDB, fetches steps as needed, and stays on the same page. Each chosen step: **speak question → await onend → wait recall time → speak answer → await onend → next step**, then next FC automatically. No refresh, server call, or button press between cards. One initial Start gesture may be needed to unlock audio. Include Pause, Resume, Stop, Skip and optional Repeat. Implement cancellation robustly: timers must be cancellable, outstanding speech promises must settle on stop/error, and a session token prevents overlapping old and new loops. `onend` is authoritative for speech completion; do not guess spoken duration.
+## REVIEW selection
 
-**Critical technical gate:** Android must keep advancing while screen is locked, with Bluetooth earbuds. A Capacitor WebView does **not automatically guarantee** that JavaScript timers, Web Speech or microphone survive backgrounding. Test on a real Android device early. A foreground service/native Android integration may be required; seek approval before substituting native TTS for the required JS speech path. Offline voice availability must be verified. Do not spend months building other features before proving pocket/screen-off narration.
+REVIEW practices material below mastery 10. A card qualifies only if its **final step** is below 10 and due within the selected window. Earlier overdue steps never select a card independently.
 
-Earlier tongue-cluck proof of concept: local microphone activity meter moved and some one/double clicks were recognized. Discreet one cluck YES / two clucks NO remains **optional future** functionality; do not require microphone access or user feedback during normal review. No audio output from the original click detector test.
+For a qualifying card, present only steps below 10 whose due dates fall within the **same** cutoff. Retain ascending step order. The final anchor is therefore included. BOUND cards preserve defined order while skipping nonqualifying/KNOWN cards; UNBOUND qualifying cards may be shuffled. Keep each card's selected steps together.
 
-## Storage: IndexedDB
-Use a single versioned local **IndexedDB** database (e.g. SRLearning) per device, with logical stores:
-- `series`: stable ID, name, bound, position, timestamps
-- `flashcards`: stable ID, seriesId, name, position, ordered steps [{id, question, answer, position}], timestamps
-- `progress`: card ID, mastery, lastReviewedAt, nextDueAt
-- `presets`: ID, name, selected series/card IDs, review mode
-- `settings`: voice preference, speaking rate, pauses, optional sync metadata
-- optional scheduled review event log
+Windows: **Due now**, **Due within N days** (whole days starting at 1), or **Max Deferred** (all non-KNOWN anchors and steps, regardless of future due date). Boundaries are inclusive. At seven days of lookahead, step dates +6 days / KNOWN / +10 days / overdue / final +5 days yield steps **1 → 4 → 5**.
 
-Index by series and due date. One mastery update changes only one IndexedDB record, **not a rewritten JSON file**. Series are logical collections in the database, not separate operating-system files. Handle at least 1,000 FCs × 10 steps and preferably much more; text data is small. Lazy-load steps and create utterances one at a time. Local data works offline but can be lost if browser storage is cleared or app uninstalled: backups are essential.
+## AUDIT selection and outcome
 
-## JSON export/import and optional Google Drive
-JSON is a **portable versioned snapshot**, not primary live storage. Export complete personal backup: all series, cards, ordered steps, progress, presets, nonsecret settings, schema version, timestamp. Import validates schema, IDs, references, mastery range and order; preview before replacing; back up existing data first; avoid partial imports. Import/export is solely for a user's **own** backup and desktop↔phone transfer, not deck sharing or a public catalog. Manual file transfer works without any Google account or network.
+AUDIT tests previously declared KNOWN material. It is **not a REVIEW mode** and is always labelled AUDIT. Support AUDIT ALL or one selected series, not multiple selected series. Only KNOWN cards qualify; present only their final steps. A completely KNOWN BOUND series contributes only its final comprehensive card, including during AUDIT ALL.
 
-**Optional Google Drive** manual **Sync** button, no self-hosted server. Desktop is authoritative for card content, mastery and presets. Android primarily downloads those and can upload scheduled review completions so desktop due dates remain accurate. Use an app-specific OAuth/Drive integration, not the ChatGPT Google Drive connection. Sync is **not** merely blind overwrite of one JSON blob: guard against lost edits/review events with version/revision checks or an explicit single-writer plus review-event upload protocol. Prefer simplicity over real-time collaboration. A manual **Restore Desktop from Google Drive** and **Restore Android** must be possible after local loss/corruption, with confirmation and validation. Sync and Restore are distinct operations. Keep multiple dated backups or versions to avoid overwriting the last good backup with corrupted data. Do not require Google Drive; JSON-only users retain full functionality.
+Future AUDIT playback repeats continuously until stopped, refreshing eligibility between cycles so reset cards leave AUDIT. Success leaves mastery and schedules unchanged. Failure also makes no automatic change: the learner explicitly chooses reset-final or reset-card/objective, with confirmation. An empty AUDIT selection terminates cleanly. Stage 5 implements this policy and cursor contract, not continuous audio playback.
 
-## UI outline
-- **Review:** General Review or named preset; Start, Pause, Resume, Skip, Stop; show current FC/step and status; same playback behavior desktop/Android.
-- **Knowledge Mastery:** browse/filter series and FCs, set level 0–10 (desktop; mobile read-only initially).
-- **Review Setup:** choose series and/or cards, name/save preset, select focused or due-only mode.
-- **Flashcard Editor (desktop):** FC name, series, position, mastery; arbitrary ordered question/answer steps; add/remove/move/edit; preserve text.
-- **Series Editor (desktop):** create, rename, bound/unbound, ordering.
-- **Data:** Export JSON, Import JSON, optional Connect Drive, Sync, Restore, backups.
-- **Settings:** available speech voices, preferred voice, rate, pause defaults, long-passage timing.
+## Completion and pending mastery contract
 
-## Suggested JSON shape (illustrative, not a frozen schema)
-```json
-{
-  "schemaVersion": 1,
-  "exportedAt": "2026-10-12T00:00:00Z",
-  "series": [{"id":"presidents","name":"Presidents","bound":false}],
-  "flashcards": [{
-    "id":"president-16","seriesId":"presidents","position":16,
-    "name":"16th President",
-    "steps":[
-      {"id":"s1","position":1,"question":"Where does sixteen lead us?","answer":"Ditch."},
-      {"id":"s2","position":2,"question":"Who drove the wagon?","answer":"Abraham Lincoln."},
-      {"id":"s3","position":3,"question":"When did he take office?","answer":"1861."}
-    ]
-  }],
-  "progress":[{"flashcardId":"president-16","mastery":3,"lastReviewedAt":null,"nextDueAt":null}],
-  "presets":[],
-  "settings":{"preferredVoice":"Google UK English Male","language":"en-GB","rate":0.9}
-}
-```
+| Situation | Schedule effect |
+|---|---|
+| Due/overdue step successfully completes in REVIEW | Set last-reviewed to actual completion time; due = completion + current mastery interval |
+| Future-due step included by lookahead | Preserve both timestamps, even if its due time passes while speaking |
+| FOCUSED practice | Preserve mastery/scheduling unless the learner explicitly changes mastery |
+| AUDIT success or failure | No automatic mastery/scheduling change |
+| Explicit mastery change/reset | Calculate due from change time; KNOWN has no due date |
+| Skipped, interrupted or unsuccessful step | No completion update; discard pending mastery |
 
-## Acceptance criteria / implementation sequence
-1. Prove a single HTML/JS page speaks question, waits, speaks answer, and automatically advances through multiple steps/cards using Google UK English Male when available. No reload.
-2. Prove locked-screen Android/Capacitor narration and timers with Bluetooth headset. **Stop and reassess** if this fails; don't silently switch speech engines.
-3. Implement versioned IndexedDB, authoring/step editing, bound/unbound series, mastery, and JSON backup/restore with validation.
-4. Implement General Review scheduling and randomized queue; focused review and saved presets; enforce no schedule mutation during focused review.
-5. Implement optional manual Google Drive sync/restore with conflict protection and backups.
-6. Only then consider tongue-click input or Android editing.
+Eligibility uses a shared window cutoff. A prepared step records whether it was due when it started; an overdue step in a lookahead session earns an update, an early step does not. Completion is step-level, not whole-card/group credit. Never credit unfinished steps. IDs combine library generation, session, occurrence, card and step. Store receipts and progress atomically; duplicate callbacks return already-applied before revision checks. Stale content/progress, restored generations and backwards completion times fail closed.
 
-Test: variable steps, chain order, series binding, shuffled independent cards, long-passage pauses, manual mastery only, 90-day L10 default, focused mode leaves due dates untouched, cancellation/restart, asynchronous voice loading, offline operation, large libraries, JSON round-trip, invalid-import rejection, restore from corruption, and screen-off Android playback.
+The reusable controller queues a mastery choice until that step finishes successfully. Stop/Skip invalidates the token and discards its pending choice. A due REVIEW with a pending choice records successful completion and uses the new level's interval. Special Reset/KNOWN actions pause via a supplied playback handler and require confirmation. Full audio controls and native journal integration belong to Stage 6; a committed completion is not undone by a later Stop.
 
-## Design decisions still open
-Precise mapping of each mastery level to playback steps and bound-series chunk size; whether to count a partially completed general review; exact date arithmetic for overdue items; initial sync conflict strategy; Android background speech feasibility; and final editor layout. Dex should investigate and propose the **simplest robust implementation** before coding beyond a small proof of concept. Avoid overengineering.
+## Persistence and JSON recovery
+
+One versioned IndexedDB database per origin/profile. Schema 2 adds **stepProgress** keyed by [flashcardId, stepId] and **stepEvents** receipts. Content, stable IDs, positions and existing stores remain. Original card-level **progress** is retained as a legacy recovery archive, not active scheduling authority. Old optional metadata is not discarded.
+
+Approved migration: validate the complete version-1 library, save a pre-migration recovery snapshot and copy each card's mastery, last-reviewed time, due date and revision to every step in one upgrade transaction. Mastery 10 becomes KNOWN with null due; **no cross-card/BOUND-series propagation during migration**. Reopening version 2 never reapplies the copy. Any validation/write/abort failure leaves the version-1 database intact. After migration, every step changes independently.
+
+Export complete version-2 snapshots. Accept validated version-1 backups through the same idempotent conversion; require safety export/reselection and explicit replacement. Preserve the previous pre-import copy and the original pre-migration copy separately. Version-2 backups are not readable by older APKs; update the APK before transfer. Unsupported/corrupt data fails closed without partial replacement. Clearing browser/app storage or uninstalling can destroy local copies: retain dated external files. Details and API: [STORAGE.md](docs/STORAGE.md).
+
+## Audio/platform boundary
+
+Desktop uses browser Web Speech, preferring Google UK English Male when available with an explicit working fallback. Android uses the already owner-approved native TextToSpeech executor. Preserve its identity, signing, Bluetooth, background and notification behavior. JavaScript owns learning policy and storage.
+
+Current fixed-sample native plans cap recall waits at 120 seconds, speech text at 2,000 characters/action and actions at 100/unit; the service has a 120-second speech watchdog and 150-second wake-lock timeout. Stage 5 stores longer recall overrides but does not change these native behaviors. Stage 6 must qualify long waits/recitations, successful step boundaries, cancellation, pending changes and continuous AUDIT before connecting real content. Never truncate a stored duration to fit the old player silently.
+
+## Acceptance and future scope
+
+G5 requires all intervals and UTC month-end/leap arithmetic; final anchors and step filtering; BOUND/UNBOUND order; KNOWN propagation/reset confirmations; REVIEW/AUDIT separation and repeat policy; due/early/focused/interrupted/duplicate completion cases; independent progress; atomic idempotent migration and JSON recovery; stale protection; 1,000 × 10 scale; and desktop UI evidence. Run all prior regressions and preserve historical test results. Actual owner States/Delaware verification and physical Android qualification must be reported separately from synthetic fixtures.
+
+Stage 6 connects these foundations to audio after explicit authorization. Offline cold launch, optional Drive, broader presets, microphone input and Android authoring remain later work. No backend or new application framework is introduced.

@@ -1,13 +1,13 @@
 import { openDatabase } from '../js/db.js';
 import { exportJSON, previewImport, restoreJSON, recoveryJSON, contentKey } from '../js/backup.js';
-import { parseSnapshot } from '../js/validation.js';
+import { parseSnapshot, migrateSnapshot } from '../js/validation.js';
 const $ = id => document.getElementById(id);
 const MAX_FILE = 32 * 1024 * 1024;
 const native = window.SRNative;
 let db, incoming, safety, busy = false, filePending = false, nativeTarget;
 function error(reason) { $('error').textContent = reason.message || String(reason); }
 function buttons() {
-  for (const id of ['export', 'recovery', 'choose-import', 'choose-safety']) $(id).disabled = !db || busy || filePending;
+  for (const id of ['export', 'recovery', 'migration-backup', 'choose-import', 'choose-safety']) $(id).disabled = !db || busy || filePending;
   $('replace').disabled = !db || busy || filePending || !incoming || !safety || !$('confirm').checked;
 }
 function stopped() { if (native && JSON.parse(native.status()).serviceRunning) throw new Error('Stop native playback on the listening page before using Data.'); }
@@ -29,11 +29,11 @@ function save(json, label) {
 async function select(json, target) {
   if (new Blob([json]).size > MAX_FILE) throw new Error('File exceeds the 32 MiB limit. No data was changed.');
   if (target === 'import') {
-    const { counts } = previewImport(json); incoming = json;
-    $('preview').textContent = `Replace with ${counts.series} series, ${counts.flashcards} cards, ${counts.steps} steps and ${counts.presets} presets (format 1). All current progress and settings will also be replaced.`;
+    const { counts, snapshot } = previewImport(json); incoming = json;
+    $('preview').textContent = `Replace with ${counts.series} series, ${counts.flashcards} cards, ${counts.steps} steps and ${counts.presets} presets (format ${snapshot.formatVersion}). ${snapshot.formatVersion === 1 ? 'Card progress will be copied to every step; KNOWN has no due date. ' : ''}All current progress and settings will also be replaced.`;
     $('confirm').checked = false;
   } else {
-    if (contentKey(parseSnapshot(json)) !== contentKey(parseSnapshot(await exportJSON(db)))) throw new Error('That file does not match the current library. Save and select a new backup.');
+    if (contentKey(migrateSnapshot(parseSnapshot(json))) !== contentKey(parseSnapshot(await exportJSON(db)))) throw new Error('That file does not match the current library. Save and select a new backup.');
     safety = json; $('safety-status').textContent = 'Saved file reselected, validated, and matched to the current library.';
   }
 }
@@ -59,6 +59,7 @@ window.addEventListener('sr-file-result', event => run(async () => {
 }));
 $('export').onclick = () => run(async () => save(await exportJSON(db), 'backup'));
 $('recovery').onclick = () => run(async () => save(await recoveryJSON(db), 'pre-import'));
+$('migration-backup').onclick = () => run(async () => save(await recoveryJSON(db, 'pre-migration'), 'pre-migration'));
 $('confirm').onchange = buttons;
 $('replace').onclick = () => run(async () => {
   await restoreJSON(db, incoming, { confirmed: $('confirm').checked, safetyJSON: safety });
