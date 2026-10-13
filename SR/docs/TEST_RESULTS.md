@@ -259,7 +259,8 @@ New files: workflow, `mobile/ci/release.mjs`, `mobile/tests/release.test.mjs`, `
 | Actual unsigned APK identity/version | PASS | SDK `aapt dump xmltree`: `com.crownandcall.srproof`, version code 100101. Manifest parser checked against this real output; certificate field in that parser test was synthetic, not a signing test |
 | Original installed signing identity | PASS (owner provenance + local APK inspection) | Owner confirmed installation of this chat's Stage 2 APK. Public APK certificate SHA-256 `ee98699416f616b1707fee62d4311a9de26c30c848b6abd6206112db01f0f0cb`; original keystore located at `C:\Users\tpaig\.android\debug.keystore` |
 | Owner backup / GitHub Secrets | BLOCKED | Owner must make and verify encrypted backups, protect the existing key, then configure four signing Secrets and the public fingerprint Variable |
-| First GitHub Actions run | BLOCKED | Initial workflow run pending push; update this row with actual run evidence |
+| First GitHub cloud build/tests | PASS | [Run 38338802278](https://github.com/twpaige/CCTTRPG/actions/runs/38338802278), source commit `81661aaa238cf1aecd6715f86857c13dd49af327`: SDK setup, all 61 tests, release compilation/lint and unsigned intermediate upload succeeded |
+| Complete GitHub workflow / publication | BLOCKED (run concludes failure at setup gate) | Same run's `publish` job stopped at **Require owner-backed signing configuration**; all signing/publication steps skipped. This is the intended missing-secrets guard, not a successful end-to-end release |
 | Signed GitHub release/download | BLOCKED | No signing credentials supplied; fail-closed signing preflight prevents release. Signature/download checks are implemented but not yet exercised end-to-end |
 | Installed update / data retention | BLOCKED | Owner must install over the original app and then install a subsequent higher-version GitHub APK, verifying diagnostic history survives both |
 

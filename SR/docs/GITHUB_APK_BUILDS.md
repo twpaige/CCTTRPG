@@ -4,6 +4,8 @@ After the one-time signing setup, GitHub builds the app and you install updates 
 
 **Current signing status: owner setup required.** The workflow will test/build without secrets, then stop at its signing check. It never invents a replacement key. No signed GitHub release or successful phone update is claimed until those steps actually occur.
 
+The [first cloud run](https://github.com/twpaige/CCTTRPG/actions/runs/38338802278) passed all 61 tests and release compilation/lint. Its publish job stopped at the missing-signing-configuration check, so the overall run is marked failed and no downloadable signed release exists yet. Complete sections 1–2, then start a new run.
+
 ## Start here: preserve your existing signing key
 
 You confirmed that your installed APK came from this chat's Stage 2 build. The original key was located on that build computer at:
@@ -42,10 +44,18 @@ On another trusted computer, install a JDK 17 if needed; Android Studio is unnec
    $srOriginal = 'C:\Users\tpaig\.android\debug.keystore'
    $srSafe = 'E:\SR-Signing'
    if (Test-Path "$srSafe\SR-signing.p12") { throw 'Backup already exists; do not overwrite it.' }
-   & $srKeytool -importkeystore -srckeystore $srOriginal -srcalias androiddebugkey -destkeystore "$srSafe\SR-signing.p12" -deststoretype PKCS12 -destalias sr-personal
+   $srPassword = Read-Host 'New backup password (save in your password manager)' -AsSecureString
+   try {
+       $env:SR_DEST_PASSWORD = [Net.NetworkCredential]::new('', $srPassword).Password
+       & $srKeytool -importkeystore -srckeystore $srOriginal -srcalias androiddebugkey -destkeystore "$srSafe\SR-signing.p12" -deststoretype PKCS12 -destalias sr-personal -deststorepass:env SR_DEST_PASSWORD -destkeypass:env SR_DEST_PASSWORD
+       if ($LASTEXITCODE -ne 0) { throw 'Import failed; stop and investigate.' }
+   } finally {
+       Remove-Item Env:SR_DEST_PASSWORD -ErrorAction SilentlyContinue
+       $srPassword.Dispose()
+   }
    ```
 
-   Enter a strong, unique **destination** password when prompted and save it in your password manager. The original Gradle debug keystore's standard source password is `android`; if that fails, stop and investigate rather than recreating it. Use the same new password for the PKCS12 store and imported key. Password prompts avoid placing your private password in shell history. Wait for a successful import.
+   Enter a strong, unique **destination** password at the hidden prompt and save it in your password manager. The original Gradle debug keystore's standard source password is `android`; enter that at keytool's source-password prompt. If that fails, stop and investigate rather than recreating it. The commands explicitly use the same new password for the PKCS12 store and imported key through a temporary process environment variable, then remove it. Your password is not printed or placed in shell history. Wait for a successful import. This follows the [keytool import/password options](https://docs.oracle.com/en/java/javase/17/docs/specs/man/keytool.html).
 3. Verify the protected copy:
 
    ```powershell
