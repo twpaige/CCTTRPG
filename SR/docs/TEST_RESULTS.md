@@ -4,7 +4,26 @@
 
 The current owner assignment explicitly authorizes Stage 3 despite the remaining formal G1/G2 checklist items. Earlier evidence below is preserved. Source was freshly cloned from GitHub `main` at `76436b14af9f3afa97bdcc1abb15b36798085a99`; no prior local checkout was assumed current.
 
-**G3: BLOCKED / open for owner Android evidence.** Automated desktop storage, browser restart, real IndexedDB rollback and file recovery pass. Physical Android IndexedDB, document-picker transfers, process restart and APK-update data retention have not been observed. No Stage 4 editor, scheduling, mastery presentation, Drive sync or playback integration has been started.
+**G3: BLOCKED / open for remaining verification; core Android transfer/restore and audio smoke test PASS (owner-observed).** The owner successfully installed APK 0.2.100301, exported/imported the synthetic library with safety verification, observed a committed restore, reopened the app and exported again. Similar export sizes support persistence but do not establish record-level equality. Android offline storage and learning-data retention across a subsequent APK update remain unverified. Automated desktop storage, browser restart, real IndexedDB rollback and file recovery evidence below remains unchanged. No Stage 4 editor, scheduling, mastery presentation, Drive sync or playback integration has been started.
+
+### Stage 3 owner verification — 2026-10-13
+
+Device: **Samsung SM-S931U**. Installed APK: **0.2.100301**, installed over the existing application **without uninstalling**. These are actual physical-device observations reported by the owner, not agent-run, simulated or automated tests. They supersede the earlier Stage 3 pending-owner statements only for the behaviors explicitly observed.
+
+| Check | Status | Owner-observed evidence |
+|---|---|---|
+| Application update and launch | PASS | Installed the new APK over the existing app and launched it successfully |
+| Initial JSON export | PASS | Exported the initially empty library to a **376-byte** JSON file |
+| Incoming JSON selection and validation preview | PASS | Selected the synthetic test backup; the app validated it and displayed **1 series, 2 flashcards, 4 steps, 0 presets (format 1)** |
+| Current-library safety verification and acknowledgement | PASS | Selected and verified the previously exported current-library backup; after acknowledging playback was stopped, **Replace Local Library** became enabled |
+| Successful restore path | PASS | Selected Replace Local Library and observed: **"Restore committed. Previous library is available with Save previous pre-import backup."** This confirms the reported successful commit path; it is not a physical-device interruption/rollback test |
+| Post-import export | PASS | Exported the restored library to a **2.32 KB** JSON file |
+| Close/reopen and export | PASS for observed workflow; content equality unverified | Closed the Android application, reopened it, and exported again; the file was approximately **2.32 KB**, consistent with the imported library persisting. Force-stop/process death was not explicitly reported |
+| Android audio regression smoke test | PASS | Returned to the speech player and confirmed Android text-to-speech still works after the database changes |
+
+The owner did **not** explicitly compare JSON contents. Matching approximate file sizes do not independently prove byte-for-byte or record-level equality, exact mnemonic text/order, or preservation of every field. Android offline IndexedDB operation was **not retested** in this Stage 3 session. The fixture was imported after installing 0.2.100301, so this update does **not** establish its persistence through a subsequent APK update. Earlier diagnostic-journal retention checks are not closed by these observations. No new Bluetooth, screen-lock or notification-control result is inferred from the audio smoke test.
+
+Deferred restore-interface feedback is recorded in [STORAGE.md](STORAGE.md#deferred-restore-usability-improvements). It is usability work for later UI development, not a Stage 3 defect requiring immediate application changes. This documentation update does not rerun tests, alter their counts, or authorize Stage 4.
 
 ### Implementation and files
 
@@ -44,7 +63,7 @@ Windows, Node v24.19.0; Chrome headless 154.0.0.0; available bundled Playwright 
 | Android API compilation | PASS | All production Java sources compile against SDK 35; existing deprecated API note only |
 | GitHub browser tests, APK build/lint, signing/publication | PASS | [Run 38397826169](https://github.com/twpaige/CCTTRPG/actions/runs/38397826169), implementation commit `a3a805728dfe7f5e40c54f2c54b3da65c75396bd`: build and publish both succeeded. Existing signing/identity/version/download guards passed. Signed [SR.apk, version 0.2.100301](https://github.com/twpaige/CCTTRPG/releases/download/sr-android-100301/SR.apk) is published |
 | Deployed website | PASS | Pages [run 38397825052](https://github.com/twpaige/CCTTRPG/actions/runs/38397825052) succeeded; Data/test URLs return HTTP 200; all 38 storage tests passed on the actual crownandcall.com origin in a disposable Chrome profile; Data panel opened successfully and was visually inspected |
-| Android file transfer, restart and update | BLOCKED | Requires owner Samsung/WebView and installed signed APK; no emulator or physical-device result inferred |
+| Android owner verification (separate from automation) | PASS for observed transfer/restore/update/audio workflows; G3 remains open | See the dated owner table above. Close/reopen export sizes support persistence; JSON equality, offline Android storage and retention through a subsequent APK update remain unverified |
 
 Storage tests are separate from the 61 regression tests; the lifecycle/UI scenarios are additional integration assertions, not inflated into independent unit-test counts. Browser databases are disposable `SRLearning-test-*`; no personal library is reset. The tests use synthetic text only.
 
@@ -75,7 +94,13 @@ CI installs pinned Playwright 1.62.1 and Chromium into runner development storag
 
 ### Remaining evidence and limits
 
-Follow [STORAGE.md](STORAGE.md#owner-verification) for the synthetic-file desktop/phone round-trip, cancel/invalid-file checks, exact Unicode text/order, offline force-stop/relaunch, and retention across the next APK update. Recheck the existing sample audio, Bluetooth, screen-lock and notification controls; their regression behavior is preserved in code but not newly certified on the phone. Existing G1/G2 and Stage 2.5 remaining owner checks below stay open.
+The owner observations above establish successful Android update/launch, file export, import preview, safety verification, restore confirmation, subsequent export and an audio smoke test. They do not close every acceptance item. Follow [STORAGE.md](STORAGE.md#owner-verification) for the outstanding checks:
+
+- Compare exported JSON records, exact Unicode/multiline mnemonic text, stable IDs, ordering and relevant fields after transfer and close/reopen; approximate file size alone is insufficient. Complete the desktop/phone round-trip comparison.
+- Retest Android IndexedDB with networking disabled, including explicit force-stop/relaunch and another export. Ordinary close/reopen was observed; offline operation/process-death behavior was not.
+- Keep the imported fixture across a **subsequent** APK update without uninstalling or clearing data, then verify its contents. Installation of 0.2.100301 preceded the import.
+- Exercise Android file-picker cancellation, invalid-import nonmutation, interrupted-restore handling, and downloading/restoring the previous-library recovery backup. Existing automated desktop evidence does not substitute for unreported Android observations.
+- Recheck Bluetooth, locked-screen progression and notification controls on this version as appropriate; the successful TTS smoke test is narrower evidence. Prior G1/G2 and diagnostic-journal retention checks remain open unless separately verified.
 
 The illustrative specification JSON is not a historical shipped format. A null-due rejection fixture is tested; an unapproved legacy converter is not invented. `reviewEvents` is reserved/empty until Stage 6; native diagnostic entries remain separate and untouched. Current corrupted/unopenable storage fails closed without deletion; exceptional recovery without a readable safety snapshot remains a limitation, not an automated recovery claim. App uninstall/browser-data clearing can remove both working data and the local recovery copy; retain dated off-device backups. No offline desktop cold launch, authored-card playback, audio-setting UI integration or scheduling is claimed.
 

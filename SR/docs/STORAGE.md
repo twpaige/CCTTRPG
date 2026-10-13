@@ -10,7 +10,7 @@ The same native ES modules run on the website and in the existing Android WebVie
 - Android database: the same name and modules, scoped to the existing `https://sr.invalid/` bundled origin and app ID. Do not change that origin, app ID, or signing identity during updates.
 - Tests create only `SRLearning-test-*` databases. Browser automation uses an entirely disposable browser profile as well. `data/index.html?test=SRLearning-test-example` opens an explicitly named isolated test database; invalid test names fail closed.
 
-Local IndexedDB access needs no network. The desktop page must already be loaded before going offline; offline cold launch/service-worker caching is Stage 9. Android bundles its assets and retains its no-INTERNET-permission architecture. `setDomStorageEnabled(true)` enables WebView DOM storage; no deprecated Web SQL database setting or native database is added. The actual WebView IndexedDB/file-picker/restart behavior still requires phone evidence. See [Android WebSettings](https://developer.android.com/reference/android/webkit/WebSettings#setDomStorageEnabled(boolean)) and [IndexedDB transactions/upgrades](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API/Using_IndexedDB).
+Local IndexedDB access needs no network. The desktop page must already be loaded before going offline; offline cold launch/service-worker caching is Stage 9. Android bundles its assets and retains its no-INTERNET-permission architecture. `setDomStorageEnabled(true)` enables WebView DOM storage; no deprecated Web SQL database setting or native database is added. The owner's October 13, 2026 phone test verified the successful file export/import/restore workflow and close/reopen export, with file sizes consistent with persistence; exact JSON equality, offline Android storage and retention across a subsequent APK update remain unverified. See [the owner evidence](TEST_RESULTS.md#stage-3-owner-verification--2026-10-13), [Android WebSettings](https://developer.android.com/reference/android/webkit/WebSettings#setDomStorageEnabled(boolean)) and [IndexedDB transactions/upgrades](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API/Using_IndexedDB).
 
 ## Repository API
 
@@ -91,3 +91,14 @@ If storage cannot open, or the current data is unreadable/invalid, the panel fai
 Run the browser test page, then use **Download synthetic storage-test backup**. Its two artificial cards are not a content library. To keep desktop tests separate, import it at `data/index.html?test=SRLearning-test-owner` after exporting/reselecting that empty test library's safety backup. Close all browser windows, reopen the same URL/profile, export, and verify the exact text/order. Do not test resets on personal data.
 
 On the updated Android app: stop audio; open Data; export/reselect the current library; preview/import the synthetic file; verify 1 series/2 cards/4 steps. Export back to desktop, then close/force-stop/reopen Android with networking off and confirm counts/text via another export. Cancel both file pickers and reject malformed JSON. Verify the previous-library backup can be downloaded. Finally check the existing voice choice, Bluetooth, locked-screen progression and notification controls. Keep the fixture across the next APK update to verify IndexedDB retention without uninstalling or clearing app data. Record actual observations separately from automation.
+
+## Deferred restore usability improvements
+
+Owner feedback, October 13, 2026, after successful physical-device testing of APK 0.2.100301:
+
+1. The JSON restore procedure feels confusing because the required sequence is not clear enough in use.
+2. Make numbered instructions more explicit and visible: select the incoming JSON, verify the saved current-library backup, acknowledge playback is stopped, then authorize replacement. Existing instructions did not make this sequence sufficiently clear to the owner.
+3. Make the success confirmation more prominent and informative; for example, **"Restore Successful — 2 Flashcards Imported"**, using the actual imported count. The current success message was easy to overlook.
+4. Preserve all existing data-protection safeguards, including validation, safety-backup verification, explicit replacement authorization, atomic writes and the pre-import recovery copy.
+
+These are **deferred usability improvements** for later UI development, not Stage 3 defects requiring immediate code changes. No interface change or Stage 4 work is authorized by recording this feedback.
