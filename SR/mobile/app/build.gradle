@@ -1,5 +1,8 @@
 plugins { id 'com.android.application' }
 
+def ciVersionCode = providers.environmentVariable('SR_VERSION_CODE').orElse('1').get().toInteger()
+if (ciVersionCode < 1 || ciVersionCode > 2100000000) throw new GradleException('Invalid SR_VERSION_CODE')
+
 android {
     namespace 'com.crownandcall.srproof'
     compileSdk 35
@@ -7,8 +10,8 @@ android {
         applicationId 'com.crownandcall.srproof'
         minSdk 26
         targetSdk 35
-        versionCode 1
-        versionName '0.2.0'
+        versionCode ciVersionCode
+        versionName ciVersionCode == 1 ? '0.2.0' : "0.2.${ciVersionCode}"
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     sourceSets.main.assets.srcDir layout.buildDirectory.dir('generated/srAssets')

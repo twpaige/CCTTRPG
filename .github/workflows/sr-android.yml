@@ -1,0 +1,140 @@
+name: SR Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/sr-android.yml'
+      - 'SR/mobile/**'
+      - '!SR/mobile/**/*.md'
+      - 'SR/js/**'
+      - 'SR/poc/sample.js'
+      - 'SR/poc/speech.css'
+      - 'SR/tests/**'
+
+permissions:
+  contents: read
+concurrency:
+  group: sr-android-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      code: ${{ steps.version.outputs.code }}
+      artifact: ${{ steps.package.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - name: Install pinned Android SDK components
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0" "platform-tools"'
+      - name: Allocate version code
+        id: version
+        run: node SR/mobile/ci/release.mjs version
+      - name: Run desktop, shared-plan, release and native tests
+        run: |
+          node SR/tests/run.mjs
+          node SR/mobile/tests/plan.test.mjs
+          node SR/mobile/tests/release.test.mjs
+          mkdir -p SR/mobile/app/build/poc-tests
+          javac -d SR/mobile/app/build/poc-tests SR/mobile/app/src/main/java/com/crownandcall/srproof/PlaybackEngine.java SR/mobile/tests/PlaybackEngineTest.java
+          java -cp SR/mobile/app/build/poc-tests com.crownandcall.srproof.PlaybackEngineTest
+      - name: Build and lint release (no signing credentials)
+        working-directory: SR/mobile
+        env:
+          SR_VERSION_CODE: ${{ steps.version.outputs.code }}
+        run: bash gradlew --no-daemon assembleRelease lintRelease
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        id: package
+        with:
+          name: unsigned-internal-${{ github.run_attempt }}
+          path: SR/mobile/app/build/outputs/apk/release/app-release-unsigned.apk
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      SR_VERSION_CODE: ${{ needs.build.outputs.code }}
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Require owner-backed signing configuration
+        env:
+          KEY: ${{ secrets.SR_KEYSTORE_BASE64 }}
+          STORE: ${{ secrets.SR_STORE_PASSWORD }}
+          ALIAS: ${{ secrets.SR_KEY_ALIAS }}
+          PASSWORD: ${{ secrets.SR_KEY_PASSWORD }}
+          CERT: ${{ vars.SR_SIGNING_CERT_SHA256 }}
+        run: |
+          if [[ -z "$KEY" || -z "$STORE" || -z "$ALIAS" || -z "$PASSWORD" || -z "$CERT" ]]; then
+            echo '::error::Signing is BLOCKED. Owner must back up the original key and configure SR secrets/variable. See SR/docs/GITHUB_APK_BUILDS.md. No replacement key will be generated.'
+            exit 1
+          fi
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;35.0.0"'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact }}
+          merge-multiple: true
+          path: SR/mobile/app/build/distribution
+      - name: Sign and verify APK
+        env:
+          SR_KEYSTORE_BASE64: ${{ secrets.SR_KEYSTORE_BASE64 }}
+          SR_STORE_PASSWORD: ${{ secrets.SR_STORE_PASSWORD }}
+          SR_KEY_ALIAS: ${{ secrets.SR_KEY_ALIAS }}
+          SR_KEY_PASSWORD: ${{ secrets.SR_KEY_PASSWORD }}
+          SR_SIGNING_CERT_SHA256: ${{ vars.SR_SIGNING_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          key="$RUNNER_TEMP/sr-signing.keystore"
+          trap 'rm -f "$key"' EXIT
+          printf '%s' "$SR_KEYSTORE_BASE64" | base64 --decode > "$key"
+          dist=SR/mobile/app/build/distribution
+          tools="$ANDROID_HOME/build-tools/35.0.0"
+          "$tools/zipalign" -f -p 4 "$dist/app-release-unsigned.apk" "$dist/aligned.apk"
+          "$tools/apksigner" sign --ks "$key" --ks-key-alias "$SR_KEY_ALIAS" --ks-pass env:SR_STORE_PASSWORD --key-pass env:SR_KEY_PASSWORD --out "$dist/SR.apk" "$dist/aligned.apk"
+          "$tools/apksigner" verify --verbose --print-certs "$dist/SR.apk" > "$dist/certificates.txt"
+          "$tools/aapt" dump xmltree "$dist/SR.apk" AndroidManifest.xml > "$dist/manifest.txt"
+          node SR/mobile/ci/release.mjs verify
+      - name: Publish versioned GitHub Release and check download
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION_CODE: ${{ needs.build.outputs.code }}
+        run: |
+          set -euo pipefail
+          node SR/mobile/ci/release.mjs guard
+          dist=SR/mobile/app/build/distribution
+          tag="sr-android-$VERSION_CODE"
+          gh release create "$tag" --target "$GITHUB_SHA" --draft --title "SR Android $VERSION_CODE" --notes-file "$dist/notes.md"
+          gh release upload "$tag" "$dist/SR.apk" "$dist/SR.apk.sha256" "$dist/build-info.json"
+          gh release download "$tag" --pattern SR.apk --dir "$RUNNER_TEMP/sr-download"
+          cmp "$dist/SR.apk" "$RUNNER_TEMP/sr-download/SR.apk"
+          gh release edit "$tag" --draft=false --latest
+          echo "APK: https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/SR.apk" >> "$GITHUB_STEP_SUMMARY"
+          echo 'Signature, application ID, version and release download verified. Phone update/data preservation still require owner verification.' >> "$GITHUB_STEP_SUMMARY"

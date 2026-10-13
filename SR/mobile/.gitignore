@@ -6,3 +6,7 @@ local.properties
 *.iml
 *.jks
 *.keystore
+*.p12
+*.pfx
+*.jks.b64
+*.p12.b64
