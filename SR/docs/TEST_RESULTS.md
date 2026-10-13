@@ -1,6 +1,41 @@
 # SR — Stage 1 and Stage 2 test results
 
-## Current gate status (2026-10-12)
+## Owner verification update — 2026-10-13
+
+The owner personally tested the live desktop page and the installed Samsung Android application on October 12–13, 2026. This section supersedes the **historical pending-owner statements** below; the original automated evidence and detailed checklists remain for traceability.
+
+**Current assessment:**
+- **G1: Core desktop speech and >30-minute minimized-window reliability PASS (owner-observed).** Formal full-checklist closure remains **OPEN** for items not explicitly verified, including offline desktop voice, exact recall-pause remainder, keyboard access, and browser test-runner execution.
+- **G2: Core Android listening feasibility PASS (owner-observed).** Screen locked, app backgrounded, USB disconnected, Bluetooth headphones, offline operation and notification controls all worked. Formal full G2 remains **OPEN** until the two explicitly timed 30-minute locked-screen sessions (at least one offline) and remaining interruption/rapid-control checks are evidenced.
+- **Stage 2.5: Cloud build/sign/publish and first phone update PASS.** Prior diagnostic journal preservation has not yet been explicitly confirmed; the owner confirmed installed version and successful post-update narration. A second successive cloud update is not yet tested.
+
+### Stage 1 — desktop owner observations
+
+The owner used the live page at `https://crownandcall.com/SR/poc/speech.html` in Chrome for **more than 30 minutes**, with the browser minimized for most of the run. Questions, recall pauses, answers and automatic progression worked. The owner exercised Pause, Resume, Stop, Restart and changing voices; reported no stalls or overlapping narration. These observations support M2/M3/M10 and the principal M12 reliability objective, plus general operation of controls M5/M6/M8. The precise phase-by-phase, rapid-cycle and timing subcases M4/M7/M9 were not individually documented; M1/M11/M13 were not reported.
+
+### Stage 2 — physical Samsung owner observations
+
+Device: **Samsung SM-S931U**, installed as **SR Speech Proof**. The owner observed:
+- **A2/A3 PASS for ordinary use:** Android native dynamic TTS spoke the three-card sample with question → pause → answer → automatic progression. Voice selection displayed about ten options; the owner selected and liked an alternate voice.
+- **A8/A12 PASS for observed conditions:** Playback continued over **Bluetooth headphones** after minimizing the app, disconnecting USB, locking the screen and putting the phone in a pocket.
+- **A9 PASS via equivalent connectivity-off method:** With both Wi-Fi **and mobile data disabled**, Bluetooth remained connected and speech continued. Airplane Mode itself was deliberately not used; do not imply it was.
+- **A14 PASS for observed controls:** Lock-screen notification Pause, Resume, Skip and Stop worked; Stop removed the notification.
+- **A5/A6 partial:** Stop and Skip worked in ordinary use; exhaustive question/answer/recall-phase tests and Restart on Android were not individually reported.
+- **A1, A4's exact recall remainder, A7, A10, A11, A13 and process-death portion of A15:** Not fully documented. Do not infer these from ordinary playback success.
+
+### Stage 2.5 — signing and update observations
+
+- The owner imported the original debug signing key into password-protected `D:\SR-Signing\SR-signing.p12` under alias `sr-personal`, verified **PrivateKeyEntry** and matching SHA-256 certificate fingerprint `ee98699416f616b1707fee62d4311a9de26c30c848b6abd6206112db01f0f0cb`, and configured four GitHub Actions secrets plus the certificate-fingerprint variable. No secret contents were provided in chat.
+- [GitHub Actions run 38340835846](https://github.com/twpaige/CCTTRPG/actions/runs/38340835846): **build SUCCESS; publish SUCCESS**. The signed release asset was published as `sr-android-100201/SR.apk`.
+- The owner downloaded the APK directly on the Samsung, overcame the device's Auto Blocker installation restriction, and installed the update **without uninstalling the existing app**. Android App info showed version **0.2.100201**. The owner confirmed audio playback still worked after updating.
+- **Not yet verified:** persistence of pre-update Device evidence completion entries and a second higher-version GitHub-to-GitHub update. The original Stage 2.5 "no signed release" statements below are historical and no longer current.
+- Signing key backup currently on D:; a second independent encrypted off-device backup is still recommended.
+
+No Stage 3 implementation is implied by these observations.
+
+---
+
+## Original gate status at initial implementation (2026-10-12)
 
 - **G1: BLOCKED / open.** The owner reports successful Chrome narration, automatic progression and playback controls in the Stage 2 assignment. The 30-minute desktop reliability test is still underway. This owner report is evidence for those reported behaviors, not a claim that every detailed checklist item below was performed.
 - **G2: BLOCKED.** Stage 2 implementation and automated evidence are recorded separately below; physical Android installation and acceptance tests remain required.
@@ -10,7 +45,7 @@
 
 Date: 2026-10-12 (America/Chicago). Scope: **Stage 1 only**.
 
-**G1 acceptance status: BLOCKED — awaiting owner desktop Chrome/audible verification.**
+**Historical G1 status at initial delivery: BLOCKED.** See owner verification update above.
 
 Implementation and available automated testing are complete. The production controller/speech adapter pass the tests below. The following environment evidence and checklist describe the original Stage 1 delivery; the owner's later report is recorded above. No 30-minute browser session is claimed as passed. Stage 2 proceeded under the owner's explicit parallel-work authorization, not a completed G1. The owner explicitly authorized restarting an interrupted utterance on Resume; this implementation uses that behavior consistently.
 
@@ -155,7 +190,7 @@ The Stage 1 engine executes each step as speak(question) → wait(recall millise
 
 # Stage 2 — Android speech and locked-screen proof
 
-Date: 2026-10-12 (America/Chicago). **G2 acceptance status: BLOCKED — owner phone required.** Implementation scope is the fixed-sample proof only.
+Date: 2026-10-12 (America/Chicago). **Historical G2 status at initial delivery: BLOCKED.** See owner verification update above. Implementation scope is the fixed-sample proof only.
 
 ## Files created or modified
 
@@ -240,7 +275,7 @@ No runtime architecture failure has yet been observed because the app has not ru
 - Lint's JavaScript warning is expected for the shared HTML/JS UI; the allowlist/CSP and disabled navigation restrict bridge exposure. Lint also notes that `allowBackup=false` does not uniformly govern Android 12+ device transfer; this proof has no personal library, and its diagnostic history should not be treated as a portable backup. Production backup policy remains later work.
 - Minimum Android API is 26; a current WebView is required for the JavaScript UI (Chromium 92+). No emulator, device, installation, sound, power behavior or screen-lock success is inferred from unit tests or compilation.
 
-**G1 remains open; G2 remains BLOCKED pending owner installation and physical verification. Stage 2 code delivery does not authorize Stage 3.**
+**Historical at Stage 2 delivery:** G1 and G2 were open. See owner verification update above for successful physical-device evidence and remaining acceptance items.
 
 # Stage 2.5 — GitHub Android builds
 
