@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SR · Desktop speech proof</title>
+  <link rel="stylesheet" href="speech.css">
+</head>
+<body>
+  <main>
+    <header><p class="eyebrow">SR / STAGE 1</p><h1>Listen, recall, continue.</h1>
+      <p>A desktop speech proof with three sample flashcards: 1, 2, and 6 ordered steps.</p></header>
+    <section aria-labelledby="settings-heading">
+      <h2 id="settings-heading">Speech settings</h2>
+      <label for="voice">English voice</label>
+      <div class="voice-row"><select id="voice" disabled><option>Loading voices…</option></select>
+        <button id="refresh" type="button">Refresh voices</button></div>
+      <p id="voice-status" role="status">Waiting for an English voice…</p>
+      <div class="settings-grid">
+        <label>Recall pause (seconds)<input id="recall" type="number" value="4" min="0" max="120" step="0.5" required></label>
+        <label>Speaking rate<input id="rate" type="number" value="0.9" min="0.5" max="2" step="0.1" required></label>
+        <label>Sample passes<input id="passes" type="number" value="1" min="1" max="100" step="1" required></label>
+      </div>
+      <p class="hint">Use extra passes for a long listening test. Settings are fixed until you Stop or finish.</p>
+    </section>
+    <section aria-labelledby="playback-heading">
+      <h2 id="playback-heading">Playback</h2>
+      <div class="controls">
+        <button id="start" class="primary" disabled>Start</button>
+        <button id="pause" disabled>Pause</button><button id="resume" disabled>Resume</button>
+        <button id="stop" disabled>Stop</button><button id="skip" disabled>Skip current flashcard</button>
+        <button id="restart" disabled>Restart session</button>
+      </div>
+      <p class="hint"><strong>Resume repeats an interrupted utterance from its beginning.</strong>
+        A paused recall wait keeps its remaining time. Skip while paused stays paused.</p>
+      <p id="status" class="status" role="status">Ready when an English voice is available.</p>
+      <p id="error" role="alert"></p>
+      <p id="position">No session started.</p>
+      <p id="session-voice" class="hint"></p>
+      <div class="prompt"><span id="phase">Current question or answer</span><p id="text">Press Start to begin.</p></div>
+    </section>
+    <details>
+      <summary>Event log — latest 200 events</summary>
+      <p>Requested speech is not proof of audible output. Compare the completion events with what you hear.</p>
+      <pre id="log" aria-label="Playback event log"></pre>
+      <button id="download" type="button">Download event log</button>
+    </details>
+    <footer><p>Keep one copy of this proof open. Nothing is saved between page loads.</p>
+      <a href="../tests/runner.html">Run silent automated tests</a> ·
+      <a href="../docs/TEST_RESULTS.md">Test status and Windows instructions</a></footer>
+    <noscript><p>JavaScript must be enabled to run this speech proof.</p></noscript>
+  </main>
+  <script type="module" src="speech-page.js"></script>
+</body>
+</html>
