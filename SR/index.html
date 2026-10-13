@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; base-uri 'none'">
+<title>SR — My library</title><link rel="stylesheet" href="styles.css"></head>
+<body><header><p class="eyebrow">SR · PERSONAL MEMORIZATION</p><h1>My library</h1>
+<p>Create your own associations. Keep every word in the order that helps you remember.</p>
+<nav aria-label="Main"><a id="data-link" href="data/index.html">Data &amp; recovery</a><a href="poc/speech.html">Sample speech player</a><a href="docs/AUTHORING.md">Authoring guide</a></nav>
+<p class="note">Saved on this browser and device. Make dated JSON backups. The speech player still uses sample cards; playback of your library comes in a later stage.</p></header>
+<main><p id="status" role="status">Opening local storage…</p><p id="error" role="alert"></p>
+<fieldset id="workspace" disabled><legend class="sr-only">Library authoring</legend>
+<div class="toolbar"><button id="new-series">New series</button><button id="backup">Save JSON backup</button><button id="reload">Reload saved library</button><span id="draft-state"></span></div>
+<div class="layout"><aside aria-label="Series"><h2>Series</h2><div id="series-list"></div></aside>
+<section aria-label="Flashcards"><h2 id="current-series">Select a series</h2><p id="binding"></p><div id="series-actions" class="toolbar"></div><div id="card-list"></div></section>
+<section id="editor" aria-label="Editor"><h2>Make a place for your memories</h2><p>Create a series, then add a flashcard with an ordered chain of questions and answers.</p></section></div>
+</fieldset>
+<dialog id="delete-dialog" aria-labelledby="delete-title"><h2 id="delete-title">Confirm deletion</h2><div id="delete-detail"></div><p>This cannot be undone here. Export a backup first if you may need this content again.</p><div class="toolbar"><button id="delete-cancel">Keep content</button><button id="delete-confirm" class="danger">Delete permanently</button></div></dialog>
+</main><script type="module" src="js/editor.js"></script></body></html>

@@ -70,6 +70,12 @@ const link = document.createElement('a'); link.href = native ? '../index.html' :
 try {
   const testName = new URLSearchParams(location.search).get('test');
   if (testName !== null && !/^SRLearning-test-[a-zA-Z0-9-]+$/.test(testName)) throw new Error('Invalid isolated test database name.');
+  if (!native) {
+    const editorLink = document.createElement('a');
+    editorLink.href = '../index.html' + (testName ? `?test=${encodeURIComponent(testName)}` : '');
+    editorLink.textContent = 'Return to library editor';
+    $('back').prepend(editorLink, document.createTextNode(' · '));
+  }
   if (testName) document.querySelector('h1').textContent = 'Data and recovery — disposable test library';
   db = await openDatabase({ name: testName || undefined, onBlocked: message => error(message), onVersionChange: message => { db = undefined; error(message); buttons(); } });
   await refresh();

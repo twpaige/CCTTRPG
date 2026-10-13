@@ -19,7 +19,13 @@ function insert(rows, row, position = rows.length) {
 }
 
 export class Repository {
-  constructor(db) { this.db = db; }
+  constructor(db, { writeGuard, guardStores = [] } = {}) { this.db = db; this.writeGuard = writeGuard; this.guardStores = guardStores; }
+  write(stores, body) {
+    return transaction(this.db, [...new Set([...stores, ...this.guardStores])], 'readwrite', async tx => {
+      if (this.writeGuard) await this.writeGuard(tx);
+      return body(tx);
+    });
+  }
   getSeries(id) { return this.get('series', id); }
   getCard(id) { return this.get('flashcards', id); }
   getProgress(id) { return this.get('progress', id); }
@@ -38,7 +44,7 @@ export class Repository {
   listPresets() { return transaction(this.db, ['presets'], 'readonly', tx => request(tx.objectStore('presets').getAll())); }
   async createSeries(input) {
     input = clone(input); fields(input, ['name', 'bound'], ['id', 'position', 'recitationPrompt']);
-    return transaction(this.db, ['series'], 'readwrite', async tx => {
+    return this.write(['series'], async tx => {
       const store = tx.objectStore('series'), rows = sorted(await request(store.getAll()));
       const row = fresh(input); row.position = insert(rows, row, input.position);
       validateSeries(row); await request(store.add(row)); reorder(store, rows); return row;
@@ -46,7 +52,7 @@ export class Repository {
   }
   async updateSeries(id, patch, expectedRevision) {
     patch = clone(patch); fields(patch, [], ['name', 'bound', 'position', 'recitationPrompt']);
-    return transaction(this.db, ['series'], 'readwrite', async tx => {
+    return this.write(['series'], async tx => {
       const store = tx.objectStore('series'), old = existing(await request(store.get(id))); revision(old, expectedRevision);
       const rows = sorted(await request(store.getAll())).filter(row => row.id !== id);
       const row = changed(old, patch); insert(rows, row, row.position); validateSeries(row);
@@ -55,7 +61,7 @@ export class Repository {
   }
   async createCard(input) {
     input = clone(input); fields(input, ['seriesId', 'name', 'steps'], ['id', 'position', 'recitationStepIds']);
-    return transaction(this.db, ['series', 'flashcards', 'progress'], 'readwrite', async tx => {
+    return this.write(['series', 'flashcards', 'progress'], async tx => {
       existing(await request(tx.objectStore('series').get(input.seriesId)));
       const store = tx.objectStore('flashcards'), rows = sorted(await request(store.index('bySeries').getAll(input.seriesId)));
       const row = fresh(input);
@@ -68,7 +74,7 @@ export class Repository {
   }
   async updateCard(id, patch, expectedRevision) {
     patch = clone(patch); fields(patch, [], ['seriesId', 'name', 'position', 'steps', 'recitationStepIds']);
-    return transaction(this.db, ['series', 'flashcards'], 'readwrite', async tx => {
+    return this.write(['series', 'flashcards'], async tx => {
       const store = tx.objectStore('flashcards'), old = existing(await request(store.get(id))); revision(old, expectedRevision);
       const row = changed(old, patch);
       existing(await request(tx.objectStore('series').get(row.seriesId)));
@@ -83,7 +89,7 @@ export class Repository {
   async updateProgress(id, patch, expectedRevision) {
     patch = clone(patch); fields(patch, [], ['mastery', 'lastReviewedAt', 'nextDueAt']);
     // No scheduling policy: this changes only explicitly supplied values.
-    return transaction(this.db, ['progress'], 'readwrite', async tx => {
+    return this.write(['progress'], async tx => {
       const store = tx.objectStore('progress'), old = existing(await request(store.get(id))); revision(old, expectedRevision);
       const row = { ...old, ...patch, revision: old.revision + 1 }; validateProgress(row);
       await request(store.put(row)); return row;
@@ -91,7 +97,7 @@ export class Repository {
   }
   async savePreset(input, expectedRevision) {
     input = clone(input); fields(input, ['name', 'seriesIds', 'cardIds', 'mode', 'order', 'grouping'], ['id']);
-    return transaction(this.db, ['presets', 'series', 'flashcards'], 'readwrite', async tx => {
+    return this.write(['presets', 'series', 'flashcards'], async tx => {
       const store = tx.objectStore('presets'), old = input.id ? await request(store.get(input.id)) : undefined;
       if (old) revision(old, expectedRevision);
       else requireValue(expectedRevision === undefined, 'Preset no longer exists.');
@@ -102,14 +108,14 @@ export class Repository {
     });
   }
   deletePreset(id, expectedRevision) {
-    return transaction(this.db, ['presets'], 'readwrite', async tx => {
+    return this.write(['presets'], async tx => {
       const store = tx.objectStore('presets'); revision(existing(await request(store.get(id))), expectedRevision);
       await request(store.delete(id));
     });
   }
   async setSetting(key, value) {
     value = clone(value); validateSetting(key, value);
-    return transaction(this.db, ['settings'], 'readwrite', tx => request(tx.objectStore('settings').put({ key, value })));
+    return this.write(['settings'], tx => request(tx.objectStore('settings').put({ key, value })));
   }
   async getSettings() {
     return transaction(this.db, ['settings'], 'readonly', async tx => Object.fromEntries((await request(tx.objectStore('settings').getAll())).map(row => [row.key, row.value])));
@@ -120,7 +126,7 @@ export class Repository {
     return this._delete('series', id, expectedRevision);
   }
   _delete(kind, id, expectedRevision) {
-    return transaction(this.db, ['series', 'flashcards', 'progress', 'presets'], 'readwrite', async tx => {
+    return this.write(['series', 'flashcards', 'progress', 'presets'], async tx => {
       const store = tx.objectStore(kind), old = existing(await request(store.get(id))); revision(old, expectedRevision);
       const cards = kind === 'series' ? await request(tx.objectStore('flashcards').index('bySeries').getAll(id)) : [old];
       const removed = new Set(cards.map(card => card.id));

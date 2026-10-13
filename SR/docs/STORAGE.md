@@ -1,6 +1,6 @@
 # Stage 3 storage and JSON recovery
 
-The same native ES modules run on the website and in the existing Android WebView. There is no application server, database package, native learning database, or editor. Sample playback remains independent of this library. Stage 4 must explicitly integrate authoring; later stages integrate scheduling. The specification and build plan remain unchanged.
+The same native ES modules run on the website and in the existing Android WebView. There is no application server, database package or native learning database. Stage 4 adds a [desktop editor](AUTHORING.md) at `https://crownandcall.com/SR/`; Android continues to package only the existing listening/Data assets. Sample playback remains independent of this library; later stages integrate scheduling. The specification and build plan remain unchanged.
 
 ## Locations and identity
 
@@ -29,7 +29,7 @@ await repository.updateProgress(card.id, { mastery: 3 }, progress.revision);
 db.close();
 ```
 
-These snippets describe future caller integration; the Data panel has no authoring controls.
+The desktop editor uses this API. The Data panel itself has no authoring controls.
 
 | Method | Contract |
 |---|---|
@@ -51,6 +51,10 @@ These snippets describe future caller integration; the Data panel has no authori
 Every mutation resolves after transaction `complete`. Any exception, request error, abort, constraint or quota failure rejects and rolls back the whole transaction. Code within transaction callbacks may await IndexedDB requests only. Never hold a transaction across file dialogs, speech, network or timers. Connections close on `versionchange`; callers should reload then. Blocked upgrades display instructions to close other tabs; no database deletion is attempted.
 
 Revision checks protect concurrent edits to content/progress/presets. Replacement also checks an exact logical safety-backup match inside its write transaction, detecting any intervening write or earlier replacement. The sample speech proof neither reads nor writes learning data. Stop it before file transfer; Android enforces stopping its native service. Full cross-tab playback ownership and session-generation checks belong to the later review integration, which must not treat a revision number alone as authority across restoration.
+
+Stage 4 adds an optional `new Repository(db, {guardStores, writeGuard})` constructor hook. Every mutation invokes the guard inside its write transaction, including the declared guard stores. Existing callers need no changes. The desktop editor captures a validated snapshot when loading its view and compares its canonical content (including library generation) against `readSnapshot(tx)` before writing. Any intervening library change rejects the operation and retains the draft. This deliberately conservative whole-library check also protects deletion counts and sibling ordering; it does not merge unrelated concurrent changes. Where available, an origin-scoped Web Lock serializes editor writes, with the transaction guard remaining authoritative even without Web Locks or against other writers. Guard callbacks may await only IndexedDB requests. No schema, backup format or Android asset-list change is made.
+
+This personal-library implementation reads the complete snapshot for the guard; it renders only 50 list summaries per page and the currently selected card's steps. Larger-library optimization and offline cold launch remain later acceptance work. Editing content never invokes the progress-writing API. Optional annotations and recitation references are preserved; the Stage 4 UI blocks deletion/reordering that would invalidate imported recitation references rather than silently rewriting them.
 
 ## Version 1 data contract
 

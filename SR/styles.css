@@ -1,0 +1,38 @@
+:root { color-scheme: light; font-family: system-ui, sans-serif; color: #23352f; background: #f3f5f0; line-height: 1.5; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+header, main { max-width: 1600px; margin: auto; padding: 1.25rem 2rem; }
+header { border-bottom: 1px solid #cbd6ca; }
+h1, h2, h3, p { margin: 0 0 .8rem; overflow-wrap: anywhere; }
+h1 { font-size: 2.2rem; } h2 { font-size: 1.3rem; } h3 { font-size: 1rem; }
+.eyebrow { font-size: .75rem; letter-spacing: .15em; font-weight: 700; color: #46674b; }
+nav, .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; margin-bottom: 1rem; }
+nav { gap: 1.5rem; } a { color: #235b40; }
+.note, small { color: #4f6057; font-size: .9rem; }
+.layout { display: grid; grid-template-columns: minmax(170px, .7fr) minmax(210px, 1fr) minmax(350px, 2.4fr); gap: 1.2rem; align-items: start; }
+aside, .layout > section { min-width: 0; padding: 1rem; background: #fff; border: 1px solid #d5ddd1; border-radius: .6rem; }
+fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+button, input, textarea, select { font: inherit; }
+button { border: 1px solid #899f8b; background: #f6f9f2; color: #244f34; border-radius: .3rem; padding: .5rem .7rem; cursor: pointer; overflow-wrap: anywhere; }
+button:hover { background: #e7efde; } button:disabled { opacity: .45; cursor: default; }
+button.primary { background: #28563c; color: white; } button.danger { color: #8f251b; border-color: #ba6a5e; }
+:focus-visible { outline: 3px solid #a35a08; outline-offset: 3px; }
+label { display: block; margin-bottom: 1rem; font-weight: 600; }
+input:not([type=checkbox]), textarea, select { display: block; width: 100%; border: 1px solid #829587; border-radius: .25rem; background: #fff; color: #1d2e24; padding: .6rem; margin-top: .25rem; }
+textarea { resize: vertical; min-height: 7rem; line-height: 1.5; font-weight: 400; }
+input[type=checkbox] { width: 1.2rem; height: 1.2rem; vertical-align: middle; }
+.list-item { border-bottom: 1px solid #dce3d7; padding: .7rem 0; }
+.list-item > button { width: 100%; text-align: left; margin-bottom: .4rem; }
+.list-item > button[aria-current=true] { border: 2px solid #28563c; background: #eaf1e2; }
+.step { border: 1px solid #bdccb8; border-left: 4px solid #6e8b62; border-radius: .3rem; padding: 1rem; margin: 1rem 0; }
+.step legend { font-weight: 700; padding: 0 .3rem; }
+.step .toolbar { margin-bottom: 0; }
+#status { padding: .6rem .9rem; background: #e1ecd8; border-radius: .3rem; }
+#error:empty { display: none; } #error { color: #852719; background: #ffede6; padding: .8rem; border-left: 4px solid #a13524; }
+#draft-state { font-weight: 600; }
+.editor-actions { position: sticky; top: 0; z-index: 1; padding: .6rem 0; background: #fff; border-bottom: 1px solid #d5ddd1; }
+dialog { border: 1px solid #899f8b; border-radius: .6rem; max-width: min(650px, 95vw); max-height: 90vh; overflow: auto; padding: 1.5rem; }
+dialog::backdrop { background: #16271d99; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+@media (max-width: 1050px) { .layout { grid-template-columns: minmax(160px, 1fr) minmax(250px, 2fr); } #editor { grid-column: 1 / -1; } }
+@media (max-width: 620px) { header, main { padding: 1rem; } .layout { display: block; } .layout > * { margin-bottom: 1rem; } }

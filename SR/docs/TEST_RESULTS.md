@@ -1,5 +1,65 @@
 # SR — Test results
 
+## Stage 4 — desktop authoring, 2026-10-13
+
+**G4: PASS for the implemented desktop authoring gate, verified by real Chrome UI automation. Owner manual usability verification remains pending.** The owner's Stage 4 assignment explicitly authorizes this stage despite the outstanding G3 Android checks. It does not close those checks or authorize Stage 5. Earlier Stage 1, 2, 2.5 and 3 evidence below is preserved; statements about unavailable later stages describe their historical delivery dates.
+
+Editor: **https://crownandcall.com/SR/**. [Authoring guide](AUTHORING.md). Source baseline: `0e25f07e7d0f3256ead1d1904f31ed44de5082d3`, freshly checked against `origin/main`. Deployment/cloud results are recorded separately below once observed.
+
+### Delivered functionality and files
+
+- Created `index.html`, `styles.css`, `js/editor.js`: plain HTML/CSS/ES-module desktop authoring. Create, rename, bind/unbind, order and delete series; create, reopen, edit, order, move and delete flashcards; add, insert, edit, delete and reorder individual multiline question/answer steps. Names/text render as text, never HTML. Series counts, one-based positions, binding explanations and read-only mastery are visible. Lists paginate at 50 summaries; only one chain is rendered. Save/Cancel remain accessible while scrolling long chains.
+- Modified `js/repository.js`: optional transaction-local guard for editor writes. Schema/version-1 backup format and existing API defaults are unchanged. The editor compares its displayed library snapshot, including generation, inside each write transaction. Concurrent writes/restoration fail closed without losing the draft. A changed deletion count cannot silently expand a confirmed cascade. Web Locks serialize editor writes where available; transactions remain authoritative. Existing progress is never reset by editor saves.
+- Modified `data/panel.js`: desktop-only return link to the editor, preserving isolated-test selection. Android retains its existing listening return link. The previously recorded recovery-interface improvements remain deferred; no restore safeguards were weakened.
+- Created `tests/editor.mjs`: reproducible Chrome/Chromium UI and real IndexedDB acceptance scenarios in disposable profiles/databases. Modified `tests/serve.mjs` to serve the editor at the local root.
+- Modified `.github/workflows/sr-android.yml`: editor HTML/CSS triggers and editor acceptance run alongside existing browser tests. Signing, identity, version policy and publishing steps are unchanged. The desktop editor is excluded by the existing Android asset allowlist; no Java, native speech, service, Bluetooth or notification code changed.
+- Created `docs/AUTHORING.md`; updated `docs/STORAGE.md` and this report. No Stage 5 scheduling/mastery management, authored-card playback or Android authoring was implemented.
+
+### Executed tests
+
+Windows; Node **24.19.0**, actual Google Chrome **154.0.0.0** in headless mode, Playwright **1.62.1**, Temurin JDK **17.0.20.1**. Browser automation uses only `SRLearning-test-*` databases inside newly created disposable browser profiles. No personal library was changed. The tests are automated browser interaction, **not owner manual tests**.
+
+| Check | Result | Evidence |
+|---|---|---|
+| Stage 1 desktop regressions | PASS | 33/33 Node tests, also 33/33 in Chrome |
+| Stage 2 shared plans / native executor | PASS | 6/6 JavaScript and 16/16 Java tests |
+| Stage 2.5 release safety | PASS | 6/6; all 61 earlier regressions pass |
+| Stage 3 IndexedDB suite | PASS | 38/38; existing restart, offline storage, actual downloads/reselection/recovery and interrupted-restore integration also pass |
+| Stage 4 actual editor UI | PASS | **17/17 acceptance scenarios**; each groups multiple assertions, not a count of individual unit tests |
+| Series management | PASS | Create/rename, empty series, bound/unbound, series position and meaningful-order explanation |
+| Variable chains and exact text | PASS | Created 1-, 6-, 10- and 100-step cards through the form; long stories/names, Unicode, leading/trailing whitespace, multiline and markup-looking text retained exactly |
+| Step editing and identities | PASS | First/last moves, insertion, deletion and text edit followed by save/reopen; surviving step IDs retained and new step receives a new ID |
+| Cards / progress / isolation | PASS | Card ordering and cross-series move normalize positions; nonzero mastery and review dates remain unchanged; ordinary content edit leaves all unrelated cards unchanged; new progress uses schema defaults |
+| Draft/error protection | PASS | Cancel and navigation discard confirmations, dismissed browser reload warning, blank/whitespace rejection, simulated quota exception and successful retry without draft loss |
+| Stale writes / safety | PASS | Second editor tab changes library; identical-content restore changes generation; both block stale save. Card added after series-deletion preview causes deletion to fail without cascade |
+| Imported optional metadata | PASS | Role/direct-question/recall annotations survive edits. Referenced recitation step deletion/order changes are refused without altering those references |
+| Destructive operations | PASS | Confirmation cancellation, named/count-based card/series cascade, progress removal, direct/series preset-reference cleanup, presets retained, empty-series deletion |
+| Browser restart and complete backup | PASS | Actual Chrome process closed and relaunched with same disposable profile; record equality and all 100 Q/A fields checked through reopened UI; real JSON download; record-level equality after isolated restore |
+| Keyboard and responsive UI | PASS (automated) | Editor action buttons exercised through focus + Enter, binding checkbox through Space; native inputs/selects; Tab reaches step controls. 390px viewport has no horizontal overflow. Desktop/small-screen screenshots visually inspected by agent; no owner usability approval inferred |
+| List scale and isolation | PASS | 54-card list paginates as 50 + 4 summaries without unselected step forms; malformed test database name disables authoring |
+
+The unchanged Stage 3 scale suite again verified 1,000 cards × 10 steps across five exports/restores: 267.8, 457.8, 394.6, 425.5 and 467.9 ms (local concurrent test run; not a device performance guarantee). No new physical-device/audio certification is inferred from these results. Initial editor test-runner issues (CSP blocking test helper evaluation and a fieldset-disabled assertion) were corrected in the test harness; the final complete run passed without weakening application CSP. Screenshot review prompted keeping Save/Cancel visible while scrolling.
+
+### Reproduce Stage 4
+
+Run the existing commands in Stage 3's Reproduce section (all 61 regressions plus `node SR/tests/browser.mjs`), with the static server running. In the same configured Playwright/Chrome environment also run:
+
+```powershell
+node SR/tests/editor.mjs
+```
+
+`SR_TEST_URL` can point to `https://crownandcall.com/SR` to exercise deployed assets in an isolated profile. `SR_SCREENSHOT` optionally saves desktop and small-screen PNGs to a development location. Development-only Playwright is not packaged in the website or Android app.
+
+### Owner verification and limitations
+
+No owner Stage 4 manual authoring result is claimed. Please use [the disposable trial](https://crownandcall.com/SR/index.html?test=SRLearning-test-owner-editor) to create a personally meaningful multi-step card, try Tab/Shift+Tab and Enter/Space, confirm the binding/ordering explanations, close/reopen the same browser/profile, and export/reselect a backup. Confirm that writing long stories and finding Save/Cancel are comfortable. Report any unexpected text or ordering change before entering a large real library. UI automation establishes G4's implemented behaviors; personal usability acceptance remains for the owner.
+
+The editor conservatively rejects **any** intervening library change, including unrelated progress/settings changes. It has no automatic merge or persistent draft autosave. Errors retain the current draft; copy needed text before explicitly discarding it to reload. Browser crash/forced termination may lose unsaved work. Complete-snapshot comparison is appropriate to the tested personal-library size but is not a very-large-library performance claim. Imported recitation references are protected by refusing operations that would delete them or change their relative order; annotation management is deferred. No schema or format migration was introduced.
+
+Cold offline website launch and authored-card playback remain later work. Android G3's exact JSON/round-trip comparison, offline/process-death check and retention through a subsequent APK update remain open, as do earlier unverified device checklist items. Owner feedback about clearer restore instructions and success messaging remains deferred in STORAGE.md. Stage 4 stops at authoring and backup; **Stage 5 is not started**.
+
+---
+
 ## Stage 3 — storage implementation, 2026-10-13
 
 The current owner assignment explicitly authorizes Stage 3 despite the remaining formal G1/G2 checklist items. Earlier evidence below is preserved. Source was freshly cloned from GitHub `main` at `76436b14af9f3afa97bdcc1abb15b36798085a99`; no prior local checkout was assumed current.

@@ -8,7 +8,7 @@ const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
 const server = createServer(async (request, response) => {
   try {
     const pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
-    const file = resolve(root, '.' + (pathname === '/' ? '/poc/speech.html' : pathname));
+    const file = resolve(root, '.' + (pathname === '/' ? '/index.html' : pathname));
     const rel = relative(root, file);
     if (rel.startsWith('..') || isAbsolute(rel) || !types[extname(file)]) {
       response.writeHead(403).end('Forbidden'); return;
