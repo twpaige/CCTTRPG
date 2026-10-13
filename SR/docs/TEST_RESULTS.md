@@ -1,10 +1,18 @@
-# SR Stage 1 — Test results and Windows verification
+# SR — Stage 1 and Stage 2 test results
+
+## Current gate status (2026-10-12)
+
+- **G1: BLOCKED / open.** The owner reports successful Chrome narration, automatic progression and playback controls in the Stage 2 assignment. The 30-minute desktop reliability test is still underway. This owner report is evidence for those reported behaviors, not a claim that every detailed checklist item below was performed.
+- **G2: BLOCKED.** Stage 2 implementation and automated evidence are recorded separately below; physical Android installation and acceptance tests remain required.
+- The owner explicitly authorized Stage 2 in parallel with open G1. No Stage 3 or later work is authorized or implemented.
+
+# Stage 1 — original implementation evidence and Windows verification
 
 Date: 2026-10-12 (America/Chicago). Scope: **Stage 1 only**.
 
 **G1 acceptance status: BLOCKED — awaiting owner desktop Chrome/audible verification.**
 
-Implementation and available automated testing are complete. The production controller/speech adapter pass the tests below. No audible test, Chrome-rendered test run, or 30-minute browser session is claimed as passed. Do not advance to Stage 2 based on these results. The owner explicitly authorized restarting an interrupted utterance on Resume; this implementation uses that behavior consistently.
+Implementation and available automated testing are complete. The production controller/speech adapter pass the tests below. The following environment evidence and checklist describe the original Stage 1 delivery; the owner's later report is recorded above. No 30-minute browser session is claimed as passed. Stage 2 proceeded under the owner's explicit parallel-work authorization, not a completed G1. The owner explicitly authorized restarting an interrupted utterance on Resume; this implementation uses that behavior consistently.
 
 ## Files
 
@@ -141,6 +149,95 @@ After these checks, record PASS or FAIL for each applicable item and the final G
 - Diagnostic speech “requested” entries precede the native call; they are not evidence that sound started. “Ended” entries reflect native completion callbacks. Timers/listeners are released on completion or cancellation, and event-log memory is capped at 200 entries.
 - No Windows/browser security settings, permissions, installed engines or network settings were changed for testing.
 
-## Future action-plan boundary — design note only
+## Stage 1 action-plan boundary — historical design note
 
-The Stage 1 engine executes each step as speak(question) → wait(recall milliseconds) → speak(answer), with a card/step cursor and cancellable operation generation. A possible future serialized plan would contain a session ID and ordered card units with `speak {text}` / `wait {milliseconds}` actions and stable unit IDs; controls would be Start/Pause/Resume/Skip-unit/Stop and completion/error notifications. Learning/scheduling rules would stay in JavaScript. This is only the Stage 1 contract sketch requested by the plan: no Android module, native code or Stage 2 experiment is included.
+The Stage 1 engine executes each step as speak(question) → wait(recall milliseconds) → speak(answer), with a card/step cursor and cancellable operation generation. Its proposed serialized boundary contained a session ID and ordered card units with `speak {text}` / `wait {milliseconds}` actions and stable unit IDs. Stage 1 added no Android code. Stage 2 below implements that boundary without modifying the desktop application.
+
+# Stage 2 — Android speech and locked-screen proof
+
+Date: 2026-10-12 (America/Chicago). **G2 acceptance status: BLOCKED — owner phone required.** Implementation scope is the fixed-sample proof only.
+
+## Files created or modified
+
+| Path under `SR/` | Purpose |
+|---|---|
+| `js/playback-plan.js` | Shared JavaScript question/recall/answer sequencing, passes and plan validation |
+| `mobile/settings.gradle`, `build.gradle`, `gradle.properties` | Minimal Android build configuration |
+| `mobile/gradlew`, `gradlew.bat`, `gradle/wrapper/*` | Official Gradle 8.11.1 wrapper, pinned distribution checksum |
+| `mobile/.gitignore` | Exclude local SDK/JDK, caches, APK/build outputs, machine settings and keys |
+| `mobile/app/build.gradle` | Android app and automatic packaging of shared sample/CSS/plan assets |
+| `mobile/app/src/main/AndroidManifest.xml` | Launcher, private foreground playback service, required platform permissions |
+| `mobile/app/src/main/java/com/crownandcall/srproof/MainActivity.java` | Local WebView, bounded JS bridge, voice inventory and notification permission |
+| `mobile/app/src/main/java/com/crownandcall/srproof/Plan.java` | Native validation of serialized action plans |
+| `mobile/app/src/main/java/com/crownandcall/srproof/PlaybackEngine.java` | Platform-independent native action executor and cancellation tokens |
+| `mobile/app/src/main/java/com/crownandcall/srproof/PlaybackService.java` | Dynamic native TTS, completion callbacks, recall timers, focus, notification controls, wake lock and completion journal |
+| `mobile/web/index.html`, `mobile.js` | Small sample UI, actual WebView speech probe and diagnostic display |
+| `mobile/tests/plan.test.mjs` | Shared plan and unchanged desktop/native sequence parity tests |
+| `mobile/tests/PlaybackEngineTest.java`, `run-native.ps1` | Framework-free production executor tests and Windows runner |
+| `docs/ANDROID_SETUP.md` | Windows Studio/SDK/JDK/USB/build/install/update instructions and device checklist |
+| `docs/TEST_RESULTS.md` | This gate evidence and owner report update |
+
+`SPECIFICATION.md`, `BUILD_PLAN.md`, `Joshua18.html` and all Stage 1 application/test files are preserved. There is no editor, IndexedDB, mastery/scheduling implementation, prerecorded audio, server or cloud TTS dependency. The bounded completion journal is diagnostic evidence only. All new project files remain under `SR/`; no repository publishing configuration changed.
+
+The build plan's proposed Capacitor wrapper was simplified to a plain WebView with one local bridge and the same JavaScript-defined plan/native foreground-service execution model. See the explicit decision and platform references in [ANDROID_SETUP.md](ANDROID_SETUP.md). No third-party runtime library or new TTS engine is bundled. This is a candidate route pending device evidence, not a claim that WebView's API was tested on a phone.
+
+## Automated and build evidence
+
+Executed with Node v24.19.0 and portable OpenJDK 17.0.20.1. SDK 35's official platform archive was used for the Android API compilation check. Development tools/caches are ignored under `mobile/.tools/`; global Java settings were not changed.
+
+| Test | Status | Evidence |
+|---|---|---|
+| Stage 1 regression suite | PASS | `node SR/tests/run.mjs`: 33/33, exit 0 |
+| Shared JavaScript action plans | PASS | `node SR/mobile/tests/plan.test.mjs`: 6/6, exit 0 |
+| Production native executor | PASS | `SR/mobile/tests/run-native.ps1 -Jdk <JDK17>`: 16/16, exit 0 |
+| Android API source compilation | PASS | All four production Java classes compile against SDK 35 `android.jar`; only a deprecated API note |
+| APK packaging | PASS | Gradle 8.11.1 / AGP 8.9.2 `assembleDebug`: BUILD SUCCESSFUL; bundled HTML, JavaScript, shared sample and CSS present |
+| Android lint | PASS | `lintDebug`: 0 errors; reviewed warnings for intentionally enabled JavaScript and Android 12+ data-extraction rules |
+| Debug APK signature | PASS | SDK `apksigner verify --verbose`: verifies, APK Signature Scheme v2, one signer |
+| Physical installation/runtime | BLOCKED | No owner phone connected or tested in this session |
+
+The shared-plan suite checks all three cards/27 actions, question → recall → answer ordering, unique IDs across passes, invalid input, unchanged samples, and sequence parity with the real Stage 1 controller. The 16 native cases cover sequential completion without JavaScript callbacks, all cards/steps, speech and recall Pause/Resume, Stop during speech/recall/answer, partial-card non-completion, whole-card Skip, paused Skip, Restart with stale waits, 20 rapid cycles, stale error callbacks, duplicate completion, explicit retry after error, interruption pause behavior, initially paused preparation, journal failure and zero/long recall.
+
+These tests use fake speech, clocks and host resources. They do **not** exercise Android's actual TTS service, audio-focus implementation, Bluetooth routing, foreground-service lifecycle, wake locks or power management. Source compilation is not an APK/device test. Notification controls and phone cleanup remain manual acceptance items.
+
+The debug APK was produced locally at `SR/mobile/app/build/outputs/apk/debug/app-debug.apk`. It is an ignored build output, not committed to Git. The development SDK contains platform 35 and Build-Tools 35.0.0; Platform-Tools/adb is not installed here, and Gradle reported that package's license was not accepted. That warning did not prevent APK packaging. No SDK license was accepted on the owner's behalf. The owner setup guide installs Platform-Tools through Studio and asks the owner to review its terms. The first build invocation had a PowerShell argument-quoting error; correcting the quoted Gradle property produced the successful build above.
+
+Local verified APK SHA-256: `c07eace7e147ae329316b9cafb4555a69b3cbdb18e2c6fa366483f3c0cc17f8f`. A build on the owner's computer may differ, including its debug signature.
+
+## Manual results and remaining evidence
+
+No Android physical-device test was performed by the agent. Follow the numbered Windows instructions in [ANDROID_SETUP.md](ANDROID_SETUP.md), then record observations for these matching checklist IDs. PASS requires observation, FAIL requires an observed failure, and BLOCKED here means not performed because the owner/device is needed.
+
+| IDs | Test | Status | Remaining evidence |
+|---|---|---|---|
+| A1 | Actual WebView speech API availability | BLOCKED | API presence/absence, voices, optional audible probe; Android/WebView versions |
+| A2 | Native TTS initialization and voice selection | BLOCKED | Engine/voice identity, audible selection, missing-voice behavior where reproducible |
+| A3 | Question/recall/answer/next-step/next-card | BLOCKED | Full hands-free audible sample pass |
+| A4 | Pause/Resume during speech and recall | BLOCKED | Repeated utterance and remaining recall interval |
+| A5 | Stop during speech and recall | BLOCKED | Silence, no delayed action, service/notification cleanup |
+| A6 | Skip and Restart | BLOCKED | Whole-card skip and restart without stale speech |
+| A7 | Rapid controls / overlapping sessions | BLOCKED | 20 physical control cycles without overlap/stalls |
+| A8 | Bluetooth routing with screen locked | BLOCKED | Audio heard in actual paired earbuds/headset |
+| A9 | Offline speech | BLOCKED | Fresh session in airplane mode with local voice and Bluetooth |
+| A10 | Incoming call / competing audio | BLOCKED | Pause on focus loss; explicit Resume afterward |
+| A11 | Bluetooth disconnect/reconnect | BLOCKED | Pause on disconnect, no unexpected speaker speech or auto-resume |
+| A12 | App backgrounding and locking | BLOCKED | Progress without a visible WebView; no duplicate session on reopening |
+| A13 | Long locked-screen reliability | BLOCKED | Two 30-minute locked Bluetooth runs, at least one offline, per build plan G2 |
+| A14 | Locked notification controls and cleanup | BLOCKED | Pause/Resume/Skip/Stop and no running service/wake lock after Stop |
+| A15 | Process death/relaunch/update | BLOCKED | No auto-speech; completion journal persists; no partial-card completion |
+
+No runtime architecture failure has yet been observed because the app has not run on the owner's phone. If the route fails, record the exact phase, device, voice, error and interruption; stop for a bounded correction/reassessment. Do not silently replace the shared JavaScript architecture or proceed to Stage 3.
+
+## Known limits and operational contract
+
+- Native TTS uses installed offline English voices only. Availability and actual offline behavior are separate tests; no Google UK English Male Android guarantee.
+- Whole prepared plans are finite (1–100 passes, three fixed cards). The service interprets `speak`/`wait` actions; it contains no flashcard/review policy. No WebView timer drives background progression.
+- Resume repeats interrupted speech; recall resumes its remaining time. Calls/focus loss and output disconnection are intended to pause until explicit Resume. OEM behavior needs testing.
+- A missing speech callback becomes an error after 120 seconds. Recall is bounded to 120 seconds. A 150-second wake lock is renewed at action boundaries and released on non-playing states. These bounds prevent indefinite wake-lock ownership, not all possible OEM termination.
+- Stop/completion request TTS shutdown and foreground-service removal. The service uses `START_NOT_STICKY`; process death never automatically restarts narration. The journal keeps only the latest 200 completed cards and is not a recovery/scheduling implementation.
+- Notification actions provide Pause/Resume, Skip and Stop; Restart is in the app. First notification permission approval requires another explicit Start. Notification display depends on phone privacy settings.
+- The app loads only bundled allowlisted assets into its bridge-enabled WebView, with no INTERNET permission, external navigation, file/content access, or third-party scripts. Normal offline TTS and Bluetooth media routing belong to Android/the selected engine.
+- Lint's JavaScript warning is expected for the shared HTML/JS UI; the allowlist/CSP and disabled navigation restrict bridge exposure. Lint also notes that `allowBackup=false` does not uniformly govern Android 12+ device transfer; this proof has no personal library, and its diagnostic history should not be treated as a portable backup. Production backup policy remains later work.
+- Minimum Android API is 26; a current WebView is required for the JavaScript UI (Chromium 92+). No emulator, device, installation, sound, power behavior or screen-lock success is inferred from unit tests or compilation.
+
+**G1 remains open; G2 remains BLOCKED pending owner installation and physical verification. Stage 2 code delivery does not authorize Stage 3.**

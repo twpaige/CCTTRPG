@@ -1,0 +1,24 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'com.crownandcall.srproof'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'com.crownandcall.srproof'
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName '0.2.0'
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    sourceSets.main.assets.srcDir layout.buildDirectory.dir('generated/srAssets')
+}
+
+// Package the actual shared JavaScript, not a manually maintained Android copy.
+tasks.register('prepareWebAssets', Sync) {
+    into layout.buildDirectory.dir('generated/srAssets')
+    from('../web')
+    from('../../poc') { include 'sample.js', 'speech.css'; into 'shared' }
+    from('../../js') { include 'playback-plan.js'; into 'shared' }
+}
+tasks.named('preBuild').configure { dependsOn 'prepareWebAssets' }
