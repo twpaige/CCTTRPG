@@ -2,7 +2,7 @@
 
 ## Stage 4 — desktop authoring, 2026-10-13
 
-**G4: PASS for the implemented desktop authoring gate, verified by real Chrome UI automation. Owner manual usability verification remains pending.** The owner's Stage 4 assignment explicitly authorizes this stage despite the outstanding G3 Android checks. It does not close those checks or authorize Stage 5. Earlier Stage 1, 2, 2.5 and 3 evidence below is preserved; statements about unavailable later stages describe their historical delivery dates.
+**G4: CLOSED / PASS — desktop authoring automation and owner hands-on acceptance completed on 2026-10-13.** The owner's Stage 4 assignment explicitly authorizes this stage despite the outstanding G3 Android checks. It does not close those checks or authorize Stage 5. Earlier Stage 1, 2, 2.5 and 3 evidence below is preserved; statements about unavailable later stages describe their historical delivery dates.
 
 Editor: **https://crownandcall.com/SR/**. [Authoring guide](AUTHORING.md). Source baseline: `0e25f07e7d0f3256ead1d1904f31ed44de5082d3`, freshly checked against `origin/main`. Implementation committed and pushed to `main` as **`fb5633071e5a96a10e87af0ea0956ccc49bf4fd3`**.
 
@@ -56,7 +56,15 @@ node SR/tests/editor.mjs
 
 `SR_TEST_URL` can point to `https://crownandcall.com/SR` to exercise deployed assets in an isolated profile. `SR_SCREENSHOT` optionally saves desktop and small-screen PNGs to a development location. Development-only Playwright is not packaged in the website or Android app.
 
-### Owner verification and limitations
+### Owner hands-on verification — 2026-10-13
+
+**PASS / Stage 4 formally closed by owner request.** On the live website `https://crownandcall.com/SR/`, the owner created a real **States** series, authored and saved a **Delaware** flashcard with their own question/answer mnemonic content, navigated away/reopened the card, and confirmed **all content remained present**. The owner approved closing Stage 4. This confirms the central real-world create/save/reopen workflow in addition to the 17/17 Chrome acceptance scenarios and all existing passing regressions.
+
+**Scope of observed manual acceptance:** The owner did not separately report keyboard-only navigation, every deletion/reordering operation, exact record-level export/restore of the Delaware card, or full usability checks from the disposable trial. Those are covered by automated tests where stated, but should not be described as individually owner-tested. The authored Delaware card is in the desktop browser's local IndexedDB; it does **not** yet play in the desktop proof or automatically synchronize to Android. Authored-card audio integration is Stage 6, not a Stage 4 defect. Recommend exporting a JSON backup of real authoring data.
+
+**Outstanding independent work:** Earlier Android G2/G3 checklist items remain open. Stage 5 has not been authorized by this documentation update.
+
+### Owner verification and limitations (historical instructions prior to acceptance)
 
 No owner Stage 4 manual authoring result is claimed. Please use [the disposable trial](https://crownandcall.com/SR/index.html?test=SRLearning-test-owner-editor) to create a personally meaningful multi-step card, try Tab/Shift+Tab and Enter/Space, confirm the binding/ordering explanations, close/reopen the same browser/profile, and export/reselect a backup. Confirm that writing long stories and finding Save/Cancel are comfortable. Report any unexpected text or ordering change before entering a large real library. UI automation establishes G4's implemented behaviors; personal usability acceptance remains for the owner.
 
