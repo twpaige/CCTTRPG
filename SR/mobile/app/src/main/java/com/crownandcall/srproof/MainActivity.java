@@ -15,7 +15,11 @@ import java.util.*;
 
 public final class MainActivity extends Activity {
     private static final String ORIGIN = "https://sr.invalid/";
-    private static final Set<String> ASSETS = new HashSet<>(Arrays.asList("index.html", "mobile.js", "shared/sample.js", "shared/speech.css", "shared/playback-plan.js"));
+    private static final Set<String> ASSETS = new HashSet<>(Arrays.asList("index.html", "mobile.js", "shared/sample.js", "shared/speech.css", "shared/playback-plan.js",
+        "data/index.html", "data/panel.js", "poc/speech.css", "js/db.js", "js/repository.js", "js/validation.js", "js/backup.js"));
+    private static final int OPEN_BACKUP = 30, SAVE_BACKUP = 31, MAX_BACKUP = 32 * 1024 * 1024;
+    private String pendingBackup;
+    private boolean filePending;
     private WebView web;
     private TextToSpeech inventory;
     private volatile String voices = "[]", voiceMessage = "Loading Android TTS voices…", bridgeError = "";
@@ -34,12 +38,16 @@ public final class MainActivity extends Activity {
         });
         setContentView(web);
         web.getSettings().setJavaScriptEnabled(true);
+        web.getSettings().setDomStorageEnabled(true);
         web.getSettings().setAllowFileAccess(false);
         web.getSettings().setAllowContentAccess(false);
         web.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         web.addJavascriptInterface(new Bridge(), "SRNative");
         web.setWebViewClient(new WebViewClient() {
-            @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) { return true; }
+            @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                String url = request.getUrl().toString();
+                return !request.isForMainFrame() || !(url.equals(ORIGIN + "index.html") || url.equals(ORIGIN + "data/index.html"));
+            }
             @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                 String url = request.getUrl().toString();
                 String path = url.startsWith(ORIGIN) ? url.substring(ORIGIN.length()) : "";
@@ -118,6 +126,60 @@ public final class MainActivity extends Activity {
             });
         }
         @JavascriptInterface public void refresh() { runOnUiThread(() -> { if (visible) refreshVoices(); }); }
+        @JavascriptInterface public void openBackup() { runOnUiThread(() -> chooseBackup(null)); }
+        @JavascriptInterface public void saveBackup(String json) { runOnUiThread(() -> chooseBackup(json)); }
+    }
+    private void fileResult(JSONObject result) {
+        if (!isDestroyed()) web.evaluateJavascript("window.dispatchEvent(new CustomEvent('sr-file-result',{detail:" + result.toString() + "}));", null);
+    }
+    private void fileError(String message) {
+        try { fileResult(new JSONObject().put("error", message)); } catch (JSONException ignored) { }
+    }
+    private void chooseBackup(String json) {
+        if (!visible || filePending) return;
+        if (PlaybackService.instance != null) { fileError("Stop playback before transferring backups."); return; }
+        if (json != null && json.getBytes(StandardCharsets.UTF_8).length > MAX_BACKUP) { fileError("Backup exceeds 32 MiB."); return; }
+        Intent intent = new Intent(json == null ? Intent.ACTION_OPEN_DOCUMENT : Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE).setType("application/json");
+        if (json != null) intent.putExtra(Intent.EXTRA_TITLE, "sr-backup-" + System.currentTimeMillis() + ".json");
+        pendingBackup = json; filePending = true;
+        try { startActivityForResult(intent, json == null ? OPEN_BACKUP : SAVE_BACKUP); }
+        catch (ActivityNotFoundException error) { pendingBackup = null; filePending = false; fileError("No document picker is available."); }
+    }
+    @Override protected void onActivityResult(int code, int result, Intent data) {
+        super.onActivityResult(code, result, data);
+        if (code != OPEN_BACKUP && code != SAVE_BACKUP) return;
+        String output = pendingBackup; pendingBackup = null;
+        if (result != RESULT_OK || data == null || data.getData() == null) {
+            filePending = false;
+            try { fileResult(new JSONObject().put("cancelled", true)); } catch (JSONException ignored) { }
+            return;
+        }
+        android.net.Uri uri = data.getData();
+        new Thread(() -> {
+            try {
+                JSONObject response = new JSONObject();
+                if (code == SAVE_BACKUP) {
+                    if (output == null) throw new IOException("Backup interrupted. Export again; local library was not changed.");
+                    try (OutputStream stream = getContentResolver().openOutputStream(uri, "wt")) {
+                        if (stream == null) throw new IOException("Cannot open output file.");
+                        stream.write(output.getBytes(StandardCharsets.UTF_8)); stream.flush();
+                    }
+                    response.put("saved", true);
+                } else {
+                    try (InputStream stream = getContentResolver().openInputStream(uri); ByteArrayOutputStream bytes = new ByteArrayOutputStream()) {
+                        if (stream == null) throw new IOException("Cannot open input file.");
+                        byte[] buffer = new byte[8192]; int count;
+                        while ((count = stream.read(buffer)) != -1) {
+                            if (bytes.size() + count > MAX_BACKUP) throw new IOException("Backup exceeds 32 MiB; nothing was changed.");
+                            bytes.write(buffer, 0, count);
+                        }
+                        response.put("json", bytes.toString(StandardCharsets.UTF_8.name()));
+                    }
+                }
+                runOnUiThread(() -> { filePending = false; fileResult(response); });
+            } catch (Exception error) { runOnUiThread(() -> { filePending = false; fileError("File transfer failed: " + error.getMessage()); }); }
+        }, "SR-backup-file").start();
     }
     @Override public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(code, permissions, results);

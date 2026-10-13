@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; base-uri 'none'">
+<title>SR — Data and recovery</title><link rel="stylesheet" href="../poc/speech.css"></head>
+<body><main><p class="eyebrow">SR / STAGE 3</p><h1>Data and recovery</h1>
+<p>Your library stays on this device. A JSON import replaces the entire library, progress, presets and preferences. Keep dated backups outside this app.</p>
+<p id="status" role="status">Opening local storage…</p><p id="error" role="alert"></p>
+<section><h2>Export</h2><button id="export" disabled>Save complete JSON backup</button>
+<button id="recovery" disabled>Save previous pre-import backup</button>
+<p>Downloads alone do not prove a backup was saved. Open the saved file again below before replacing data.</p></section>
+<section><h2>Restore from JSON</h2><ol><li>Stop playback and close other speech pages.</li><li>Choose and preview the file to restore.</li><li>Save a current backup, then choose that saved file as your safety backup.</li><li>Confirm replacement.</li></ol>
+<button id="choose-import" disabled>Choose JSON to restore</button><input id="import-file" type="file" accept=".json,application/json" hidden>
+<p id="preview">No restore file selected.</p>
+<button id="choose-safety" disabled>Verify saved current backup</button><input id="safety-file" type="file" accept=".json,application/json" hidden>
+<p id="safety-status">No safety backup verified.</p>
+<label><input id="confirm" type="checkbox"> I stopped playback and want to replace all local learning data with the previewed file.</label>
+<button id="replace" disabled>Replace local library</button></section>
+<p>A previous pre-import copy is kept locally after a successful restore. Clearing browser/app storage removes it too. File limit: 32 MiB. This panel does not edit cards or connect storage to sample playback.</p>
+<p id="back"></p></main><script type="module" src="panel.js"></script></body></html>

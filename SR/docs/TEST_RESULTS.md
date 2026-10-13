@@ -1,5 +1,84 @@
 # SR — Stage 1 and Stage 2 test results
 
+## Stage 3 — storage implementation, 2026-10-13
+
+The current owner assignment explicitly authorizes Stage 3 despite the remaining formal G1/G2 checklist items. Earlier evidence below is preserved. Source was freshly cloned from GitHub `main` at `76436b14af9f3afa97bdcc1abb15b36798085a99`; no prior local checkout was assumed current.
+
+**G3: BLOCKED / open for owner Android evidence.** Automated desktop storage, browser restart, real IndexedDB rollback and file recovery pass. Physical Android IndexedDB, document-picker transfers, process restart and APK-update data retention have not been observed. No Stage 4 editor, scheduling, mastery presentation, Drive sync or playback integration has been started.
+
+### Implementation and files
+
+Created:
+- `js/db.js`, `js/repository.js`, `js/validation.js`, `js/backup.js`: version-1 IndexedDB, indexed CRUD/progress/preset/settings API, validation, complete snapshots and atomic confirmed replacement with a pre-import recovery copy.
+- `data/index.html`, `data/panel.js`: minimal shared export/preview/safety-file-reselection/confirmation/recovery panel.
+- `tests/persistence.test.js`, `tests/persistence.html`, `tests/persistence-runner.js`: isolated real-IndexedDB tests and downloadable synthetic transfer fixture.
+- `tests/browser.mjs`: development-only Playwright automation using a disposable browser profile, restart, offline access, file UI and interrupted-import verification.
+- `docs/STORAGE.md`: API, exact version-1 contract, limitations and owner steps.
+
+Modified:
+- `mobile/app/src/main/java/com/crownandcall/srproof/MainActivity.java`: DOM storage enabled at the same local HTTPS origin; allowlisted Data assets/navigation; bounded Android document-picker import/export bridge. Native speech/executor/service code is unchanged.
+- `mobile/app/build.gradle`: packages the same storage/Data modules and stylesheet, not a second implementation.
+- `mobile/web/index.html`: Data link.
+- `.github/workflows/sr-android.yml`: Data path trigger and real Chromium storage tests in the unsigned build job. Signing identity, signing steps, application ID and version progression remain unchanged.
+- `docs/TEST_RESULTS.md`: this evidence. No unrelated files modified.
+
+### Automated verification
+
+Windows, Node v24.19.0; Chrome headless 154.0.0.0; available bundled Playwright 1.62.1; portable Temurin JDK 17.0.20.1; official Android platform-35-ext15 API jar. No global Java/SDK setting or signing credential was read or changed. SDK source compilation does not certify packaging or phone behavior.
+
+| Check | Status | Evidence |
+|---|---|---|
+| Existing desktop controller/speech tests | PASS | 33/33 Node; same 33 also pass in actual Chrome |
+| Existing shared playback plans | PASS | 6/6 |
+| Existing native executor | PASS | 16/16 production Java tests |
+| Existing release safety | PASS | 6/6; all 61 preexisting regressions pass |
+| Real IndexedDB persistence suite | PASS | 38/38 in Chrome; includes initialization, CRUD, ordered/unlimited practical steps, stable IDs, indexed retrieval, progress isolation, settings, preset references, cascades, stale writes and complete round-trip |
+| Invalid-import nonmutation | PASS | Truncated JSON, future format/schema, duplicate/missing IDs/progress, dangling references, invalid mastery/date/order, unsupported/unsafe keys and null-due illustrative data are rejected |
+| Transaction failure/recovery | PASS | Explicit abort, simulated quota exception after clears, actual asynchronous constraint failure, unchanged previous recovery copy, safety-backup mismatch, explicit confirmation and successful previous-library restoration |
+| Database upgrade safety | PASS | v0→v1 initialization, blocked v1→test-v2, aborted upgrade retaining v1/data, versionchange connection close, future-version refusal without deletion. Test v2 is disposable, not a shipped schema |
+| Actual browser process restart | PASS | Close persistent Chrome context/process; relaunch same disposable profile/origin; exact saved content retained |
+| Offline storage | PASS | Browser context networking disabled; read, individual progress write, export and restore succeed. Cold offline website launch is not claimed |
+| Data file UI | PASS | Real download, file reselection, preview, disabled replacement without prerequisites, explicit confirmation, replacement, recovery download and page reload in an isolated test database |
+| Page destruction during import | PASS | Held an actual replacement transaction active; closed its page; reopened and confirmed old content survived |
+| 1,000 cards × 10 steps | PASS | Five export+restore runs; all 10,000 steps validated each time; indexed ID lookup and reopen retained 1,000 cards. Example timings: 212.6, 382.2, 365.0, 393.1, 377.0 ms; median 377.0 ms, slowest 393.1 ms (before the final documentation-only review) |
+| Android API compilation | PASS | All production Java sources compile against SDK 35; existing deprecated API note only |
+| Android file transfer, restart and update | BLOCKED | Requires owner Samsung/WebView and installed signed APK; no emulator or physical-device result inferred |
+
+Storage tests are separate from the 61 regression tests; the lifecycle/UI scenarios are additional integration assertions, not inflated into independent unit-test counts. Browser databases are disposable `SRLearning-test-*`; no personal library is reset. The tests use synthetic text only.
+
+### Reproduce
+
+From repository root, using Node 22+ and JDK 17+:
+
+```powershell
+node SR/tests/run.mjs
+node SR/mobile/tests/plan.test.mjs
+node SR/mobile/tests/release.test.mjs
+& ./SR/mobile/tests/run-native.ps1 -Jdk 'C:/path/to/jdk-17'
+node SR/tests/serve.mjs
+```
+
+With the static server still running, open `http://127.0.0.1:8765/tests/persistence.html`, or run:
+
+```powershell
+# Existing development-only Playwright installation; no dependency ships in SR.
+$env:SR_PLAYWRIGHT = 'C:/path/to/node_modules/playwright'
+$env:SR_BROWSER = 'C:/Program Files/Google/Chrome/Application/chrome.exe'
+node SR/tests/browser.mjs
+```
+
+CI installs pinned Playwright 1.62.1 and Chromium into runner development storage, then runs the same script before APK compilation/signing. No application framework/build system is introduced. Expected public URLs after site deployment:
+- `https://crownandcall.com/SR/tests/persistence.html`
+- `https://crownandcall.com/SR/data/index.html`
+
+### Remaining evidence and limits
+
+Follow [STORAGE.md](STORAGE.md#owner-verification) for the synthetic-file desktop/phone round-trip, cancel/invalid-file checks, exact Unicode text/order, offline force-stop/relaunch, and retention across the next APK update. Recheck the existing sample audio, Bluetooth, screen-lock and notification controls; their regression behavior is preserved in code but not newly certified on the phone. Existing G1/G2 and Stage 2.5 remaining owner checks below stay open.
+
+The illustrative specification JSON is not a historical shipped format. A null-due rejection fixture is tested; an unapproved legacy converter is not invented. `reviewEvents` is reserved/empty until Stage 6; native diagnostic entries remain separate and untouched. Current corrupted/unopenable storage fails closed without deletion; exceptional recovery without a readable safety snapshot remains a limitation, not an automated recovery claim. App uninstall/browser-data clearing can remove both working data and the local recovery copy; retain dated off-device backups. No offline desktop cold launch, authored-card playback, audio-setting UI integration or scheduling is claimed.
+
+---
+
 ## Owner verification update — 2026-10-13
 
 The owner personally tested the live desktop page and the installed Samsung Android application on October 12–13, 2026. This section supersedes the **historical pending-owner statements** below; the original automated evidence and detailed checklists remain for traceability.

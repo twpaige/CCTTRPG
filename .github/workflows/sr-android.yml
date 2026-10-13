@@ -9,6 +9,7 @@ on:
       - 'SR/mobile/**'
       - '!SR/mobile/**/*.md'
       - 'SR/js/**'
+      - 'SR/data/**'
       - 'SR/poc/sample.js'
       - 'SR/poc/speech.css'
       - 'SR/tests/**'
@@ -51,6 +52,18 @@ jobs:
           mkdir -p SR/mobile/app/build/poc-tests
           javac -d SR/mobile/app/build/poc-tests SR/mobile/app/src/main/java/com/crownandcall/srproof/PlaybackEngine.java SR/mobile/tests/PlaybackEngineTest.java
           java -cp SR/mobile/app/build/poc-tests com.crownandcall.srproof.PlaybackEngineTest
+      - name: Test real browser storage and recovery
+        run: |
+          npm install --prefix "$RUNNER_TEMP/sr-browser-tests" --no-audit --no-fund --ignore-scripts playwright@1.62.1
+          node "$RUNNER_TEMP/sr-browser-tests/node_modules/playwright/cli.js" install --with-deps chromium
+          node SR/tests/serve.mjs > "$RUNNER_TEMP/sr-test-server.log" 2>&1 &
+          server=$!
+          trap 'kill "$server"' EXIT
+          for attempt in {1..30}; do
+            if curl --silent --fail http://127.0.0.1:8765/tests/persistence.html > /dev/null; then break; fi
+            sleep 1
+          done
+          SR_PLAYWRIGHT="$RUNNER_TEMP/sr-browser-tests/node_modules/playwright" node SR/tests/browser.mjs
       - name: Build and lint release (no signing credentials)
         working-directory: SR/mobile
         env:
