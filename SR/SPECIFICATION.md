@@ -5,7 +5,7 @@ Specification v0.6 · Stage 6 desktop playback, approved Stage 5 rules · 2026-1
 
 A personal, local-first audio memorization system for desktop Chrome and Android listening. The learner writes their own mnemonic associations; preserve every word, Unicode character, identifier and authored order. No AI-generated stories, subject-specific mandatory fields, accounts, public sharing, cloud database or backend. Desktop is the content/mastery authority. JSON file transfer remains independent of Google services.
 
-Stage 4 is formally CLOSED/PASS. Stage 5 provides step mastery, scheduling policy, selection previews, migration and reusable completion APIs. Stage 6 connects these to desktop authored-card audio at `/SR/`; the editor remains available at `/SR/library.html` in the same origin/database. G6 remains BLOCKED pending the owner's actual audible Delaware verification. Historical evidence remains in [TEST_RESULTS.md](docs/TEST_RESULTS.md).
+Stage 4 is formally CLOSED/PASS. Stage 5 provides step mastery, scheduling policy, selection previews, migration and reusable completion APIs. Stage 6 connects these to desktop authored-card audio at `/SR/`; the editor remains available at `/SR/library.html` in the same origin/database. The owner verified actual Delaware desktop REVIEW audio (all eligible steps, correct pauses and automatic progression) and resulting due-date changes on 2026-10-13. G6 core audible/scheduling acceptance is PASS; full manual-checklist closure remains open. Historical evidence remains in [TEST_RESULTS.md](docs/TEST_RESULTS.md).
 
 ## Hierarchy and ordering
 
