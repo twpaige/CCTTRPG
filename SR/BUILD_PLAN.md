@@ -3,7 +3,7 @@ Current Stage 6 desktop implementation · 2026-10-13
 
 ## Current authority and gates
 
-The owner's Stage 5 rules and Stage 6 assignment supersede the original mastery bands, card-level schedules, L10 90-day interval, whole-unit completion credit and proposed bound recitation grouping. [SPECIFICATION.md](SPECIFICATION.md) is the current rule set. Stage 4 is formally CLOSED/PASS; earlier Android checks remain separately open. Stage 6 is authorized and implemented for desktop; **Stage 7 is not authorized**. G6 awaits actual owner listening evidence. Empirical results belong in [docs/TEST_RESULTS.md](docs/TEST_RESULTS.md).
+The owner's Stage 5 rules and Stage 6 assignment supersede the original mastery bands, card-level schedules, L10 90-day interval, whole-unit completion credit and proposed bound recitation grouping. [SPECIFICATION.md](SPECIFICATION.md) is the current rule set. Stage 4 is formally CLOSED/PASS; earlier Android checks remain separately open. Stage 6 is authorized and implemented for desktop; **Stage 7 is not authorized**. G6 core real-content desktop audible playback and scheduling have now been owner-verified on 2026-10-13; remaining detailed manual G6 checks stay open. Empirical results belong in [docs/TEST_RESULTS.md](docs/TEST_RESULTS.md).
 
 ## Architecture
 
@@ -32,7 +32,7 @@ Desktop playback is at /SR/; authoring moves to /SR/library.html within the same
 5. Hold one exclusive origin/database Web Lock for the active/paused/error session. The transaction helper rejects other current-version writes during ownership. Preserve revision/generation checks for old tabs, stop late callbacks, await outstanding writes before releasing, and never resume automatically after reload.
 6. Run all 162 prior scenarios plus Stage 6 isolated real-Chrome/IndexedDB/Web-Lock/UI tests, injected speech/error/timer/write races and deployed-site tests. Automation uses synthetic text and simulated sound; only the owner can confirm their actual Delaware is heard. See [PLAYBACK.md](docs/PLAYBACK.md).
 
-**G6: BLOCKED pending owner audible verification**, even when all automated checks pass. Require exact Delaware wording/order, audible recall pauses/progression, controls, preferred/fallback voice, long answer/long wait, and explicit REVIEW/AUDIT/mastery outcomes. Preserve old gates independently. No Stage 7 work follows automatically.
+**G6: CORE OWNER AUDIBLE/SCHEDULING PASS; formal full-checklist OPEN.** Owner heard a newly authored Delaware card on the home desktop, confirmed correct ordered question → recall → answer progression and checked the resulting Mastery due-date changes. Other manual playback controls, long passages, AUDIT sound and concurrency edge cases remain to be individually verified. Require exact Delaware wording/order, audible recall pauses/progression, controls, preferred/fallback voice, long answer/long wait, and explicit REVIEW/AUDIT/mastery outcomes. Preserve old gates independently. No Stage 7 work follows automatically.
 
 ### Android investigation boundary
 
