@@ -2,7 +2,7 @@
 
 ## Stage 10 — authored Android listening, 2026-10-14
 
-**G10: implementation and local automated checks PASS; physical Samsung acceptance OPEN.** Stage 10 is ACTIVE; Stage 7 is SUPERSEDED and Stages 8, 9 and 11 are ON HOLD. No later stage is started. This section supersedes earlier statements that Android can only play fixed samples; all dated prior-stage evidence below is preserved.
+**G10: implementation, automated checks and signed release PASS; physical Samsung acceptance OPEN.** Stage 10 is ACTIVE; Stage 7 is SUPERSEDED and Stages 8, 9 and 11 are ON HOLD. No later stage is started. This section supersedes earlier statements that Android can only play fixed samples; all dated prior-stage evidence below is preserved.
 
 Owner authorized the existing WebView/native TTS route with a **simple in-memory completion queue**, replacing the preflight's durable-journal requirement. Up to 512 completions / 16 MiB are retained without eviction; capacity pauses before the next step. Visible/reopened UI reconciles through existing atomic IndexedDB scheduling/receipt rules and removes only successfully handled records. Stop retains queued completions. Unexpected process death can lose every unsaved entry, so those steps may be reviewed again. No automatic speech recovery is implemented or promised.
 
@@ -44,7 +44,13 @@ node SR/tests/native.mjs
 
 [Android listening and Samsung checklist](ANDROID_LISTENING.md) documents installation over the existing APK, real authored REVIEW/early-date isolation, long locked Bluetooth/offline playback and recall, notification/interruption controls, AUDIT/manual mastery, queue reconciliation and accepted process-loss behavior, plus safe OneDrive JSON round-trip verification. Matching file sizes alone do not prove record equality. These checks remain OPEN; earlier G1–G6 and Stage 9 unperformed checks do not become passes through this implementation.
 
-Release build/lint/sign/publication evidence will be recorded after the existing GitHub Actions workflow completes. No signed Stage 10 artifact or physical acceptance is claimed by this local test record alone.
+### Published release evidence
+
+Implementation commit **`db0f93db37f5a57c9f29c7882c28d5c611d47526`** was pushed to `origin/main`. [Android workflow 38621770197](https://github.com/twpaige/CCTTRPG/actions/runs/38621770197) completed **successfully**, including the existing and focused test suites, release compilation/lint, signing, identity/version upgrade guards, publication and download verification. [Pages deployment 38621769805](https://github.com/twpaige/CCTTRPG/actions/runs/38621769805) also succeeded; the public Data page was fetched and contains the new prominent restore result and OneDrive guidance.
+
+[Release `sr-android-100701`](https://github.com/twpaige/CCTTRPG/releases/tag/sr-android-100701) provides the signed [SR.apk — version 0.2.100701](https://github.com/twpaige/CCTTRPG/releases/download/sr-android-100701/SR.apk). Public `build-info.json` confirms source commit above, application ID **`com.crownandcall.srproof`**, versionCode **100701**, original certificate SHA-256 **`ee98699416f616b1707fee62d4311a9de26c30c848b6abd6206112db01f0f0cb`**, and APK SHA-256 **`d8756c53ca96d16af52a95f212b3d9f6fad92da2422b5ffc2288891012d817cf`**. The public APK was independently downloaded (67,195 bytes) and its SHA-256 matched. Signing credentials were neither changed nor exposed.
+
+Install as an update **without uninstalling** after saving a dated backup. Physical installation/data retention, authored locked-screen/Bluetooth/offline speech, native lifecycle/long waits and actual OneDrive provider round trip remain **NOT YET VERIFIED for this APK**. No earlier stage's owner observations are reused as a Stage 10 device pass. Work stops here pending owner verification or separate authorization; no subsequent stage begins.
 
 ## Stage 6 — authored desktop REVIEW / AUDIT, 2026-10-13
 

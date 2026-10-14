@@ -146,3 +146,5 @@ Owner feedback, October 13, 2026, after successful physical-device testing of AP
 4. Preserve all existing data-protection safeguards, including validation, safety-backup verification, explicit replacement authorization, atomic writes and the pre-import recovery copy.
 
 These are **deferred usability improvements** for later UI development, not Stage 3 defects requiring immediate code changes. No interface change or Stage 4 work is authorized by recording this feedback.
+
+**Stage 10 follow-up (2026-10-14):** authorized listening/transfer work now adds explicit OneDrive round-trip instructions, retains the numbered replacement sequence, and displays a bold “Restore Successful — N Flashcards Imported” result using the actual count. Backup verification, stopped-playback acknowledgement, atomic replacement and previous-library recovery remain intact. Automated Data recovery tests pass; whether the revised presentation resolves the owner's confusion remains a physical-device usability check.
