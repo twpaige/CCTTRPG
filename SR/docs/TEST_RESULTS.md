@@ -2,7 +2,15 @@
 
 ## Stage 6 — authored desktop REVIEW / AUDIT, 2026-10-13
 
-**G6: BLOCKED pending owner audible verification of the actual Delaware flashcard and the listening checklist.** Implementation and available local automation are complete. Stage 7 is not started. All owner content remains in its existing origin/profile; no personal database was opened, seeded, cleared or restored by automation. Schema/JSON format remain 2.
+**G6: CORE DESKTOP AUDIBLE PLAYBACK AND SCHEDULING OWNER-VERIFIED / formal full-checklist closure still OPEN.** Implementation and available local automation are complete. Stage 7 is not started. All owner content remains in its existing origin/profile; no personal database was opened, seeded, cleared or restored by automation. Schema/JSON format remain 2.
+
+### Owner's actual desktop acceptance observations — 2026-10-13 (after deployment)
+
+The owner used the live Stage 6 desktop player on their **home computer**, created a **new Delaware flashcard** locally because the daytime computer's States/Delaware library was not present on this computer, and confirmed that the authored card **played beautifully**. They specifically confirmed that playback traversed **all eligible steps in order**, spoke the questions, waited the **correct recall durations**, narrated the answers, and **automatically advanced** without intervening clicks. Afterward the owner opened the Mastery page and confirmed the **next-review dates changed as expected** following completed REVIEW playback. These are owner-observed audible and scheduling results, not simulated tests.
+
+**Result: PASS for core real-content desktop REVIEW playback and owner-observed scheduling.** This resolves the previously unverified core Delaware audible milestone. It does **not** establish that every G6 manual checklist item passed: Pause/Resume/Skip/Stop/Restart in the new authored player, long recitation and long recall, second-tab conflict on the owner's profile, pending mastery during playback, AUDIT audible behavior, alternate voice, and detailed early-versus-due date isolation were not separately reported. Preserve their status as not owner-verified, despite automated coverage. Do not claim formal full G6 closure without that evidence or an explicit owner-approved reduced gate.
+
+**Separate local libraries:** The home computer's new Delaware card and the daytime computer's earlier States/Delaware card are distinct local IndexedDB records. No synchronization or merge was performed. Export dated JSON backups before transferring or replacing either library. Physical Android authored-card playback remains unavailable; Stage 6 Android APK retains the sample listener.
 
 Live player: **https://crownandcall.com/SR/**. Editor: **https://crownandcall.com/SR/library.html**. [Playback/Windows guide](PLAYBACK.md). Implementation commit **`34872c52dae44b0731a4e960fcd7df7cc8b9e2d1`** was pushed to `origin/main`. [Pages deployment 38501349232](https://github.com/twpaige/CCTTRPG/actions/runs/38501349232) succeeded. The deployed HTTPS player then passed the complete **30/30 domain + 7/7 UI** Stage 6 suite in a new disposable Chrome profile, including live second-tab exclusion and reload recovery. This used synthetic test data and simulated speech, never the owner's profile.
 
