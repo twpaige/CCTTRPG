@@ -1,6 +1,12 @@
 # SR — Audio Spaced Repetition System
 Specification v0.6 · Stage 6 desktop playback, approved Stage 5 rules · 2026-10-13
 
+## Owner-approved roadmap revision — 2026-10-14
+
+Stage 7 is **SUPERSEDED**: BOUND series preserve the authored order of **independent** flashcards; no automatic adjacent-card grouping or special full-passage playback feature is desired. Each flashcard retains its own final-step scheduling anchor, ordered steps and mastery. A final comprehensive flashcard may test the entire bound series, with the already-approved KNOWN propagation and AUDIT behavior unchanged.
+
+Stages 8 (focused selections/presets) and 9 (desktop qualification) are **ON HOLD**. The next planned development priority is **Stage 11 (optional Google Drive synchronization)**, followed by **Stage 10 (authored Android listening)**, reversing their original order. Existing JSON export/import remains independently usable. The Stage 11 design must not depend on unfinished Stage 10 native authored playback/receipts; investigate safe desktop-first synchronization and later Android integration before authorizing implementation. Existing testing gates remain open where not verified. No application code or synchronization is authorized by this documentation-only roadmap decision.
+
 ## Purpose and scope
 
 A personal, local-first audio memorization system for desktop Chrome and Android listening. The learner writes their own mnemonic associations; preserve every word, Unicode character, identifier and authored order. No AI-generated stories, subject-specific mandatory fields, accounts, public sharing, cloud database or backend. Desktop is the content/mastery authority. JSON file transfer remains independent of Google services.
