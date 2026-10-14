@@ -1,6 +1,6 @@
 # Author your library
 
-Open **https://crownandcall.com/SR/** in desktop Chrome. Your library is stored in this browser profile on this device. Use the same origin and profile when returning. Clearing site data can erase it; keep dated JSON backups outside the browser.
+Open **https://crownandcall.com/SR/library.html** in desktop Chrome, or choose **Library editor** from the player at `/SR/`. Your existing library stays in the same browser profile and origin; this navigation change needs no import or migration. Stop playback before saving edits. Clearing site data can erase the library; keep dated JSON backups outside the browser.
 
 1. Choose **New series**, enter a name and choose its binding. **Bound** means the sequence matters (for example, a passage journey). **Unbound** means related cards may later be reviewed independently or randomly. This setting does not rearrange your cards. Choose **Save**.
 2. Select the series and choose **New flashcard**. Enter its descriptive name and write the first question and answer. Multiline text, Unicode, punctuation and your own wording are retained; no story is generated for you.
@@ -53,6 +53,6 @@ The approved migration copies each existing card's mastery, last-reviewed time a
 
 Keep a dated export before an update when possible. After upgrading, **Data & recovery → Save original pre-migration backup** downloads the preserved version-1 library; this is separate from **Save previous pre-import backup**. Save these files externally. Confirm your real States/Delaware content and copied progress in the same profile; synthetic test fixtures are not a substitute for that owner check. Never uninstall or clear storage as an update procedure.
 
-The sample speech player still does **not** play authored cards. Stage 5 supplies scheduling/mastery policy and a future-player completion API; full audio integration is Stage 6. Android's current sample player still caps pauses at two minutes and has other long-speech limits. Longer stored overrides await later native integration and are not silently shortened. Desktop cold offline launch is not available yet; already-loaded pages can access local storage without networking.
+The desktop [REVIEW / AUDIT player](PLAYBACK.md) now plays authored cards using Stage 5 scheduling and completion APIs. The separate historical sample proof is unchanged. Android's current sample player still caps pauses at two minutes and has other long-speech limits. Longer stored overrides await later native integration and are not silently shortened. Desktop cold offline launch is not available yet; already-loaded pages can access local storage without networking.
 
-For a disposable owner trial use **https://crownandcall.com/SR/index.html?test=SRLearning-test-owner-editor**. Its Data link preserves that test database selection. Do not use a personal library for destructive acceptance testing.
+For a disposable owner trial use **https://crownandcall.com/SR/library.html?test=SRLearning-test-owner-editor**. Its player, mastery and Data links preserve that test database selection. Do not use a personal library for destructive acceptance testing.

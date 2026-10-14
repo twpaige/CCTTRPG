@@ -6,12 +6,15 @@ const defaultClock = {
 
 // One pending action at a time. Every replacement invalidates its old continuation.
 export class ReviewController {
-  constructor(cards, speech, { clock = defaultClock, onChange = () => {}, onEvent = () => {} } = {}) {
+  constructor(cards, speech, { clock = defaultClock, onChange = () => {}, onEvent = () => {},
+    prepareStep, completeStep, discardStep = () => {}, nextCycle, segment = text => [text], recall = (_step, settings) => settings.recallMs } = {}) {
     this.cards = cards;
     this.speech = speech;
     this.clock = clock;
     this.onChange = onChange;
     this.onEvent = onEvent;
+    this.hooks = { prepareStep, completeStep, discardStep, nextCycle, segment, recall };
+    this.part = 0;
     this.status = 'idle';
     this.phase = 'question';
     this.cardIndex = 0;
@@ -59,7 +62,7 @@ export class ReviewController {
     this.settings = { ...settings };
     this.cardIndex = 0;
     this.stepIndex = 0;
-    this.phase = 'question';
+    this._newStep();
     this.error = '';
     this.status = 'playing';
     this._publish('session-start');
@@ -73,6 +76,7 @@ export class ReviewController {
 
   stop() {
     this._cancelAction();
+    this.hooks.discardStep();
     this.status = 'stopped';
     this.error = '';
     this._publish('stop');
@@ -100,11 +104,11 @@ export class ReviewController {
     this._cancelAction();
     ++this.cardIndex;
     this.stepIndex = 0;
-    this.phase = 'question';
+    this._newStep();
     this.error = '';
     this.status = paused ? 'paused' : 'playing';
     this._publish('skip-card');
-    if (this.cardIndex >= this.cards.length) this._finish();
+    if (this.cardIndex >= this.cards.length && !this.hooks.nextCycle) this._finish();
     else if (!paused) this._execute();
   }
 
@@ -114,47 +118,98 @@ export class ReviewController {
     this._publish('session-finished');
   }
 
+  _newStep() {
+    this.hooks.discardStep();
+    this.context = undefined;
+    this.work = undefined;
+    this.part = 0;
+    this.phase = this.hooks.prepareStep ? 'prepare' : 'question';
+    this.parts = undefined;
+  }
+
+  // A special mastery action cancels the unfinished attempt, even if its dialog is dismissed.
+  resetCurrentStep() { this.pause(); this._newStep(); this._publish('step-reset'); }
+
+  _advance() {
+    if (++this.stepIndex >= this.cards[this.cardIndex].steps.length) { this.stepIndex = 0; ++this.cardIndex; }
+    this._newStep();
+  }
+
+  _error(error) {
+    this._cancelAction(); this.status = 'error'; this.error = error.message;
+    this._publish('playback-error');
+  }
+
   _execute() {
     if (this.status !== 'playing') return;
-    if (this.cardIndex >= this.cards.length) return this._finish();
+    if (this.cardIndex >= this.cards.length) {
+      if (!this.hooks.nextCycle) return this._finish();
+      this.phase = 'cycle';
+    }
     const token = ++this.generation;
     const stillCurrent = () => token === this.generation && this.status === 'playing';
+    if (['prepare', 'commit', 'cycle'].includes(this.phase)) {
+      const phase = this.phase;
+      this._publish(`${phase}-start`);
+      // Retain in-flight work over Pause/Resume. Retry failed commits with the same receipt.
+      if (!this.work) {
+        try {
+          const result = phase === 'prepare' ? this.hooks.prepareStep(this.snapshot)
+            : phase === 'commit' ? this.hooks.completeStep(this.context)
+              : this.hooks.nextCycle();
+          this.work = Promise.resolve(result);
+        } catch (error) { this._error(error); return; }
+      }
+      this.work.then(result => {
+        if (!stillCurrent()) return;
+        this.work = undefined;
+        if (phase === 'prepare') { this.context = result; this.phase = 'question'; }
+        else if (phase === 'commit') this._advance();
+        else {
+          this.cards = result; this.cardIndex = this.stepIndex = 0;
+          if (!result.length) return this._finish();
+          this._newStep();
+        }
+        this._execute();
+      }).catch(error => { if (stillCurrent()) { this.work = undefined; this._error(error); } });
+      return;
+    }
     if (this.phase === 'recall') {
       this.deadline = this.clock.now() + this.remainingMs;
       this._publish('recall-start');
       this.timer = this.clock.setTimeout(() => {
         if (!stillCurrent()) return;
         this.timer = null;
+        this.remainingMs = Math.max(0, this.deadline - this.clock.now());
+        if (this.remainingMs > 0) { this._execute(); return; }
         this._publish('recall-end');
         this.phase = 'answer';
         this._execute();
-      }, this.remainingMs);
+      }, Math.min(this.remainingMs, 2147483647));
       return;
     }
     this.abort = new AbortController();
     const step = this.cards[this.cardIndex].steps[this.stepIndex];
+    const parts = this.parts ??= this.hooks.segment(step[this.phase]);
     this._publish(`${this.phase}-requested`);
-    this.speech.speak(step[this.phase], { ...this.settings, signal: this.abort.signal }).then(result => {
+    this.speech.speak(parts[this.part], { ...this.settings, signal: this.abort.signal }).then(result => {
       if (!stillCurrent() || result !== 'ended') return;
       this.abort = null;
+      if (++this.part < parts.length) { this._execute(); return; }
+      this.part = 0;
+      this.parts = undefined;
       this._publish(`${this.phase}-ended`);
       if (this.phase === 'question') {
         this.phase = 'recall';
-        this.remainingMs = this.settings.recallMs;
+        this.remainingMs = this.hooks.recall(step, this.settings);
       } else {
-        this.phase = 'question';
-        if (++this.stepIndex >= this.cards[this.cardIndex].steps.length) {
-          this.stepIndex = 0;
-          ++this.cardIndex;
-        }
+        if (this.hooks.completeStep) this.phase = 'commit';
+        else this._advance();
       }
       this._execute();
     }).catch(error => {
       if (!stillCurrent()) return;
-      this._cancelAction();
-      this.status = 'error';
-      this.error = error.message;
-      this._publish('speech-error');
+      this._error(error);
     });
   }
 }

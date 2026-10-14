@@ -67,13 +67,14 @@ $('replace').onclick = () => run(async () => {
   $('preview').textContent = 'Restore committed. Previous library is available with Save previous pre-import backup.';
   $('safety-status').textContent = 'A new safety backup is required for another restore.'; await refresh();
 });
-const link = document.createElement('a'); link.href = native ? '../index.html' : '../poc/speech.html'; link.textContent = 'Return to listening proof'; $('back').append(link);
+const link = document.createElement('a'); link.href = '../index.html'; link.textContent = native ? 'Return to listening proof' : 'REVIEW / AUDIT player'; $('back').append(link);
 try {
   const testName = new URLSearchParams(location.search).get('test');
   if (testName !== null && !/^SRLearning-test-[a-zA-Z0-9-]+$/.test(testName)) throw new Error('Invalid isolated test database name.');
   if (!native) {
     const editorLink = document.createElement('a');
-    editorLink.href = '../index.html' + (testName ? `?test=${encodeURIComponent(testName)}` : '');
+    editorLink.href = '../library.html' + (testName ? `?test=${encodeURIComponent(testName)}` : '');
+    if (testName) link.href += `?test=${encodeURIComponent(testName)}`;
     editorLink.textContent = 'Return to library editor';
     $('back').prepend(editorLink, document.createTextNode(' · '));
   }

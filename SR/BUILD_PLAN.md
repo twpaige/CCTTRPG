@@ -1,15 +1,15 @@
 # Dex — SR implementation plan
-Current Stage 5 contract · 2026-10-13
+Current Stage 6 desktop implementation · 2026-10-13
 
 ## Current authority and gates
 
-The owner's Stage 5 assignment and approved migration mapping supersede the original mastery bands, card-level schedules, L10 90-day interval, whole-unit completion credit and proposed bound recitation grouping. [SPECIFICATION.md](SPECIFICATION.md) is the current rule set. Stage 4 is formally CLOSED/PASS; earlier Android checks remain separately open. Stage 5 is authorized; **Stage 6 is not authorized by its completion**. Empirical results belong in [docs/TEST_RESULTS.md](docs/TEST_RESULTS.md).
+The owner's Stage 5 rules and Stage 6 assignment supersede the original mastery bands, card-level schedules, L10 90-day interval, whole-unit completion credit and proposed bound recitation grouping. [SPECIFICATION.md](SPECIFICATION.md) is the current rule set. Stage 4 is formally CLOSED/PASS; earlier Android checks remain separately open. Stage 6 is authorized and implemented for desktop; **Stage 7 is not authorized**. G6 awaits actual owner listening evidence. Empirical results belong in [docs/TEST_RESULTS.md](docs/TEST_RESULTS.md).
 
 ## Architecture
 
 Keep plain HTML/CSS/ES modules, native IndexedDB and the existing static site. Content remains in series/flashcards, with steps embedded in authored order. Independent active step progress lives in schema-2 stepProgress; legacy progress remains a recovery archive. Use atomic transactions, revision/generation checks, explicit Save and confirmations. No server, framework, account system or synchronization service.
 
-Desktop authoring remains at /SR/; /SR/mastery.html manages mastery and previews REVIEW/AUDIT. Native Android listening remains the existing fixed-sample proof. Only the shared storage dependency allowlist changes for schema-2 compatibility; no playback/service policy is changed.
+Desktop playback is at /SR/; authoring moves to /SR/library.html within the same origin and database. /SR/mastery.html manages mastery and previews REVIEW/AUDIT. Native Android listening remains the existing fixed-sample proof. Stage 6 preserves schema 2, native playback/service policy, asset allowlist, origin, application ID and signing.
 
 ## Stage 5 — implementation and G5
 
@@ -23,13 +23,22 @@ Desktop authoring remains at /SR/; /SR/mastery.html manages mastery and previews
 
 **G5 passes** when the approved rules, atomic migration/recovery and desktop controls match these tests without losing content or silently altering other steps. Report unsupported physical-device claims and any open owner verification explicitly.
 
-## Stage 6 handoff — not implemented here
+## Stage 6 — implemented desktop player and G6
 
-On separate authorization, connect authored content to the desktop speech controller using the Stage 5 policy APIs. Keep each card indivisible and selected steps ascending. REVIEW/AUDIT must remain visibly distinct. Integrate real question → recall → answer success boundaries, pause/resume/skip/stop, session ownership and receipt retries. Refresh AUDIT eligibility between repeated cycles. No automatic grading or schedule updates from unsuccessful speech.
+1. `index.html`/`js/player.js` load the actual IndexedDB library. Link the preserved editor, mastery and Data screens; never seed/reset personal content. Choose REVIEW/AUDIT, ALL/one series, due-now/N-day/Max Deferred, unbound shuffle, voice, rate and default recall. Show authored card/step/text/state and empty/error outcomes.
+2. `js/study.js` adapts Stage 5 selection/completion to the original `ReviewController`. A REVIEW pass keeps ordered units; AUDIT repeats refreshed eligible cycles. Questions, full recall waits and complete answers progress without extra gestures. Native `BrowserSpeech` remains the only desktop speech adapter.
+3. Extend that controller with asynchronous prepare/commit/cycle hooks, retained in-flight work across pauses, exact Unicode text segments and long timer chaining. Preserve all original controls/cancellation tests. Commit only after the entire answer; retry the identical receipt/time without replaying an already finished answer.
+4. Queue current-step mastery until successful answer completion, using the established confirmation policy. Reuse `StepCompletionController.special` for card/BOUND-series KNOWN and reset actions. Pause dialogs, discard interrupted choices, and exclude reset AUDIT targets on the next cycle. No automatic mastery increase.
+5. Hold one exclusive origin/database Web Lock for the active/paused/error session. The transaction helper rejects other current-version writes during ownership. Preserve revision/generation checks for old tabs, stop late callbacks, await outstanding writes before releasing, and never resume automatically after reload.
+6. Run all 162 prior scenarios plus Stage 6 isolated real-Chrome/IndexedDB/Web-Lock/UI tests, injected speech/error/timer/write races and deployed-site tests. Automation uses synthetic text and simulated sound; only the owner can confirm their actual Delaware is heard. See [PLAYBACK.md](docs/PLAYBACK.md).
 
-Qualify Android per-step completion journaling and long recitations before using stored long overrides: current shared/native plan waits cap at 120 seconds, text at 2,000 characters/action, actions at 100/unit, and the native service uses a 120-second speech watchdog and 150-second wake lock. Stage 5 deliberately does not change these. Preserve app origin/ID/signing and existing audio behavior.
+**G6: BLOCKED pending owner audible verification**, even when all automated checks pass. Require exact Delaware wording/order, audible recall pauses/progression, controls, preferred/fallback voice, long answer/long wait, and explicit REVIEW/AUDIT/mastery outcomes. Preserve old gates independently. No Stage 7 work follows automatically.
 
-Stage 6 must also handle browser timer/utterance limits, safe long text segmentation without rewriting words, duplicate/late callbacks, and pending mastery confirmations while listening. Do not treat a stored long duration as verified native support.
+### Android investigation boundary
+
+The existing shared plan builder/parser caps recall at 120 seconds, text at 2,000 characters/action and actions at 100/unit; the service has a 120-second speech watchdog and a 150-second action-renewed wake lock. Its last-200-card diagnostic journal lacks durable per-step receipts, captured revisions, generation and due-at-start state. It cannot safely schedule authored steps while the WebView is suspended.
+
+Stage 6 requires no native architecture change because it delivers desktop authored playback and preserves the functioning native sample. A future separately authorized integration must version the plan/receipt contract; add stable per-step answer boundaries and durable replay/acknowledgement; chunk text under the engine limit without early credit; handle long waits using renewed bounded wake ownership; and reconcile receipts atomically with JavaScript storage. It also needs physical screen-locked/Bluetooth/offline/process-death testing. Merely raising limits is insufficient. The automatically rebuilt APK contains shared storage/navigation updates, not the new desktop player or authored/native scheduling. No native long-recitation support is claimed.
 
 ## Later stages
 

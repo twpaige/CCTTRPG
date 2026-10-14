@@ -48,7 +48,7 @@ try {
   if (process.env.SR_MASTERY_SCREENSHOT) await page.screenshot({ path: process.env.SR_MASTERY_SCREENSHOT });
   await page.setViewportSize({ width: 390, height: 844 }); assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   console.log('PASS UI responsive narrow-screen layout and keyboard button activation');
-  await page.goto(`${base}/index.html?test=${name}`); await ready();
+  await page.goto(`${base}/library.html?test=${name}`); await ready();
   await page.getByRole('button', { name: '1. Delaware (synthetic fixture)', exact: true }).click(); await page.locator('#recall-0').fill('3600'); await press('Save');
   await page.getByRole('button', { name: '1. Delaware (synthetic fixture)', exact: true }).click(); assert.equal(await page.locator('#recall-0').inputValue(), '3600');
   state = await read(); assert.equal(state.flashcards.find(card => card.id === 'card-0').steps[0].recallSeconds, 3600);

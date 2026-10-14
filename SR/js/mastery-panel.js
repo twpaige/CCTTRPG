@@ -86,7 +86,7 @@ window.addEventListener('pageshow', event => { if (event.persisted) location.rel
 await run(async () => {
   const name = new URLSearchParams(location.search).get('test');
   if (name !== null && !/^SRLearning-test-[a-zA-Z0-9-]+$/.test(name)) throw new Error('Invalid isolated test database name.');
-  if (name) for (const id of ['library-link', 'data-link']) $(id).href += `?test=${encodeURIComponent(name)}`;
+  if (name) for (const id of ['library-link', 'data-link', 'player-link']) $(id).href += `?test=${encodeURIComponent(name)}`;
   db = await openDatabase({ name: name || undefined, onBlocked: error, onVersionChange: reason => { db = undefined; error(reason); controls(); } });
   await load(); $('status').textContent = 'Mastery ready. Make a JSON backup before major changes.';
 });

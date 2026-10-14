@@ -1,5 +1,82 @@
 # SR — Test results
 
+## Stage 6 — authored desktop REVIEW / AUDIT, 2026-10-13
+
+**G6: BLOCKED pending owner audible verification of the actual Delaware flashcard and the listening checklist.** Implementation and available local automation are complete. Stage 7 is not started. All owner content remains in its existing origin/profile; no personal database was opened, seeded, cleared or restored by automation. Schema/JSON format remain 2.
+
+Live player: **https://crownandcall.com/SR/**. Editor: **https://crownandcall.com/SR/library.html**. [Playback/Windows guide](PLAYBACK.md). Deployment/cloud evidence will be appended after the push; no success is inferred from local tests.
+
+### Owner observations carried forward
+
+The Stage 6 assignment reports that the owner personally used the live mastery page with the actual States series and Delaware card, adjusted and persisted mastery, confirmed final-step KNOWN propagation, and reset the entire card to mastery 0 with a 15-minute interval. This closes the previously unrecorded owner mastery observations for those actions. It is not agent inspection of private text, Stage 6 audio evidence, or Android upgrade/long-recitation evidence. Other historical device checks remain as recorded below.
+
+### Files and behavior
+
+- `index.html`, `js/player.js`, `js/study.js`: real IndexedDB REVIEW/AUDIT player; voice inventory/fallback, selectors, exact text/state, controls, mastery queue, confirmed resets/KNOWN, refreshed continuous AUDIT and safe scheduling retry.
+- `js/review.js`: extend the existing speech controller with prepare/commit/cycle hooks, cancellation-safe asynchronous work, retained speech segment cursor, full recall overrides and chained long timers. `js/speech.js` and the original sample/`Joshua18.html` are unchanged.
+- `js/db.js`: exclusive playback ownership and shared short-lived mutation locks. Read/export is allowed; competing playback/edit/mastery/import fails without overwriting. Existing revision/generation/transaction checks remain.
+- `js/mastery.js`: special-action clock is evaluated after confirmation (explicit test timestamps still supported). The existing policy/completion/confirmation APIs remain authoritative.
+- `library.html`: preserved editor relocated within the same origin. `js/editor.js`, `mastery.html`, `js/mastery-panel.js`, `data/panel.js`: updated navigation with isolated-test database propagation. Native Data's existing return route is preserved.
+- `tests/study.test.js`, `study.html`, `study-runner.js`, `study.mjs`: dependency-free domain harness and existing development-only Playwright runner. Old editor/mastery runners now use the editor's new URL; prior coverage remains.
+- `.github/workflows/sr-android.yml`: add the new suite and editor-path trigger; signing/version allocation/publication remain unchanged. No native Java, manifest, plan, asset allowlist, application ID or signing configuration changed.
+- Specification, build plan, storage/authoring guides, this report and new `docs/PLAYBACK.md`: current contract, scope, owner steps and deferred native requirements.
+
+### Executed local evidence
+
+Windows, Node **24.19.0**, installed Google Chrome **155.0.0.0** headless in disposable profiles, existing Playwright runtime, JDK **17.0.20.1**. **199 scenarios passed: 162 prior + 37 Stage 6.** Scenario totals count grouped tests, not each assertion. Speech callbacks and clock advances in Stage 6 tests are simulated; IndexedDB, transactions, Web Locks, browser reloads, DOM controls and navigation are real.
+
+| Check | Result | Evidence |
+|---|---|---|
+| Prior desktop / shared plan / native / release | PASS | 33 + 6 + 16 + 6 = **61/61**; unchanged native executor, signature/version safety tests |
+| Persistence and backup | PASS | **38/38**, plus actual browser-process restart, offline storage, Data download/reselection/recovery and interrupted-import rollback; original 33 speech cases also execute in Chrome |
+| Editor | PASS | **17/17**, including 100-step authoring, content equality, saved progress, revision conflicts and browser restart |
+| Stage 5 domain / UI | PASS | **39/39 + 7/7**, migration, selection, per-step writes, receipts, recovery and mastery controls |
+| Stage 6 domain/storage | PASS | **30/30**, real authored repository fixtures passed through the production player and completion API |
+| Stage 6 browser UI | PASS | **7/7**, asynchronous preferred voice, authored Q/A/pending mastery, second-tab exclusion/editor draft retention, paused Skip/KNOWN confirmation, continuous AUDIT/reset refresh, reload/no false credit, narrow layout/keyboard/no uncaught errors |
+| Selection and ordering | PASS | Due now/lookahead/Max Deferred, final anchor, individual eligibility, series scope, BOUND order, UNBOUND shuffle, exact ascending steps, no interleaving and multi-card progression |
+| Timing and long text | PASS (simulated time/speech) | Zero/default/override recall; full wait beyond 2,147,483,647 ms chained without overflow; Unicode answer above 2,000 characters preserves concatenated wording; interrupted segment only repeats; Stop/Skip never credit partial answer; unrepresentable duration errors before speech |
+| Completion and retry | PASS | No receipt before entire answer; due versus early-at-start; pending mastery; duplicate/late callback; speech failure/watchdog; receipt failure rolls back; same receipt/time retries without answer replay; lost acknowledgement cannot double-credit |
+| Races and ownership | PASS | 20 repeated Stop/Restart cycles; repeated Start; Stop/Pause/Skip during preparation, speech/recall/save; Stop during delayed confirmation; old noncooperating progress write rejects stale completion; live second tab cannot narrate or save; read/export works |
+| AUDIT and explicit actions | PASS | ALL/one series, final-only KNOWN targets, full BOUND collapse, repeated cycles with zero automatic writes, reset-final/card/series scopes, cancellation, pending final KNOWN and explicit series confirmation |
+| Compatibility / data preservation | PASS | Existing complete schema-2/version-1 conversion and receipt round-trips; content/legacy progress/settings unaffected by automatic review; no schema migration |
+| Workflow static check | PASS | Existing checksum-verified `actionlint`, no diagnostics |
+| Visual inspection | PASS (agent) | Inspected isolated narrow-layout screenshot; controls/text readable, no horizontal overflow. Not owner usability approval |
+| Actual audible Delaware / native voice output | BLOCKED | Not heard by the agent. Owner must follow the live-site checklist |
+| Physical Android authored playback / long waits | NOT IMPLEMENTED / NOT VERIFIED | Fixed-sample native behavior retained; no claim from desktop tests |
+
+During testing, one moved-editor URL replacement also changed a Data test URL; that test fixture was corrected and the complete Stage 5 runner passed. Two added save-race tests initially tried to poll a transaction that completed too quickly to observe; they now explicitly delay its acknowledgement and verify Pause/Stop deterministically. No failed test is classified as a pass without the corrected rerun.
+
+### Reproduce and remaining acceptance
+
+Start `node SR/tests/serve.mjs` from the repository root. In another PowerShell window:
+
+```powershell
+node SR/tests/run.mjs
+node SR/mobile/tests/plan.test.mjs
+node SR/mobile/tests/release.test.mjs
+& .\SR\mobile\tests\run-native.ps1 -Jdk 'C:\path\to\jdk-17'
+# Use an existing development Playwright installation and Chrome executable:
+$env:SR_PLAYWRIGHT = 'C:\path\to\node_modules\playwright'
+$env:SR_BROWSER = 'C:\Program Files (x86)\Google\Chrome\Application\chrome.exe'
+node SR/tests/browser.mjs
+node SR/tests/editor.mjs
+node SR/tests/mastery.mjs
+node SR/tests/study.mjs
+# To test deployed files in another disposable profile:
+$env:SR_TEST_URL = 'https://crownandcall.com/SR'
+node SR/tests/study.mjs
+```
+
+Use actual local tool paths. This chat's source is `C:\Users\tpaig\Documents\Codex\2026-10-12\files-pasted-by-the-user-dex\work\CCTTRPG\SR\index.html`; the exact live and localhost opening steps are in [PLAYBACK.md](PLAYBACK.md). Localhost does not contain the owner's live-site data. Do not double-click the HTML file.
+
+Owner actions: listen to actual Delaware using REVIEW → States → Max Deferred (or AUDIT if KNOWN), confirm exact wording/order and recall duration, exercise controls, verify due/early/AUDIT outcomes and deliberate mastery choices, then report voice/browser and results. Long speech/recall, offline voice and background sound still need empirical checks. **No G6 PASS is claimed from simulated audio.**
+
+Known limits: desktop HTTPS/localhost Chrome with Web Locks required for playback; old predeployment tabs must be closed/reloaded; no offline cold launch or crash-resume playback; the 120-second per-segment watchdog fails visibly rather than inventing success. Recall can be delayed by browser/system suspension. Native authored-step plans, durable step receipts, long-wait wake renewal and physical locked-screen qualification remain separately authorized future work. The new desktop player is not bundled into the APK.
+
+---
+
+## Historical Stage 5 delivery (superseded status notes)
+
 ## Stage 5 — step mastery, migration, REVIEW and AUDIT, 2026-10-13
 
 **G5: PASS for implemented policy, migration and desktop UI automated acceptance. Owner verification of the private live library and physical Android upgrade remains pending. Stage 6 has not started.** Stage 4 remains formally CLOSED/PASS. Earlier test evidence below is preserved without reclassifying unperformed device checks.

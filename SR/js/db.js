@@ -64,7 +64,32 @@ export function openDatabase({ name = DB_NAME, onBlocked = () => {}, onVersionCh
 }
 
 // body may await IndexedDB requests only, never network, timers, or file dialogs.
+const playbackOwners = new WeakSet();
+const lockName = db => `SR-library-${db.name}`;
+
+// The player holds an exclusive lease, including while paused or retrying a write.
+// Other current-version pages can still read/export, but cannot mutate this library.
+export function acquirePlayback(db) {
+  if (!globalThis.navigator?.locks) return Promise.reject(new Error('Playback requires desktop Chrome on HTTPS or localhost (Web Locks unavailable).'));
+  return new Promise((resolve, reject) => {
+    navigator.locks.request(lockName(db), { ifAvailable: true }, async lock => {
+      if (!lock) throw new Error('This library is busy in another tab. Stop its playback or wait for its save, then Start again.');
+      playbackOwners.add(db);
+      await new Promise(release => resolve(() => { playbackOwners.delete(db); release(); }));
+    }).catch(reject);
+  });
+}
+
 export async function transaction(db, stores, mode, body) {
+  const run = () => transact(db, stores, mode, body);
+  if (mode !== 'readwrite' || playbackOwners.has(db) || !globalThis.navigator?.locks) return run();
+  return navigator.locks.request(lockName(db), { mode: 'shared', ifAvailable: true }, lock => {
+    if (!lock) throw new Error('Stop playback in the other SR tab before saving, changing mastery, or restoring. Your changes were not saved.');
+    return run();
+  });
+}
+
+async function transact(db, stores, mode, body) {
   const tx = db.transaction(stores, mode);
   const completed = new Promise((resolve, reject) => {
     tx.oncomplete = resolve;

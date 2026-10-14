@@ -1,11 +1,11 @@
 # SR — Audio Spaced Repetition System
-Specification v0.5 · Owner-approved Stage 5 rules · 2026-10-13
+Specification v0.6 · Stage 6 desktop playback, approved Stage 5 rules · 2026-10-13
 
 ## Purpose and scope
 
 A personal, local-first audio memorization system for desktop Chrome and Android listening. The learner writes their own mnemonic associations; preserve every word, Unicode character, identifier and authored order. No AI-generated stories, subject-specific mandatory fields, accounts, public sharing, cloud database or backend. Desktop is the content/mastery authority. JSON file transfer remains independent of Google services.
 
-Stage 4 is formally CLOSED/PASS. Stage 5 provides step mastery, scheduling policy, selection previews, migration and reusable completion APIs. It does **not** connect authored cards to an audio player. Stage 6 requires separate authorization. Historical evidence remains in [TEST_RESULTS.md](docs/TEST_RESULTS.md).
+Stage 4 is formally CLOSED/PASS. Stage 5 provides step mastery, scheduling policy, selection previews, migration and reusable completion APIs. Stage 6 connects these to desktop authored-card audio at `/SR/`; the editor remains available at `/SR/library.html` in the same origin/database. G6 remains BLOCKED pending the owner's actual audible Delaware verification. Historical evidence remains in [TEST_RESULTS.md](docs/TEST_RESULTS.md).
 
 ## Hierarchy and ordering
 
@@ -76,7 +76,7 @@ Windows: **Due now**, **Due within N days** (whole days starting at 1), or **Max
 
 AUDIT tests previously declared KNOWN material. It is **not a REVIEW mode** and is always labelled AUDIT. Support AUDIT ALL or one selected series, not multiple selected series. Only KNOWN cards qualify; present only their final steps. A completely KNOWN BOUND series contributes only its final comprehensive card, including during AUDIT ALL.
 
-Future AUDIT playback repeats continuously until stopped, refreshing eligibility between cycles so reset cards leave AUDIT. Success leaves mastery and schedules unchanged. Failure also makes no automatic change: the learner explicitly chooses reset-final or reset-card/objective, with confirmation. An empty AUDIT selection terminates cleanly. Stage 5 implements this policy and cursor contract, not continuous audio playback.
+AUDIT playback repeats continuously until stopped, refreshing eligibility between cycles so reset cards leave AUDIT. Success leaves mastery and schedules unchanged. Failure also makes no automatic change: the learner explicitly chooses reset-final or reset-card/objective, with confirmation. An empty AUDIT selection terminates cleanly. Stage 6 implements desktop audio using Stage 5 selection.
 
 ## Completion and pending mastery contract
 
@@ -91,7 +91,17 @@ Future AUDIT playback repeats continuously until stopped, refreshing eligibility
 
 Eligibility uses a shared window cutoff. A prepared step records whether it was due when it started; an overdue step in a lookahead session earns an update, an early step does not. Completion is step-level, not whole-card/group credit. Never credit unfinished steps. IDs combine library generation, session, occurrence, card and step. Store receipts and progress atomically; duplicate callbacks return already-applied before revision checks. Stale content/progress, restored generations and backwards completion times fail closed.
 
-The reusable controller queues a mastery choice until that step finishes successfully. Stop/Skip invalidates the token and discards its pending choice. A due REVIEW with a pending choice records successful completion and uses the new level's interval. Special Reset/KNOWN actions pause via a supplied playback handler and require confirmation. Full audio controls and native journal integration belong to Stage 6; a committed completion is not undone by a later Stop.
+The reusable controller queues a mastery choice until that step finishes successfully. Stop/Skip invalidates the token and discards its pending choice. A due REVIEW with a pending choice records successful completion and uses the new level's interval. Special Reset/KNOWN actions pause via a supplied playback handler and require confirmation. A committed completion is not undone by a later Stop. Native step journal integration is deferred; the existing Android diagnostic card journal is not a scheduling receipt.
+
+### Desktop playback contract
+
+One existing `ReviewController` performs preparation → question → recall → answer → completion write, with cancellable generations. REVIEW freezes its eligible pass at Start; Restart starts a fresh eligible pass using the captured settings and retains previous credit. AUDIT refreshes between cycles. IDs, authored order and full wording remain unchanged.
+
+The player segments long text into at most 400 Unicode code points per utterance, preferring whitespace boundaries and retaining every character. Resume repeats the interrupted segment only. Recall uses the full step override/default and remaining time after pauses, chaining waits above the browser's signed 32-bit timer limit. Unrepresentable durations fail visibly before speech; there is no 120-second recall cap. Each speech segment keeps the established 120-second missing-callback watchdog. No receipt precedes the final answer segment's successful end. A failed scheduling write keeps the same token/completion timestamp for Resume / retry without replaying speech.
+
+Queue mastery pauses playback and displays the interval. Explicit Resume continues; final-step KNOWN propagation requires confirmation before queuing. Special actions invalidate the unfinished attempt, including its pending choice. Confirming skips that card; cancelling leaves it paused and starts that step again on Resume. Reset dates use confirmation time. Stop/Skip cannot undo a write already started for a successfully finished answer.
+
+An exclusive Web Lock protects one player per origin/database, including paused/error states. Current-version editor/mastery/import writes request a compatible short-lived lock and fail visibly while playback owns the library. Reads/exports remain available. Content/progress revisions, whole-library pending-change checks and library generations also reject stale writes from old tabs. Close/reload old SR tabs after deployment. Stop releases ownership after outstanding operations settle; reload never automatically resumes or credits unfinished speech. No schema or backup-format change is required.
 
 ## Persistence and JSON recovery
 
@@ -105,10 +115,10 @@ Export complete version-2 snapshots. Accept validated version-1 backups through 
 
 Desktop uses browser Web Speech, preferring Google UK English Male when available with an explicit working fallback. Android uses the already owner-approved native TextToSpeech executor. Preserve its identity, signing, Bluetooth, background and notification behavior. JavaScript owns learning policy and storage.
 
-Current fixed-sample native plans cap recall waits at 120 seconds, speech text at 2,000 characters/action and actions at 100/unit; the service has a 120-second speech watchdog and 150-second wake-lock timeout. Stage 5 stores longer recall overrides but does not change these native behaviors. Stage 6 must qualify long waits/recitations, successful step boundaries, cancellation, pending changes and continuous AUDIT before connecting real content. Never truncate a stored duration to fit the old player silently.
+Current fixed-sample native plans cap recall waits at 120 seconds, speech text at 2,000 characters/action and actions at 100/unit; the service has a 120-second speech watchdog and 150-second wake-lock timeout. Stage 6 preserves these native behaviors. Desktop authored playback bypasses that fixed-sample plan builder. Future native authored playback needs versioned step identity/answer-boundary actions, durable idempotent step receipts, exact text chunking, bounded renewable long-wait wake ownership and physical locked/Bluetooth evidence before integration. Never truncate a stored duration to fit the old player silently.
 
 ## Acceptance and future scope
 
 G5 requires all intervals and UTC month-end/leap arithmetic; final anchors and step filtering; BOUND/UNBOUND order; KNOWN propagation/reset confirmations; REVIEW/AUDIT separation and repeat policy; due/early/focused/interrupted/duplicate completion cases; independent progress; atomic idempotent migration and JSON recovery; stale protection; 1,000 × 10 scale; and desktop UI evidence. Run all prior regressions and preserve historical test results. Actual owner States/Delaware verification and physical Android qualification must be reported separately from synthetic fixtures.
 
-Stage 6 connects these foundations to audio after explicit authorization. Offline cold launch, optional Drive, broader presets, microphone input and Android authoring remain later work. No backend or new application framework is introduced.
+G6 requires real-library selection, all controls/ordering, long text/waits, automatic progression, answer-only atomic scheduling, pending mastery and confirmation scopes, continuous AUDIT, safe retry, cross-tab protection, regression/backup compatibility and owner audible verification. Stage 6 ends at desktop playback; Stage 7 requires separate authorization. Offline cold launch, optional Drive, broader presets, microphone input and Android authoring remain later work. No backend or new application framework is introduced.

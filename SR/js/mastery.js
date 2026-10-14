@@ -117,11 +117,11 @@ export class StepCompletionController {
     if (!token.promise) token.promise = completeStep(this.db, token.prepared, { successful: true, completedAt, pending: token.pending }).catch(error => { token.promise = undefined; throw error; });
     return token.promise;
   }
-  async special(action, { pause, confirm, now = Date.now() }) {
+  async special(action, { pause, confirm, now = Date.now }) {
     requireValue(typeof pause === 'function' && typeof confirm === 'function', 'Special actions need playback pause and confirmation handlers.');
     await pause(); this.interrupt();
     const snapshot = await exportSnapshot(this.db), plan = planMastery(snapshot, action);
     if (!await confirm(plan.message)) return { applied: false };
-    return changeMastery(this.db, { action, expectedKey: contentKey(snapshot), confirmed: true, now });
+    return changeMastery(this.db, { action, expectedKey: contentKey(snapshot), confirmed: true, now: typeof now === 'function' ? now() : now });
   }
 }

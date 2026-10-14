@@ -227,7 +227,7 @@ window.addEventListener('pageshow', event => {
 await run(async () => {
   const testName = new URLSearchParams(location.search).get('test');
   if (testName !== null && !/^SRLearning-test-[a-zA-Z0-9-]+$/.test(testName)) throw new Error('Invalid isolated test database name.');
-  if (testName) { document.querySelector('h1').textContent = 'My library — disposable test database'; for (const id of ['data-link', 'mastery-link']) $(id).href += `?test=${encodeURIComponent(testName)}`; }
+  if (testName) { document.querySelector('h1').textContent = 'My library — disposable test database'; for (const id of ['data-link', 'mastery-link', 'player-link']) $(id).href += `?test=${encodeURIComponent(testName)}`; }
   databaseOptions = { name: testName || undefined, onBlocked: error, onVersionChange: reason => { db = undefined; controls(); error(reason); } };
   db = await openDatabase(databaseOptions);
   await load(); message('Library ready. Changes stay on this browser until you export a backup.');

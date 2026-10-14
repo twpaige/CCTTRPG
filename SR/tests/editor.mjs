@@ -8,7 +8,7 @@ const { chromium } = createRequire(import.meta.url)(process.env.SR_PLAYWRIGHT ||
 const base = process.env.SR_TEST_URL || 'http://127.0.0.1:8765';
 const profile = await mkdtemp(join(tmpdir(), 'sr-editor-test-'));
 const name = 'SRLearning-test-editor';
-const url = `${base}/index.html?test=${name}`;
+const url = `${base}/library.html?test=${name}`;
 let context, page, checks = 0;
 const passed = text => { console.log(`PASS ${text}`); checks++; };
 const launch = () => chromium.launchPersistentContext(profile, { headless: true, executablePath: process.env.SR_BROWSER || undefined, viewport: { width: 1440, height: 1000 } });
@@ -160,7 +160,7 @@ try {
   await reload(); assert.equal(await page.locator('#card-list .list-item').count(), 50); assert.equal(await page.locator('.step').count(), 0);
   const next = page.locator('#card-list').getByRole('button', { name: 'Next', exact: true }); await next.focus(); await next.press('Enter'); assert.equal(await page.locator('#card-list .list-item').count(), 4);
   passed('Card list pagination renders 50 summaries and no unselected step forms');
-  await page.goto(`${base}/index.html?test=invalid`); await page.waitForFunction(() => document.getElementById('error').textContent.includes('Invalid isolated'));
+  await page.goto(`${base}/library.html?test=invalid`); await page.waitForFunction(() => document.getElementById('error').textContent.includes('Invalid isolated'));
   assert(await page.locator('#workspace').evaluate(element => element.disabled)); passed('Invalid test database name fails closed');
   console.log(`${checks}/${checks} editor acceptance scenarios passed. Browser UI automation, not owner manual verification.`);
 } finally {
