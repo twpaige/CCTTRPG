@@ -1,5 +1,51 @@
 # SR — Test results
 
+## Stage 10 — authored Android listening, 2026-10-14
+
+**G10: implementation and local automated checks PASS; physical Samsung acceptance OPEN.** Stage 10 is ACTIVE; Stage 7 is SUPERSEDED and Stages 8, 9 and 11 are ON HOLD. No later stage is started. This section supersedes earlier statements that Android can only play fixed samples; all dated prior-stage evidence below is preserved.
+
+Owner authorized the existing WebView/native TTS route with a **simple in-memory completion queue**, replacing the preflight's durable-journal requirement. Up to 512 completions / 16 MiB are retained without eviction; capacity pauses before the next step. Visible/reopened UI reconciles through existing atomic IndexedDB scheduling/receipt rules and removes only successfully handled records. Stop retains queued completions. Unexpected process death can lose every unsaved entry, so those steps may be reviewed again. No automatic speech recovery is implemented or promised.
+
+### Implementation and compatibility
+
+- `js/native-study.js` reuses shared REVIEW/AUDIT selection, exact Q/A/step order, revision/generation checks and the existing `completeStep` transaction. No scheduler, database-schema, migration or JSON-format change.
+- Native version-2 plans carry per-step identity and original progress. `PlaybackEngine`, `Plan`, `CompletionQueue` and `PlaybackService` execute prepared steps without WebView dispatch, segment long text exactly, retain full recall waits with bounded wake renewal, credit only the last successful answer segment, skip whole cards and repeat AUDIT. Session handoff is bounded at 16 MiB and fails without truncation.
+- Mobile Listening supplies selection, offline voice/recall/rate, native controls, saved mastery, confirmed manual changes and pending after-answer mastery. Pending changes require a fresh Start after completion. Data/JSON recovery keeps the existing safety verification and rollback, adds clear manual OneDrive guidance and prominent restore success, and blocks transfer until native playback is stopped and completions saved.
+- Manifest/application ID `com.crownandcall.srproof`, original signing certificate, `https://sr.invalid/`, IndexedDB `SRLearning` and schema/JSON version 2 are preserved. Version-1 backups still migrate through the existing rules. No Capacitor, cloud API, account requirement, backend, Android content editor or new native learning database. The old sample/diagnostic path remains for regression compatibility.
+- Workflow adds focused tests to the existing build/lint/sign/publish process; signing and version allocation policy are unchanged. Baseline was `89c6426` on `origin/main`, including the repository's synthetic 1,000-card/5,000-step stress file, which was used without modification. No owner database or private content was opened by automation.
+
+### Executed local evidence
+
+Windows, Node **24.19.0**, JDK **17.0.20.1**, Chrome headless **154.0.0.0** in disposable profiles. **234/234 scenarios PASS: all 199 existing + 35 focused Stage 10.** Grouped scenarios count once regardless of assertion count. Speech, Android bridge, native time and process-death state are simulated in these tests; IndexedDB, transaction rollback, DOM and browser reload behavior are real. Native Java is also compiled against Android API 35; only the existing deprecated-API note remains.
+
+| Check | Result | Evidence |
+|---|---|---|
+| All existing scenarios | PASS, **199/199** | 33 desktop + 6 shared plans + 6 release + 16 native; 38 persistence; 17 editor; 39 + 7 mastery; 30 + 7 study. Browser process restart/offline storage/restore integration also passed |
+| Authored native/parser/queue | PASS, **16/16** | Production JS plan parsed by Java; exact segmented Unicode; one-hour recall and remaining-time pause; final-answer-only credit; duplicate/stale callback rejection; partial Stop/Skip; native AUDIT repeat; no active occurrence before a paused step begins; 512-bound/no eviction/drain-resume; byte bound; batch/head removal; fresh idle state; error retry; 1,000-card synthetic plan |
+| Shared native integration | PASS, **13/13** | REVIEW/AUDIT selection parity; exact text and long/zero/override recall; oversized rejection; due versus early-at-start; duplicate-safe acknowledgement retry; AUDIT isolation; stale revision/generation retention; transaction failure rollback/retry; confirmed pending final mastery; backwards clock rejection; JSON receipt/progress recovery |
+| Mobile UI | PASS, **6/6** | Authored native-only Start; visible completion save/Data guard; paused pending mastery and fresh selection; confirmed KNOWN/AUDIT BOUND semantics; reload without speech; 390px layout/no uncaught errors. Bridge/audio simulated |
+| Visual inspection | PASS (agent) | Disposable narrow-screen screenshot inspected; readable controls and no horizontal overflow. Not owner usability approval |
+| Android identity/update | SOURCE PRESERVED; device OPEN | App ID/origin/schema/manifest/signing configuration unchanged; actual Samsung update/data preservation not performed |
+| Locked/offline/Bluetooth/OneDrive | OWNER VERIFICATION REQUIRED | No Stage 10 physical-device result inferred from unit/browser tests or earlier fixed-sample observations |
+
+The new parser suite uses a checksum-pinned **test-only** `org.json` JAR for host-JVM execution; it is not an APK/runtime dependency. The existing 1,000 × 10 storage/selection benchmarks also passed. No tests are recorded as passed without a successful rerun: the initial UI runner was corrected to wait for asynchronous AUDIT Start before inspecting its plan, and the full focused UI suite then passed. A paused-step occurrence edge case was fixed and covered before publication.
+
+### Reproduce and owner qualification
+
+Run the existing commands in the Stage 6 section below, including `study.mjs`, then add:
+
+```powershell
+# JDK 17; SR_PLAYWRIGHT / SR_BROWSER as in the existing browser runners.
+$env:SR_JAVA_HOME = 'C:\path\to\jdk-17'
+node SR/mobile/tests/authored.test.mjs
+# With node SR/tests/serve.mjs running:
+node SR/tests/native.mjs
+```
+
+[Android listening and Samsung checklist](ANDROID_LISTENING.md) documents installation over the existing APK, real authored REVIEW/early-date isolation, long locked Bluetooth/offline playback and recall, notification/interruption controls, AUDIT/manual mastery, queue reconciliation and accepted process-loss behavior, plus safe OneDrive JSON round-trip verification. Matching file sizes alone do not prove record equality. These checks remain OPEN; earlier G1–G6 and Stage 9 unperformed checks do not become passes through this implementation.
+
+Release build/lint/sign/publication evidence will be recorded after the existing GitHub Actions workflow completes. No signed Stage 10 artifact or physical acceptance is claimed by this local test record alone.
+
 ## Stage 6 — authored desktop REVIEW / AUDIT, 2026-10-13
 
 **G6: CORE DESKTOP AUDIBLE PLAYBACK AND SCHEDULING OWNER-VERIFIED / formal full-checklist closure still OPEN.** Implementation and available local automation are complete. Stage 7 is not started. All owner content remains in its existing origin/profile; no personal database was opened, seeded, cleared or restored by automation. Schema/JSON format remain 2.

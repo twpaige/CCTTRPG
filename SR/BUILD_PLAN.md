@@ -1,5 +1,5 @@
 # Dex — SR implementation plan
-Current Stage 6 desktop implementation · 2026-10-13
+Current Stage 10 Android implementation · 2026-10-14
 
 ## Owner-approved roadmap revision — 2026-10-14
 
@@ -8,10 +8,20 @@ Current Stage 6 desktop implementation · 2026-10-13
 - **Stage 7 — SUPERSEDED / NO ACTION.** No automatic grouping of adjacent BOUND flashcards into combined recitation units. Every flashcard remains independent with its own final-step eligibility, step mastery and schedule. BOUND means ordered flashcards, not merged cards. The last card may contain a complete passage; focused practice can select that card without a special passage feature. No Stage 7 application code is required; G7 is retired rather than claimed as tested.
 - **Stage 8 — ON HOLD.** Focused selections and saved presets remain planned but are not a prerequisite for the revised next work.
 - **Stage 9 — ON HOLD.** Desktop MVP hardening and release qualification remain planned and their unperformed acceptance checks stay open; no implied release certification.
-- **Stage 11 — NEXT FOR DESIGN / AUTHORIZATION.** Implement optional Google Drive synchronization **before Stage 10**, initially around the existing desktop schema-2 library and JSON backup/restore. Dex must first investigate and report dependency changes, OAuth/security constraints, single-writer/conflict and recovery rules, and how an Android client can subsequently integrate. Do not assume the Stage 10 native completion protocol exists. No sync implementation is authorized merely by this roadmap change.
-- **Stage 10 — AFTER STAGE 11.** Integrate authored REVIEW/AUDIT playback and progress on Android, using the established signing identity and native service. Adapt to the Stage 11 sync contract where appropriate. Preserve outstanding G2/G3/G6 and G10 verification requirements.
+- **Stage 10 — ACTIVE.** Owner authorized authored Android REVIEW/AUDIT using the existing WebView/native TTS service, IndexedDB and manual OneDrive JSON files. Implement and test, then commit/push and provide the signed APK. Physical Samsung qualification remains a separate gate.
+- **Stage 11 — ON HOLD.** No automatic synchronization, cloud API, OAuth integration or merge. OneDrive is an optional Android document-provider destination; local files remain supported.
 
-**Priority order: Stage 11 → Stage 10; Stages 8 and 9 remain on hold.** The original Stage 11 dependency on Stage 10 and Stage 8 dependency on Stage 7 are superseded. Do not silently reinstate automatic bound grouping or require on-hold stages before the newly approved order. This revision changes the plan only, not application code or gate evidence.
+**Current priority: Stage 10 only.** The prior Stage 11-first decision and original Stage 9 prerequisite are superseded. Stage 7 remains superseded; Stages 8, 9 and 11 remain on hold. Their unperformed qualification checks are not passed. Stop after Stage 10; another stage requires explicit authorization.
+
+### Stage 10 implementation contract — current authority
+
+Use shared JS selection/scheduling and a version-2 native plan with one ordered unit per selected step, retaining card identity for Skip. Native code advances question segments → recall → answer segments without WebView callbacks. AUDIT repeats independently; REVIEW is a finite selected pass. Rebuild selection on Restart, after saving available completions. Preserve app ID, signing certificate, `https://sr.invalid/`, database name/schema 2 and JSON formats 1/2.
+
+The owner explicitly replaced the preflight's durable-journal proposal with **simple process-memory recovery**. Retain at most 512 completed steps / 16 MiB, pause before accepting another step when capacity is insufficient, and never evict unacknowledged entries. Save via existing atomic IndexedDB completion/receipt rules while the UI is available, before a new session and before Data transfer. Remove a queue entry only after a successful transaction or duplicate/no-op result. Stop retains completed entries; process death can lose every still-unsaved entry and those steps may be reviewed again. Never automatically resume speech. No disk completion journal, crash checkpoint, new native learning database or distributed commit protocol.
+
+Long text is preserved in small native utterances (up to 400 code points); full per-step recall uses monotonic deadlines and 30-second timer slices with bounded wake renewal. Speech watchdog remains 120 seconds per segment. Whole sessions have a measured/practical 16 MiB UTF-8 handoff bound and fail visibly without truncation. Native mastery controls use the approved JS confirmations and transactions. Queued changes pause first and apply after the full answer; afterward Stop/Start refreshes eligibility. Special actions pause, confirm, then stop before mutation. No content editing on Android.
+
+Incremental work packages: (1) shared plan and bounded queue/native tests; (2) native step execution, long waits and completion boundaries; (3) JS reconciliation/mobile controls; (4) safe manual transfer and clear recovery instructions; (5) all 199 existing tests plus focused Stage 10 tests, build/lint/sign, then owner Samsung checks. See [Android listening guide](docs/ANDROID_LISTENING.md). No later stage follows automatically.
 
 ## Current authority and gates
 
@@ -21,7 +31,7 @@ The owner's Stage 5 rules and Stage 6 assignment supersede the original mastery 
 
 Keep plain HTML/CSS/ES modules, native IndexedDB and the existing static site. Content remains in series/flashcards, with steps embedded in authored order. Independent active step progress lives in schema-2 stepProgress; legacy progress remains a recovery archive. Use atomic transactions, revision/generation checks, explicit Save and confirmations. No server, framework, account system or synchronization service.
 
-Desktop playback is at /SR/; authoring moves to /SR/library.html within the same origin and database. /SR/mastery.html manages mastery and previews REVIEW/AUDIT. Native Android listening remains the existing fixed-sample proof. Stage 6 preserves schema 2, native playback/service policy, asset allowlist, origin, application ID and signing.
+Desktop playback is at /SR/; authoring is at /SR/library.html within the same origin and database. /SR/mastery.html manages mastery and previews REVIEW/AUDIT. Stage 10 connects authored selection to the existing Android native service and adds a small listening/mastery interface. Schema 2, local origin, application ID and signing identity remain unchanged.
 
 ## Stage 5 — implementation and G5
 
@@ -46,7 +56,7 @@ Desktop playback is at /SR/; authoring moves to /SR/library.html within the same
 
 **G6: CORE OWNER AUDIBLE/SCHEDULING PASS; formal full-checklist OPEN.** Owner heard a newly authored Delaware card on the home desktop, confirmed correct ordered question → recall → answer progression and checked the resulting Mastery due-date changes. Other manual playback controls, long passages, AUDIT sound and concurrency edge cases remain to be individually verified. Require exact Delaware wording/order, audible recall pauses/progression, controls, preferred/fallback voice, long answer/long wait, and explicit REVIEW/AUDIT/mastery outcomes. Preserve old gates independently. No Stage 7 work follows automatically.
 
-### Android investigation boundary
+### Historical Stage 6 Android investigation boundary (superseded by Stage 10 above)
 
 The existing shared plan builder/parser caps recall at 120 seconds, text at 2,000 characters/action and actions at 100/unit; the service has a 120-second speech watchdog and a 150-second action-renewed wake lock. Its last-200-card diagnostic journal lacks durable per-step receipts, captured revisions, generation and due-at-start state. It cannot safely schedule authored steps while the WebView is suspended.
 

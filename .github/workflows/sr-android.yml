@@ -53,6 +53,7 @@ jobs:
           node SR/tests/run.mjs
           node SR/mobile/tests/plan.test.mjs
           node SR/mobile/tests/release.test.mjs
+          node SR/mobile/tests/authored.test.mjs
           mkdir -p SR/mobile/app/build/poc-tests
           javac -d SR/mobile/app/build/poc-tests SR/mobile/app/src/main/java/com/crownandcall/srproof/PlaybackEngine.java SR/mobile/tests/PlaybackEngineTest.java
           java -cp SR/mobile/app/build/poc-tests com.crownandcall.srproof.PlaybackEngineTest
@@ -71,6 +72,7 @@ jobs:
           SR_PLAYWRIGHT="$RUNNER_TEMP/sr-browser-tests/node_modules/playwright" node SR/tests/editor.mjs
           SR_PLAYWRIGHT="$RUNNER_TEMP/sr-browser-tests/node_modules/playwright" node SR/tests/mastery.mjs
           SR_PLAYWRIGHT="$RUNNER_TEMP/sr-browser-tests/node_modules/playwright" node SR/tests/study.mjs
+          SR_PLAYWRIGHT="$RUNNER_TEMP/sr-browser-tests/node_modules/playwright" node SR/tests/native.mjs
       - name: Build and lint release (no signing credentials)
         working-directory: SR/mobile
         env:

@@ -1,5 +1,7 @@
 # SR Stage 2 — Windows build, installation and phone test
 
+**Historical Stage 2 setup below. Current Stage 10 instructions:** [Android listening and Samsung verification](ANDROID_LISTENING.md). Authored REVIEW/AUDIT and Data are now included. GitHub builds/signs updates using the existing identity; routine installation needs no Android Studio. Earlier owner observations are preserved in [TEST_RESULTS.md](TEST_RESULTS.md); the old blocked status below describes the original proof, not all subsequent results. Stage 10 physical qualification remains open.
+
 This is a fixed-sample Android listening proof. G2 is **BLOCKED** until the owner's phone passes the checks in `TEST_RESULTS.md`. G1 remains open independently. No Stage 3 functionality is included.
 
 ## What is being tested

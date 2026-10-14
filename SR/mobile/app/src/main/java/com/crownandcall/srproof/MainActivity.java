@@ -7,7 +7,6 @@ import android.content.pm.PackageManager;
 import android.os.*;
 import android.speech.tts.*;
 import android.webkit.*;
-import android.util.AtomicFile;
 import org.json.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -16,7 +15,7 @@ import java.util.*;
 public final class MainActivity extends Activity {
     private static final String ORIGIN = "https://sr.invalid/";
     private static final Set<String> ASSETS = new HashSet<>(Arrays.asList("index.html", "mobile.js", "shared/sample.js", "shared/speech.css", "shared/playback-plan.js",
-        "data/index.html", "data/panel.js", "poc/speech.css", "js/db.js", "js/repository.js", "js/validation.js", "js/backup.js", "js/scheduler.js"));
+        "data/index.html", "data/panel.js", "poc/speech.css", "js/db.js", "js/repository.js", "js/validation.js", "js/backup.js", "js/scheduler.js", "js/mastery.js", "js/native-study.js"));
     private static final int OPEN_BACKUP = 30, SAVE_BACKUP = 31, MAX_BACKUP = 32 * 1024 * 1024;
     private String pendingBackup;
     private boolean filePending;
@@ -86,16 +85,13 @@ public final class MainActivity extends Activity {
         }));
     }
     private void startPlan(String json) {
-        if (!visible || PlaybackService.instance != null) { bridgeError = "Stop the current service before starting a new session."; return; }
+        if (!visible || PlaybackService.instance != null || PlaybackService.launching || PlaybackService.completions.size() != 0) { bridgeError = "Stop playback and save queued progress before starting a new session."; return; }
         try {
-            new Plan(json); // Validate before writing or launching the service.
-            AtomicFile file = new AtomicFile(new File(getFilesDir(), "session.json"));
-            FileOutputStream out = file.startWrite();
-            try { out.write(json.getBytes(StandardCharsets.UTF_8)); file.finishWrite(out); }
-            catch (IOException error) { file.failWrite(out); throw error; }
+            PlaybackService.preparedPlan = new Plan(json);
+            PlaybackService.launching = true;
             bridgeError = "";
             startForegroundService(new Intent(this, PlaybackService.class).setAction("START"));
-        } catch (Exception error) { bridgeError = "Start failed: " + error.getMessage(); }
+        } catch (Exception error) { PlaybackService.launching = false; PlaybackService.preparedPlan = null; bridgeError = "Start failed: " + error.getMessage(); }
     }
     private final class Bridge {
         @JavascriptInterface public String status() {
@@ -103,7 +99,7 @@ public final class MainActivity extends Activity {
                 boolean running = PlaybackService.instance != null;
                 JSONObject result = running ? new JSONObject(PlaybackService.snapshot) : new JSONObject().put("status", "stopped");
                 android.content.SharedPreferences prefs = getSharedPreferences(PlaybackService.PREFS, MODE_PRIVATE);
-                return result.put("serviceRunning", running).put("voices", new JSONArray(voices)).put("voiceMessage", voiceMessage)
+                return result.put("serviceRunning", running || PlaybackService.launching).put("queuedCount", PlaybackService.completions.size()).put("queueLimit", CompletionQueue.LIMIT).put("voices", new JSONArray(voices)).put("voiceMessage", voiceMessage)
                     .put("bridgeError", bridgeError).put("android", Build.VERSION.RELEASE)
                     .put("webview", WebView.getCurrentWebViewPackage() == null ? "unknown" : WebView.getCurrentWebViewPackage().versionName)
                     .put("lastStatus", new JSONObject(prefs.getString("lastStatus", "{}")))
@@ -111,7 +107,7 @@ public final class MainActivity extends Activity {
             } catch (JSONException error) { return "{\"status\":\"error\",\"bridgeError\":\"Invalid diagnostic state\"}"; }
         }
         @JavascriptInterface public void start(String json) {
-            if (json == null || json.length() > 900000) return;
+            if (json == null || json.getBytes(StandardCharsets.UTF_8).length > Plan.MAX_BYTES) { bridgeError = "Selected session exceeds 16 MiB; choose a smaller series. Nothing truncated."; return; }
             runOnUiThread(() -> {
                 if (!visible) return;
                 if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -126,6 +122,17 @@ public final class MainActivity extends Activity {
             });
         }
         @JavascriptInterface public void refresh() { runOnUiThread(() -> { if (visible) refreshVoices(); }); }
+        @JavascriptInterface public String completions() { return "[" + String.join(",", PlaybackService.completions.batch()) + "]"; }
+        @JavascriptInterface public boolean acknowledge(String id) { return PlaybackService.completions.acknowledge(id); }
+        @JavascriptInterface public String queueMastery(String json) {
+            java.util.concurrent.FutureTask<String> task = new java.util.concurrent.FutureTask<>(() -> {
+                if (!visible || PlaybackService.instance == null) return "No active session.";
+                return PlaybackService.instance.queueMastery(json);
+            });
+            runOnUiThread(task);
+            try { return task.get(5, java.util.concurrent.TimeUnit.SECONDS); }
+            catch (Exception error) { task.cancel(false); return "Mastery request did not complete. Keep playback paused and retry."; }
+        }
         @JavascriptInterface public void openBackup() { runOnUiThread(() -> chooseBackup(null)); }
         @JavascriptInterface public void saveBackup(String json) { runOnUiThread(() -> chooseBackup(json)); }
     }
@@ -137,7 +144,7 @@ public final class MainActivity extends Activity {
     }
     private void chooseBackup(String json) {
         if (!visible || filePending) return;
-        if (PlaybackService.instance != null) { fileError("Stop playback before transferring backups."); return; }
+        if (PlaybackService.instance != null || PlaybackService.launching || PlaybackService.completions.size() != 0) { fileError("Stop playback and return to Listening to save queued progress before transferring backups."); return; }
         if (json != null && json.getBytes(StandardCharsets.UTF_8).length > MAX_BACKUP) { fileError("Backup exceeds 32 MiB."); return; }
         Intent intent = new Intent(json == null ? Intent.ACTION_OPEN_DOCUMENT : Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE).setType("application/json");

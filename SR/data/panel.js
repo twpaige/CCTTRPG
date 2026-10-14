@@ -10,7 +10,7 @@ function buttons() {
   for (const id of ['export', 'recovery', 'migration-backup', 'choose-import', 'choose-safety']) $(id).disabled = !db || busy || filePending;
   $('replace').disabled = !db || busy || filePending || !incoming || !safety || !$('confirm').checked;
 }
-function stopped() { if (native && JSON.parse(native.status()).serviceRunning) throw new Error('Stop native playback on the listening page before using Data.'); }
+function stopped() { if (native) { const state = JSON.parse(native.status()); if (state.serviceRunning || state.queuedCount) throw new Error('Return to Listening, Stop, and save queued progress before using Data.'); } }
 async function run(action) {
   busy = true; buttons(); $('error').textContent = '';
   try { stopped(); await action(); } catch (reason) { error(reason); }
@@ -55,19 +55,20 @@ window.addEventListener('sr-file-result', event => run(async () => {
   filePending = false;
   if (event.detail.error) throw new Error(event.detail.error);
   if (event.detail.json !== undefined) await select(event.detail.json, nativeTarget);
-  if (event.detail.saved) $('status').textContent = 'Backup saved. Reselect it to verify before replacement.';
+  if (event.detail.saved) $('status').textContent = 'Backup written to the selected provider. Wait for OneDrive to finish syncing before using it on another device. Reselect this file to verify before replacement.';
 }));
 $('export').onclick = () => run(async () => save(await exportJSON(db), 'backup'));
 $('recovery').onclick = () => run(async () => save(await recoveryJSON(db), 'pre-import'));
 $('migration-backup').onclick = () => run(async () => save(await recoveryJSON(db, 'pre-migration'), 'pre-migration'));
 $('confirm').onchange = buttons;
 $('replace').onclick = () => run(async () => {
+  const count = previewImport(incoming).counts.flashcards;
   await restoreJSON(db, incoming, { confirmed: $('confirm').checked, safetyJSON: safety });
   incoming = safety = undefined; $('confirm').checked = false;
-  $('preview').textContent = 'Restore committed. Previous library is available with Save previous pre-import backup.';
+  $('preview').textContent = `Restore Successful — ${count} Flashcards Imported. Restore committed. Previous library is available with Save previous pre-import backup.`;
   $('safety-status').textContent = 'A new safety backup is required for another restore.'; await refresh();
 });
-const link = document.createElement('a'); link.href = '../index.html'; link.textContent = native ? 'Return to listening proof' : 'REVIEW / AUDIT player'; $('back').append(link);
+const link = document.createElement('a'); link.href = '../index.html'; link.textContent = native ? 'Return to Listening / save queued progress' : 'REVIEW / AUDIT player'; $('back').append(link);
 try {
   const testName = new URLSearchParams(location.search).get('test');
   if (testName !== null && !/^SRLearning-test-[a-zA-Z0-9-]+$/.test(testName)) throw new Error('Invalid isolated test database name.');

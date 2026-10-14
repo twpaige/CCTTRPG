@@ -1,22 +1,28 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'">
-<title>SR Android speech proof</title><link rel="stylesheet" href="shared/speech.css"></head>
-<body><main><p class="eyebrow">SR / STAGE 2</p><h1>Android listening proof</h1>
-<p>Dynamic Android TTS. Start here, then lock the phone. G2 needs your physical-device test.</p>
-<p><a href="data/index.html">Data and JSON recovery</a> — stop playback before transferring a backup.</p>
-<section><h2>Settings</h2><p id="platform"></p><p id="voice-message"></p>
-<label>Offline English voice<select id="voice"><option value="">Automatic English selection</option></select></label>
-<button id="refresh">Refresh voices</button>
-<label>Recall seconds<input id="recall" type="number" value="4" min="0" max="120" step="0.5" required></label>
-<label>Speaking rate<input id="rate" type="number" value="0.9" min="0.5" max="2" step="0.1" required></label>
-<label>Sample passes (30 for long test)<input id="passes" type="number" value="1" min="1" max="100" step="1" required></label>
-</section><section><h2>Native playback</h2><div class="controls">
-<button id="start" class="primary">Start</button><button id="pause">Pause</button><button id="resume">Resume</button>
-<button id="skip">Skip card</button><button id="restart">Restart</button><button id="stop">Stop</button></div>
-<p class="hint">Resume repeats interrupted speech. Recall waits keep remaining time. Calls and disconnected audio pause until you Resume.</p>
-<p id="status" role="status"></p><p id="error" role="alert"></p><p id="current"></p></section>
-<details><summary>WebView capability probe</summary><p id="web-speech"></p>
-<button id="probe">Test one Web Speech question</button><p>This probe is separate from native playback. It cannot certify locked-screen behavior.</p></details>
-<details><summary>Device evidence / latest 200 completed cards</summary><p>Diagnostic completion entries are not mastery or scheduling data. Reopening does not restart audio.</p><pre id="evidence"></pre></details>
+<title>SR Listening</title><link rel="stylesheet" href="shared/speech.css"></head>
+<body><main><p class="eyebrow">SR / LISTEN</p><h1>Your flashcards</h1>
+<p><a id="data" href="data/index.html">Data &amp; JSON Recovery</a> — import your desktop library here. No account required.</p>
+<p id="platform"></p><p id="status" role="status">Opening library…</p><p id="error" role="alert"></p>
+<fieldset id="settings" disabled><legend>Prepare a walk</legend>
+<label>Activity<select id="mode"><option>REVIEW</option><option>AUDIT</option></select></label>
+<label>Series<select id="series"><option value="">ALL series</option></select></label>
+<div id="review-options"><label>Review window<select id="window"><option value="now">Due Now</option><option value="days">Lookahead days</option><option value="max">Max Deferred</option></select></label>
+<label>Days<input id="days" type="number" min="1" step="1" value="7"></label>
+<label><input id="random" type="checkbox">Shuffle UNBOUND cards</label></div>
+<p id="audit-note" hidden>AUDIT repeats KNOWN final steps until Stop. No automatic mastery or scheduling changes.</p>
+<label>Offline English voice<select id="voice"><option value="">Automatic offline English</option></select></label><button id="refresh">Refresh voices</button><p id="voice-message"></p>
+<label>Default recall seconds<input id="recall" type="number" min="0" step="any" value="4"></label>
+<label>Speaking rate<input id="rate" type="number" min="0.5" max="2" step="0.1" value="0.9"></label>
+<p>Each saved step recall duration overrides the default, including zero.</p><p id="selection"></p></fieldset>
+<section><h2>Playback</h2><div class="controls"><button id="start">Start</button><button id="pause">Pause</button><button id="resume">Resume</button><button id="skip">Skip card</button><button id="stop">Stop</button><button id="restart">Restart session</button></div>
+<p id="current"></p><p id="progress"></p><button id="save-progress">Save queued progress / retry</button>
+<p>Resume repeats the interrupted speech segment; recall keeps its remaining time. Reopening never starts speech automatically. Unexpected app/phone shutdown can lose unsaved completions, so those steps may be reviewed again.</p></section>
+<details><summary>Mastery — learner controlled</summary><p>While listening, queue a choice after pausing; it saves only after the entire answer. After that change, Start a fresh session. Stop or Skip discards an unfinished choice.</p>
+<label>Flashcard<select id="card"></select></label><label>Step<select id="step"></select></label>
+<p id="saved-mastery"></p><label>Mastery<select id="level"></select></label><p id="interval"></p>
+<button id="apply">Apply while stopped</button><button id="queue">Queue current step mastery after answer</button>
+<button id="known">I know this for sure</button><button id="reset-card">Reset FC</button><button id="reset-final">Reset final step only</button><button id="reset-objective">Reset entire flashcard / objective</button>
+<p>Reset and KNOWN actions pause and confirm their scope, then stop the session before applying. Cards and text are read-only here.</p></details>
 </main><script type="module" src="mobile.js"></script></body></html>

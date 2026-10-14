@@ -4,7 +4,7 @@ Open **[https://crownandcall.com/SR/](https://crownandcall.com/SR/)** in the **s
 
 ## Owner verification and current limits (2026-10-13)
 
-The owner successfully played a newly authored Delaware flashcard on the home desktop using the live player, hearing all eligible steps in order with correct question/recall/answer timing and automatic progression. They then verified the expected next-review date changes on the Mastery page. **Core desktop audio REVIEW and scheduling are owner-verified; remaining detailed G6 checks are not yet all signed off.** The home library is separate from the earlier daytime-computer library. Back up each library before transferring JSON; importing is not automatic synchronization. The Android APK still uses fixed sample playback, not authored-card REVIEW/AUDIT.
+The owner successfully played a newly authored Delaware flashcard on the home desktop using the live player, hearing all eligible steps in order with correct question/recall/answer timing and automatic progression. They then verified the expected next-review date changes on the Mastery page. **Core desktop audio REVIEW and scheduling are owner-verified; remaining detailed G6 checks are not yet all signed off.** The home library is separate from the earlier daytime-computer library. Back up each library before transferring JSON; importing is not automatic synchronization. Stage 10 now implements [authored Android listening](ANDROID_LISTENING.md); its new physical-device acceptance remains open.
 
 ## Hear Delaware
 
@@ -57,7 +57,7 @@ Report the date, Chrome version, voice, recall settings, and observations:
 - Try a long answer and a saved recall override above 120 seconds. Confirm full duration/wording and controls; automatic synthetic timing tests do not prove sound.
 - Record preferred/fallback availability and any stalls in a background tab. Earlier G1/G2 long-run/device checks remain separate.
 
-**G6 remains BLOCKED until the necessary audible evidence is reported.** Automated tests never read your personal library. The APK still plays its fixed sample; this desktop release does not add authored-card Android playback.
+**G6 core audible/scheduling acceptance is owner-verified; full-checklist closure remains OPEN.** Automated tests never read your personal library. Android Stage 10 has its own [Samsung verification checklist](ANDROID_LISTENING.md); desktop evidence does not certify native listening.
 
 ## Local development on Windows
 

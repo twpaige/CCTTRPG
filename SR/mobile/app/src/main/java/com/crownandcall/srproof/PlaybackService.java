@@ -12,6 +12,9 @@ import java.util.*;
 public final class PlaybackService extends Service implements PlaybackEngine.Host {
     static volatile PlaybackService instance;
     static volatile String snapshot = "{\"status\":\"idle\"}";
+    static final CompletionQueue completions = new CompletionQueue();
+    static volatile Plan preparedPlan;
+    static volatile boolean launching;
     static final String CHANNEL = "sr_playback", PREFS = "stage2_evidence";
     private final Handler control = new Handler(Looper.getMainLooper());
     private final Handler actions = new Handler(Looper.getMainLooper());
@@ -25,6 +28,10 @@ public final class PlaybackService extends Service implements PlaybackEngine.Hos
     private String selectedVoice = "", interruption = "";
     private long initialization;
     private int restartCount;
+    private long occurrence, stepStartedAt;
+    private String occurrenceId;
+    private JSONObject pendingMastery;
+    private boolean refreshRequired;
     private final BroadcastReceiver noisy = new BroadcastReceiver() {
         @Override public void onReceive(Context c, Intent intent) { interrupt("Audio output disconnected. Reconnect, then Resume."); }
     };
@@ -49,21 +56,16 @@ public final class PlaybackService extends Service implements PlaybackEngine.Hos
             if (plan != null) return START_NOT_STICKY; // Ignore repeated Start.
             startForeground(1, notification("Initializing speech…"));
             try {
-                plan = new Plan(new String(readPlan(), StandardCharsets.UTF_8));
-                engine.start(plan.units, true);
+                plan = preparedPlan; preparedPlan = null; launching = false;
+                if (plan == null) throw new IllegalStateException("No prepared session. Open SR and press Start.");
+                engine.start(plan.units, true, plan.mode.equals("AUDIT"));
                 long init = ++initialization;
                 control.postDelayed(() -> { if (!ready && !destroyed && init == initialization) engine.fail("TTS initialization timed out. Stop and try again."); }, 15000);
                 tts = new TextToSpeech(this, status -> control.post(() -> initializeTts(status, init)));
-            } catch (Exception error) { engine.fail("Cannot start: " + error.getMessage()); shutdown(); }
-        } else command(command);
+            } catch (Exception error) { launching = false; engine.fail("Cannot start: " + error.getMessage()); shutdown(); }
+        } else if (plan == null) shutdown();
+        else command(command);
         return START_NOT_STICKY;
-    }
-    private byte[] readPlan() throws java.io.IOException {
-        try (java.io.FileInputStream in = openFileInput("session.json"); java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream()) {
-            byte[] buffer = new byte[8192]; int count;
-            while ((count = in.read(buffer)) != -1) { out.write(buffer, 0, count); if (out.size() > 900000) throw new java.io.IOException("Plan too large"); }
-            return out.toByteArray();
-        }
     }
     private void initializeTts(int result, long init) {
         if (destroyed || init != initialization || !engine.status.equals("paused")) return;
@@ -88,6 +90,7 @@ public final class PlaybackService extends Service implements PlaybackEngine.Hos
             @Override public void onStart(String id) { }
             @Override public void onDone(String id) { control.post(() -> { if (!destroyed) engine.done(Long.parseLong(id)); }); }
             @Override public void onError(String id) { onError(id, -1); }
+            @Override public void onStop(String id, boolean interrupted) { control.post(() -> { if (!destroyed) engine.failed(Long.parseLong(id), "Speech interrupted. Resume retries the unfinished segment."); }); }
             @Override public void onError(String id, int error) { control.post(() -> { if (!destroyed) engine.failed(Long.parseLong(id), "TTS error " + error + ". Resume retries; Stop ends the service."); }); }
         });
         ready = true;
@@ -98,11 +101,11 @@ public final class PlaybackService extends Service implements PlaybackEngine.Hos
         if (destroyed) return;
         switch (command == null ? "STOP" : command) {
             case "PAUSE": interrupt("Paused. Resume repeats interrupted speech; recall keeps remaining time."); break;
-            case "RESUME": if (ready) resumePlayback(); break;
-            case "SKIP": if (ready) engine.skip(); break;
+            case "RESUME": if (ready && !refreshRequired) resumePlayback(); break;
+            case "SKIP": if (ready && !refreshRequired) { pendingMastery = null; engine.skip(); } break;
             case "RESTART":
-                if (ready && plan != null) { restartCount++; engine.start(plan.units, true); pendingPause = false; resumePlayback(); } break;
-            case "STOP": engine.stop(); break;
+                if (ready && plan != null && !plan.authored) { restartCount++; engine.start(plan.units, true); pendingPause = false; resumePlayback(); } break;
+            case "STOP": pendingMastery = null; engine.stop(); break;
         }
     }
     private void resumePlayback() {
@@ -117,15 +120,58 @@ public final class PlaybackService extends Service implements PlaybackEngine.Hos
     }
     @Override public long now() { return SystemClock.elapsedRealtime(); }
     @Override public void speak(String text, long token) {
+        if (text.trim().isEmpty()) { actions.post(() -> engine.done(token)); return; }
         if (text.length() > TextToSpeech.getMaxSpeechInputLength()) { engine.failed(token, "Text exceeds this TTS engine's input limit."); return; }
         actions.postDelayed(() -> engine.failed(token, "No speech completion after 120 seconds. Resume retries."), 120000);
         int result = tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, Long.toString(token));
         if (result == TextToSpeech.ERROR) engine.failed(token, "TTS rejected the utterance. Resume retries.");
     }
-    @Override public void delay(long ms, Runnable done) { actions.postDelayed(done, ms); }
+    @Override public void delay(long ms, Runnable done) {
+        long deadline = now() + ms;
+        Runnable tick = new Runnable() { public void run() {
+            long left = Math.max(0, deadline - now());
+            if (left == 0) { done.run(); return; }
+            if (wake.isHeld()) wake.release(); wake.acquire(150000);
+            actions.postDelayed(this, Math.min(left, 30000));
+        }};
+        actions.postDelayed(tick, Math.min(ms, 30000));
+    }
     @Override public void cancel() { actions.removeCallbacksAndMessages(null); if (tts != null) tts.stop(); }
+    @Override public boolean canBegin() {
+        return !refreshRequired && (!plan.authored || completions.canFit(completionSize()));
+    }
+    private int completionSize() { return plan.descriptors.get(plan.units.get(engine.unitIndex).id()).toString().getBytes(StandardCharsets.UTF_8).length + JSONObject.quote(plan.libraryGeneration).getBytes(StandardCharsets.UTF_8).length + 2048; }
+    @Override public void started(String id) { occurrenceId = Long.toString(++occurrence); stepStartedAt = System.currentTimeMillis(); pendingMastery = null; }
+    String queueMastery(String json) {
+        try {
+            JSONObject choice = new JSONObject(json);
+            if (plan == null || !plan.authored || !engine.status.equals("paused") || !engine.stepStarted() || refreshRequired || occurrenceId == null
+                || !choice.getString("sessionId").equals(plan.sessionId) || !choice.getString("occurrenceId").equals(occurrenceId)
+                || completions.size() != 0) throw new IllegalStateException("Step changed or progress remains unsaved; reopen and retry.");
+            JSONObject descriptor = plan.descriptors.get(plan.units.get(engine.unitIndex).id()), action = choice.getJSONObject("action");
+            if (!action.getString("type").equals("step") || !action.getString("cardId").equals(descriptor.getString("cardId"))
+                || !action.getString("stepId").equals(descriptor.getString("stepId"))) throw new IllegalStateException("Wrong step");
+            double level = action.getDouble("level"); if (level < 0 || level > 10 || level != Math.floor(level)) throw new IllegalStateException("Invalid mastery");
+            if (!completions.canFit(json.getBytes(StandardCharsets.UTF_8).length + completionSize())) throw new IllegalStateException("Pending change is too large. Stop and apply mastery while stopped instead.");
+            pendingMastery = choice; changed(); return "";
+        } catch (Exception error) { return error.getMessage(); }
+    }
     @Override public void completed(String id) {
         try {
+            if (plan.authored) {
+                JSONObject unit = plan.descriptors.get(id);
+                JSONObject row = new JSONObject().put("queueId", plan.sessionId + ":" + occurrenceId)
+                    .put("sessionId", plan.sessionId).put("occurrenceId", occurrenceId).put("mode", plan.mode)
+                    .put("libraryGeneration", plan.libraryGeneration).put("cardId", unit.getString("cardId"))
+                    .put("stepId", unit.getString("stepId")).put("cardRevision", unit.getLong("cardRevision"))
+                    .put("progressRevision", unit.getLong("progressRevision")).put("mastery", unit.getInt("mastery"))
+                    .put("nextDueAt", unit.get("nextDueAt")).put("startedAt", stepStartedAt).put("completedAt", System.currentTimeMillis());
+                if (pendingMastery != null) row.put("pending", pendingMastery);
+                completions.add(row.getString("queueId"), row.toString());
+                if (pendingMastery != null) refreshRequired = true;
+                pendingMastery = null;
+                return;
+            }
             android.content.SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
             JSONArray prior = new JSONArray(prefs.getString("completions", "[]")), next = new JSONArray();
             for (int i = Math.max(0, prior.length() - 199); i < prior.length(); i++) next.put(prior.get(i));
@@ -146,6 +192,10 @@ public final class PlaybackService extends Service implements PlaybackEngine.Hos
                 .put("message", engine.message).put("unit", engine.unitIndex + 1).put("total", engine.unitCount())
                 .put("card", engine.unitName()).put("action", action == null ? "" : action.label())
                 .put("text", action == null ? "" : action.text()).put("voice", selectedVoice)
+                .put("sessionId", plan == null ? "" : plan.sessionId).put("occurrenceId", occurrenceId == null || !engine.stepStarted() ? "" : occurrenceId)
+                .put("mode", plan == null ? "" : plan.mode).put("refreshRequired", refreshRequired)
+                .put("pendingMastery", pendingMastery == null ? JSONObject.NULL : pendingMastery.getJSONObject("action").getInt("level"))
+                .put("step", plan != null && plan.authored && engine.unitIndex < plan.units.size() ? plan.descriptors.get(plan.units.get(engine.unitIndex).id()) : JSONObject.NULL)
                 .put("updatedAt", System.currentTimeMillis()).toString();
             getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString("lastStatus", snapshot).apply();
             ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).notify(1, notification(engine.status + " · " + engine.unitName()));
@@ -159,8 +209,8 @@ public final class PlaybackService extends Service implements PlaybackEngine.Hos
         PendingIntent open = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class), PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
         boolean playing = engine != null && engine.status.equals("playing");
         return new Notification.Builder(this, CHANNEL).setSmallIcon(android.R.drawable.ic_media_play)
-            .setContentTitle("SR Speech Proof").setContentText(text).setContentIntent(open).setOnlyAlertOnce(true)
-            .setVisibility(Notification.VISIBILITY_PUBLIC).setOngoing(true)
+            .setContentTitle("SR Listening").setContentText(text).setContentIntent(open).setOnlyAlertOnce(true)
+            .setVisibility(Notification.VISIBILITY_PRIVATE).setOngoing(true)
             .addAction(new Notification.Action.Builder(null, playing ? "Pause" : "Resume", pending(playing ? "PAUSE" : "RESUME", 1)).build())
             .addAction(new Notification.Action.Builder(null, "Skip", pending("SKIP", 2)).build())
             .addAction(new Notification.Action.Builder(null, "Stop", pending("STOP", 3)).build()).build();
@@ -168,6 +218,7 @@ public final class PlaybackService extends Service implements PlaybackEngine.Hos
     private PendingIntent pending(String action, int id) { return PendingIntent.getService(this, id, new Intent(this, PlaybackService.class).setAction(action), PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT); }
     @Override public void ended() { shutdown(); }
     private void shutdown() {
+        launching = false;
         cancel(); releaseResources(); ready = false;
         if (tts != null) { tts.shutdown(); tts = null; }
         stopForeground(STOP_FOREGROUND_REMOVE); stopSelf();
