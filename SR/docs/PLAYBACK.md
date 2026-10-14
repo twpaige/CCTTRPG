@@ -2,6 +2,10 @@
 
 Open **[https://crownandcall.com/SR/](https://crownandcall.com/SR/)** in the **same desktop Chrome profile** where you created States/Delaware. Close old SR tabs and reload once after the update. The player uses the existing library; do not clear site data, import sample data, or reset your cards to enable playback. The editor is now the **Library editor** link at `/SR/library.html`.
 
+## Owner verification and current limits (2026-10-13)
+
+The owner successfully played a newly authored Delaware flashcard on the home desktop using the live player, hearing all eligible steps in order with correct question/recall/answer timing and automatic progression. They then verified the expected next-review date changes on the Mastery page. **Core desktop audio REVIEW and scheduling are owner-verified; remaining detailed G6 checks are not yet all signed off.** The home library is separate from the earlier daytime-computer library. Back up each library before transferring JSON; importing is not automatic synchronization. The Android APK still uses fixed sample playback, not authored-card REVIEW/AUDIT.
+
 ## Hear Delaware
 
 1. Choose **REVIEW**, then the **States** series.
