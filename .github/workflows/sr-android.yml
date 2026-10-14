@@ -73,6 +73,7 @@ jobs:
           SR_PLAYWRIGHT="$RUNNER_TEMP/sr-browser-tests/node_modules/playwright" node SR/tests/mastery.mjs
           SR_PLAYWRIGHT="$RUNNER_TEMP/sr-browser-tests/node_modules/playwright" node SR/tests/study.mjs
           SR_PLAYWRIGHT="$RUNNER_TEMP/sr-browser-tests/node_modules/playwright" node SR/tests/native.mjs
+          SR_PLAYWRIGHT="$RUNNER_TEMP/sr-browser-tests/node_modules/playwright" node SR/tests/android-recovery.mjs
       - name: Build and lint release (no signing credentials)
         working-directory: SR/mobile
         env:

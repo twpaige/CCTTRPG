@@ -2,6 +2,8 @@
 
 Stage 10 is ACTIVE. Implementation/automated evidence and the current signed APK are recorded in [TEST_RESULTS.md](TEST_RESULTS.md). Physical Samsung qualification remains open. Stages 8, 9 and 11 are on hold; Stage 7 is superseded. Desktop remains the authoring environment. Android listens and adjusts mastery; it does not edit flashcard content.
 
+The owner verified installation of 0.2.100701 over the existing app, the REVIEW/AUDIT interface, import of the 1,000-card stress library, authored native TTS through Bluetooth with the screen locked, and lock-screen controls. Notifications required manual Resume in that release. The corrections below are automated-test passes pending updated-APK Samsung verification.
+
 ## Install and prepare
 
 Export a dated backup from the existing app before updating. Install the signed APK **over the existing application without uninstalling or clearing storage**. App ID `com.crownandcall.srproof`, original signing identity, local `https://sr.invalid/` origin and IndexedDB `SRLearning` schema 2 are unchanged. Do not substitute a newly signed build if Android rejects the update. A compatible signature/build check is automated; actual in-place data retention still needs owner confirmation.
@@ -15,7 +17,7 @@ Press Start. Android owns question → recall → answer and subsequent steps, i
 - Pause/Resume repeats only an interrupted speech segment; paused recall retains its remaining time. Long answers are divided into small exact text segments. Slight pauses between segments are possible. A stalled segment produces an error after 120 seconds; Resume retries it.
 - Skip skips the unfinished step and remaining steps of its flashcard. Previously completed steps retain their credit. Paused Skip stays paused.
 - Stop ends audio and releases playback resources. Completed work remains queued for saving. Restart stops, saves available work and rebuilds the last selection. After recreating the page, use Start to make a new selection.
-- Notification Pause/Resume, Skip and Stop continue to operate without the WebView. Calls/audio-focus loss and headphone disconnection pause; resume explicitly when ready.
+- Notification Pause/Resume, Skip and Stop continue to operate without the WebView. Brief duckable interruptions pause and automatically resume only when Android returns audio focus, preserving the segment and recall time. Pause during the interruption cancels that automatic resume. Calls, other-media takeover, ambiguous transient loss, Bluetooth disconnect, deliberate Pause and Stop require explicit user action. No timer blindly restarts speech.
 - Saved mastery is visible. While stopped, select a card/step and Apply a level. KNOWN and reset actions retain the shared confirmation/scope rules. During listening, these special actions pause first, then stop the session before applying a confirmed change. Cancelling leaves playback paused.
 - “Queue after answer” pauses the current step and captures the chosen level after any required confirmation. Resume explicitly. It applies only after that step's entire answer finishes. Stop or Skip discards the unfinished choice. After a queued change completes, Stop then Start refreshes selection before further listening.
 
@@ -36,14 +38,18 @@ Storage, generation/revision or clock errors retain the queued record and show a
 OneDrive is optional. Local files work without a Microsoft account. The app uses Android's existing document picker; it contains no Microsoft Graph/OAuth/cloud integration or automatic merge.
 
 1. On desktop, export the complete library into a dated JSON file in OneDrive. Keep a separate backup and let synchronization finish.
-2. On Android, stop playback and save queued progress. Open Data and export the current library as a safety backup; keep it available for verification.
-3. Select the incoming JSON through the system picker (OneDrive or local storage). Check its validation summary and counts.
-4. Select and verify the current-library safety backup. Acknowledge playback is stopped, then authorize Replace Local Library. The confirmation prominently reports “Restore Successful — N Flashcards Imported.” The previous library remains available through Save previous pre-import backup.
+2. On Android, stop playback and save queued progress, then open Data.
+3. Select the incoming JSON through the system picker (OneDrive or local storage). SR validates it and displays its series/card/step counts, then opens the save picker for an automatic backup of the current library.
+4. Choose OneDrive or Downloads and save **SR-Backup-YYYY-MM-DD-HHMM.json** (local time; collision-safe suffixes as needed). SR closes/reopens the file and verifies every byte. Only then press **Confirm replacement of library and review progress**. No manual backup reselection or stopped-playback checkbox is needed on Android. A prominent “Library Restored Successfully” result shows imported counts and the actual backup filename. The previous library also remains available through Save previous pre-import backup. Cancellation/failure leaves the local library unchanged; use Retry automatic backup if needed. Leaving without confirming never replaces it.
 5. Listen offline. Reopen SR to save available progress, then Stop and confirm the queue is empty before exporting an updated, distinctly named JSON file to OneDrive.
 6. A successful write means the provider accepted the file, **not** that cloud synchronization finished. Wait for OneDrive, reselect/verify the file where practical, and confirm it appears on desktop.
 7. Back up the desktop library before importing the Android snapshot through the same verified replacement procedure. Compare intended content and representative step mastery/dates afterward.
 
 **A snapshot replaces the whole destination library; it does not merge independent edits.** If both devices changed, keep both exports and decide which complete snapshot to restore. Never assume Android progress will merge with newer desktop authoring. Offline/unavailable provider errors leave the library intact; retry when available or use a local file. No persistent document grant is needed because each operation selects/creates its own document. JSON schema 2 and version-1 recovery compatibility remain unchanged.
+
+The timestamped backup is outside app-private storage. Existing-name collisions are handled by Android's CREATE_DOCUMENT picker; repeated same-minute app requests also get a numeric suffix. SR refuses a nonempty returned document before writing. If the provider cannot reopen the new document or returns different/incomplete bytes, replacement remains blocked. A successful read-back proves provider-accessible content, not remote OneDrive synchronization. The desktop procedure still requires exporting/reselecting its safety file and the original confirmation checkbox.
+
+**Audio-focus limitation:** Android reports interruption categories, not “SMS” or “phone call.” SR automatically resumes only for LOSS_TRANSIENT_CAN_DUCK followed by GAIN; ordinary transient/permanent loss stays manually paused. If a Samsung notification uses an ambiguous category, it may still require Resume. This conservative policy avoids guessing from elapsed time or requesting phone permissions. Verify SMS/email, calls, deliberate Pause/Stop and Bluetooth behavior on the updated APK. [Android guidance](https://developer.android.com/media/optimize/audio-focus), [document creation/collision behavior](https://developer.android.com/training/data-storage/shared/documents-files#create).
 
 ## Remaining Samsung SM-S931U verification
 

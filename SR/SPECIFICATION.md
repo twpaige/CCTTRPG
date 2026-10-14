@@ -7,6 +7,10 @@ Stage 7 is **SUPERSEDED**: BOUND series preserve the authored order of **indepen
 
 Stages 8 (focused selections/presets), 9 (desktop qualification) and 11 (automatic cloud synchronization) are **ON HOLD**. **Stage 10 is ACTIVE and owner-authorized**: authored Android listening and manual JSON transfer, optionally through OneDrive's system document provider. This supersedes both the earlier Stage 11-first order and the original Stage 9 prerequisite. Unperformed gates remain open. No automatic sync, account requirement, Microsoft Graph, OAuth integration, backend or Capacitor is introduced. Another stage requires explicit authorization.
 
+### Stage 10 owner-authorized corrections — 2026-10-14
+
+Duckable audio-focus loss may pause and automatically resume on focus gain. Ambiguous transient/permanent loss, calls, disconnects and user Pause/Stop remain manual; no timer or crash restart. Android import automatically saves a timestamped external backup through the system creation picker and verifies its bytes before one replacement confirmation. Desktop recovery and atomic/stale-library safeguards are unchanged. See [Android guide](docs/ANDROID_LISTENING.md) and [owner/automated evidence](docs/TEST_RESULTS.md). These are Stage 10 corrections, not a new stage.
+
 ## Purpose and scope
 
 A personal, local-first audio memorization system for desktop Chrome and Android listening. The learner writes their own mnemonic associations; preserve every word, Unicode character, identifier and authored order. No AI-generated stories, subject-specific mandatory fields, accounts, public sharing, cloud database or backend. Desktop is the content/mastery authority. JSON file transfer remains independent of Google services.

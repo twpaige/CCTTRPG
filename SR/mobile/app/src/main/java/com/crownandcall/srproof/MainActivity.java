@@ -148,7 +148,13 @@ public final class MainActivity extends Activity {
         if (json != null && json.getBytes(StandardCharsets.UTF_8).length > MAX_BACKUP) { fileError("Backup exceeds 32 MiB."); return; }
         Intent intent = new Intent(json == null ? Intent.ACTION_OPEN_DOCUMENT : Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE).setType("application/json");
-        if (json != null) intent.putExtra(Intent.EXTRA_TITLE, "sr-backup-" + System.currentTimeMillis() + ".json");
+        if (json != null) {
+            android.content.SharedPreferences names = getSharedPreferences("backup_names", MODE_PRIVATE);
+            Date now = new Date(); String base = BackupDocument.name(now, 0);
+            int suffix = base.equals(names.getString("last", "")) ? names.getInt("suffix", 0) + 1 : 0;
+            names.edit().putString("last", base).putInt("suffix", suffix).apply();
+            intent.putExtra(Intent.EXTRA_TITLE, BackupDocument.name(now, suffix));
+        }
         pendingBackup = json; filePending = true;
         try { startActivityForResult(intent, json == null ? OPEN_BACKUP : SAVE_BACKUP); }
         catch (ActivityNotFoundException error) { pendingBackup = null; filePending = false; fileError("No document picker is available."); }
@@ -168,11 +174,15 @@ public final class MainActivity extends Activity {
                 JSONObject response = new JSONObject();
                 if (code == SAVE_BACKUP) {
                     if (output == null) throw new IOException("Backup interrupted. Export again; local library was not changed.");
-                    try (OutputStream stream = getContentResolver().openOutputStream(uri, "wt")) {
-                        if (stream == null) throw new IOException("Cannot open output file.");
-                        stream.write(output.getBytes(StandardCharsets.UTF_8)); stream.flush();
+                    BackupDocument.save(output.getBytes(StandardCharsets.UTF_8),
+                        () -> getContentResolver().openInputStream(uri),
+                        () -> getContentResolver().openOutputStream(uri, "wt"));
+                    String filename;
+                    try (android.database.Cursor cursor = getContentResolver().query(uri, new String[]{android.provider.OpenableColumns.DISPLAY_NAME}, null, null, null)) {
+                        if (cursor == null || !cursor.moveToFirst() || cursor.isNull(0)) throw new IOException("Backup written but its filename could not be verified.");
+                        filename = cursor.getString(0);
                     }
-                    response.put("saved", true);
+                    response.put("saved", true).put("verified", true).put("filename", filename);
                 } else {
                     try (InputStream stream = getContentResolver().openInputStream(uri); ByteArrayOutputStream bytes = new ByteArrayOutputStream()) {
                         if (stream == null) throw new IOException("Cannot open input file.");

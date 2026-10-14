@@ -54,7 +54,7 @@ function render() {
   $('start').disabled = !db || busy || active || !!s.queuedCount;
   for (const id of ['pause', 'resume', 'skip', 'stop']) $(id).disabled = busy || !active;
   $('stop').disabled = !active;
-  $('pause').disabled ||= !['playing', 'initializing'].includes(s.status);
+  $('pause').disabled ||= !['playing', 'initializing'].includes(s.status) && !s.autoResumePending;
   $('resume').disabled ||= !s.ready || !['paused', 'error'].includes(s.status) || s.refreshRequired;
   $('skip').disabled ||= !s.ready || s.refreshRequired;
   $('restart').disabled = busy || !lastOptions;

@@ -1,5 +1,38 @@
 # SR — Test results
 
+## Stage 10 corrections — notification recovery and Android import, 2026-10-14
+
+**G10: core authored locked-screen Samsung playback OWNER-VERIFIED on 0.2.100701; these corrections still require physical verification.** Stage 10 remains ACTIVE. Stage 7 is superseded; 8, 9 and 11 remain on hold.
+
+### Actual owner observations, preceding this correction
+
+On Samsung **SM-S931U**, the owner installed **0.2.100701 over the existing app**, saw the REVIEW/AUDIT interface correctly, imported the **1,000-card synthetic stress library**, heard authored flashcards through native Android TTS/Bluetooth, continued listening with the **screen locked**, and successfully used **lock-screen playback controls**. Text notifications played through the headphones but left SR paused until manual Resume. These are actual owner observations, not simulated results. They establish those specific behaviors only: exact pre-update record equality, all scheduling/manual-mastery cases, long recall, process loss, offline speech and OneDrive round-trip equality are not newly inferred as passed.
+
+### Corrections and practical limits
+
+- Native speech pauses for duckable focus loss and automatically resumes the interrupted segment/remaining recall only on Android focus GAIN. The focus request stays registered while waiting; no restart timer is used. Permanent loss, ambiguous transient loss (including calls), Bluetooth disconnect and intentional Pause/Stop cancel automatic recovery. Notification/UI Pause remains usable during a temporary interruption. Late/duplicate callbacks cannot credit an unfinished answer.
+- Android audio focus identifies a loss category, not the originating app. Conservative policy: only **LOSS_TRANSIENT_CAN_DUCK → GAIN** resumes automatically. A notification reported as ordinary transient loss still needs manual Resume; a provider/device that misclassifies an interruption cannot be identified by this API. The updated Samsung notification/call behavior remains unverified. [Android audio-focus guidance](https://developer.android.com/media/optimize/audio-focus).
+- Android validates incoming JSON, automatically exports the current library, asks for a destination through CREATE_DOCUMENT, closes and reopens the file, and requires exact UTF-8 byte equality before enabling one explicit replacement confirmation. The local timestamp name is **SR-Backup-YYYY-MM-DD-HHMM.json**; repeated same-minute requests use a suffix and the system picker resolves existing-name collisions. The actual provider filename is displayed. Nonempty returned documents are refused before writing. [Android document creation](https://developer.android.com/training/data-storage/shared/documents-files#create).
+- Cancellation, write/read-back failure, invalid JSON and stale current-library contents block replacement. Existing atomic restore/recovery and final transaction-time safety match are unchanged. Playback must be stopped and completions saved; native and JS guards remain. Desktop export/reselect/checkbox recovery remains unchanged. Read-back verifies provider-accessible bytes, not completed OneDrive cloud synchronization.
+
+### Executed automated evidence
+
+**256/256 scenarios PASS: all 234 prior Stage 1–10 scenarios plus 22 correction scenarios.** Same isolated Windows/Node 24.19.0, Chrome 154 and JDK 17 environment as above; owner IndexedDB untouched.
+
+| Coverage | Result |
+|---|---|
+| Existing suites | All 234 prior scenarios pass, including full desktop backup/reselect/recovery regression |
+| Added focus tests | 7 pass: duckable loss/gain and final-answer completion, recall remainder, permanent/ambiguous transient loss, user Pause, Stop with late callbacks, Bluetooth/manual paused state, duplicate losses/gains |
+| Added external-backup tests | 5 pass: local timestamp/suffix, exact Unicode read-back, refusal to overwrite nonempty document, write failure, truncated/changed/extra/unavailable verification |
+| Added Android recovery UI | 10 pass: incoming picker cancel, invalid JSON, backup picker cancel, write/unverified failure, mutation during backup, mutation after verification, leaving without confirmation, atomic rollback, successful counts/filename/previous recovery, unsaved-completion guard |
+| Production Java | Compiles against Android API 35; existing deprecated-API note only |
+
+Native focus and document streams are simulated in host tests; Android picker/bridge is simulated in browser UI tests, with real IndexedDB transactions. The system's actual filename collision handling and OneDrive behavior require phone testing. Initial UI testing exposed a CSS display rule that kept the old checkbox visible; the native-only wrapper now hides it correctly. A test callback race was fixed by waiting until the simulated backup picker had opened. Both corrections were rerun successfully.
+
+Reproduce with the existing regression commands plus `node SR/mobile/tests/authored.test.mjs` (now 28 scenarios) and `node SR/tests/android-recovery.mjs` (10 scenarios, server/Playwright configuration unchanged). GitHub build/lint/sign and release evidence will be appended after publication.
+
+Owner verification: install the updated signed APK without uninstalling; while locked/Bluetooth, trigger SMS and another app notification, then test Pause/Stop during interruption, a phone call and disconnect/reconnect. Check no skipped answer/early credit. Import through OneDrive and Downloads, verify the timestamped backup and visible counts, cancel both pickers, leave confirmation without replacing, and restore only after verified backup. Test two backups in the same minute without overwriting. Reopen the old backup and compare representative JSON records. Wait for provider synchronization before cross-device transfer. See [Android guide](ANDROID_LISTENING.md).
+
 ## Stage 10 — authored Android listening, 2026-10-14
 
 **G10: implementation, automated checks and signed release PASS; physical Samsung acceptance OPEN.** Stage 10 is ACTIVE; Stage 7 is SUPERSEDED and Stages 8, 9 and 11 are ON HOLD. No later stage is started. This section supersedes earlier statements that Android can only play fixed samples; all dated prior-stage evidence below is preserved.

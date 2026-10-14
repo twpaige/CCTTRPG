@@ -22,6 +22,7 @@ public final class PlaybackService extends Service implements PlaybackEngine.Hos
     private TextToSpeech tts;
     private AudioManager audio;
     private AudioFocusRequest focus;
+    private final FocusRecovery focusRecovery = new FocusRecovery();
     private PowerManager.WakeLock wake;
     private Plan plan;
     private boolean ready, destroyed, pendingPause, hasFocus;
@@ -41,9 +42,7 @@ public final class PlaybackService extends Service implements PlaybackEngine.Hos
         audio = (AudioManager) getSystemService(AUDIO_SERVICE);
         AudioAttributes attributes = new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build();
         focus = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN).setAudioAttributes(attributes)
-            .setWillPauseWhenDucked(true).setOnAudioFocusChangeListener(change -> {
-                if (change < 0) interrupt("Audio focus lost (call or another app). Resume when ready.");
-            }, control).build();
+            .setWillPauseWhenDucked(true).setOnAudioFocusChangeListener(this::focusChanged, control).build();
         wake = ((PowerManager) getSystemService(POWER_SERVICE)).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "SR:Playback");
         wake.setReferenceCounted(false);
         ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).createNotificationChannel(new NotificationChannel(CHANNEL, "SR playback", NotificationManager.IMPORTANCE_LOW));
@@ -99,6 +98,8 @@ public final class PlaybackService extends Service implements PlaybackEngine.Hos
     }
     void command(String command) {
         if (destroyed) return;
+        focusRecovery.cancel();
+        if (engine.status.equals("paused")) releaseResources();
         switch (command == null ? "STOP" : command) {
             case "PAUSE": interrupt("Paused. Resume repeats interrupted speech; recall keeps remaining time."); break;
             case "RESUME": if (ready && !refreshRequired) resumePlayback(); break;
@@ -109,14 +110,27 @@ public final class PlaybackService extends Service implements PlaybackEngine.Hos
         }
     }
     private void resumePlayback() {
+        focusRecovery.cancel();
         if (!ready || engine.status.equals("playing")) return;
         if (audio.requestAudioFocus(focus) != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) { engine.fail("Audio focus denied. End the call/other playback and Resume."); return; }
         hasFocus = true; pendingPause = false; engine.resume();
     }
     private void interrupt(String reason) {
+        focusRecovery.cancel();
         pendingPause = true; interruption = reason;
         engine.pause(reason);
-        if (!ready) { engine.message = reason; changed(); }
+        if (!engine.status.equals("playing")) releaseResources();
+        engine.message = reason; changed();
+    }
+    private void focusChanged(int change) {
+        if (destroyed || !ready) return;
+        FocusRecovery.Action action = focusRecovery.change(change, engine.status.equals("playing"), engine.status.equals("paused"));
+        if (action == FocusRecovery.Action.PAUSE) {
+            if (focusRecovery.waiting()) engine.pause("Brief audio interruption. Playback resumes when audio focus returns.");
+            else interrupt("Audio focus lost (call or another app). Resume when ready.");
+        } else if (action == FocusRecovery.Action.RESUME && !refreshRequired) {
+            pendingPause = false; engine.resume();
+        }
     }
     @Override public long now() { return SystemClock.elapsedRealtime(); }
     @Override public void speak(String text, long token) {
@@ -180,6 +194,7 @@ public final class PlaybackService extends Service implements PlaybackEngine.Hos
         } catch (JSONException error) { throw new IllegalStateException(error); }
     }
     @Override public void changed() {
+        if (!engine.status.equals("paused")) focusRecovery.cancel();
         if (engine.status.equals("playing")) {
             // Re-arm only at action boundaries; bounded even if a platform callback never arrives.
             if (wake.isHeld()) wake.release();
@@ -189,6 +204,7 @@ public final class PlaybackService extends Service implements PlaybackEngine.Hos
             PlaybackEngine.Action action = engine.action();
             snapshot = new JSONObject().put("status", ready ? engine.status : engine.status.equals("paused") ? "initializing" : engine.status)
                 .put("ready", ready)
+                .put("autoResumePending", focusRecovery.waiting())
                 .put("message", engine.message).put("unit", engine.unitIndex + 1).put("total", engine.unitCount())
                 .put("card", engine.unitName()).put("action", action == null ? "" : action.label())
                 .put("text", action == null ? "" : action.text()).put("voice", selectedVoice)
@@ -203,11 +219,12 @@ public final class PlaybackService extends Service implements PlaybackEngine.Hos
     }
     private void releaseResources() {
         if (wake != null && wake.isHeld()) wake.release();
-        if (audio != null && hasFocus) { hasFocus = false; audio.abandonAudioFocusRequest(focus); }
+        // Retain the focus request only during a duckable interruption so GAIN can arrive.
+        if (audio != null && hasFocus && !focusRecovery.waiting()) { hasFocus = false; audio.abandonAudioFocusRequest(focus); }
     }
     private Notification notification(String text) {
         PendingIntent open = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class), PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
-        boolean playing = engine != null && engine.status.equals("playing");
+        boolean playing = engine != null && (engine.status.equals("playing") || focusRecovery.waiting());
         return new Notification.Builder(this, CHANNEL).setSmallIcon(android.R.drawable.ic_media_play)
             .setContentTitle("SR Listening").setContentText(text).setContentIntent(open).setOnlyAlertOnce(true)
             .setVisibility(Notification.VISIBILITY_PRIVATE).setOngoing(true)
@@ -218,12 +235,14 @@ public final class PlaybackService extends Service implements PlaybackEngine.Hos
     private PendingIntent pending(String action, int id) { return PendingIntent.getService(this, id, new Intent(this, PlaybackService.class).setAction(action), PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT); }
     @Override public void ended() { shutdown(); }
     private void shutdown() {
+        focusRecovery.cancel();
         launching = false;
         cancel(); releaseResources(); ready = false;
         if (tts != null) { tts.shutdown(); tts = null; }
         stopForeground(STOP_FOREGROUND_REMOVE); stopSelf();
     }
     @Override public void onDestroy() {
+        focusRecovery.cancel();
         destroyed = true; initialization++; control.removeCallbacksAndMessages(null);
         cancel(); releaseResources(); if (tts != null) tts.shutdown();
         unregisterReceiver(noisy); stopForeground(STOP_FOREGROUND_REMOVE); instance = null;
