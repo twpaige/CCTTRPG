@@ -1,9 +1,21 @@
 # Dex — SR implementation plan
 Current Stage 6 desktop implementation · 2026-10-13
 
+## Owner-approved roadmap revision — 2026-10-14
+
+**This section supersedes the historical Stage 7–11 order and dependencies below; retain original stage numbering and historical descriptions for reference.**
+
+- **Stage 7 — SUPERSEDED / NO ACTION.** No automatic grouping of adjacent BOUND flashcards into combined recitation units. Every flashcard remains independent with its own final-step eligibility, step mastery and schedule. BOUND means ordered flashcards, not merged cards. The last card may contain a complete passage; focused practice can select that card without a special passage feature. No Stage 7 application code is required; G7 is retired rather than claimed as tested.
+- **Stage 8 — ON HOLD.** Focused selections and saved presets remain planned but are not a prerequisite for the revised next work.
+- **Stage 9 — ON HOLD.** Desktop MVP hardening and release qualification remain planned and their unperformed acceptance checks stay open; no implied release certification.
+- **Stage 11 — NEXT FOR DESIGN / AUTHORIZATION.** Implement optional Google Drive synchronization **before Stage 10**, initially around the existing desktop schema-2 library and JSON backup/restore. Dex must first investigate and report dependency changes, OAuth/security constraints, single-writer/conflict and recovery rules, and how an Android client can subsequently integrate. Do not assume the Stage 10 native completion protocol exists. No sync implementation is authorized merely by this roadmap change.
+- **Stage 10 — AFTER STAGE 11.** Integrate authored REVIEW/AUDIT playback and progress on Android, using the established signing identity and native service. Adapt to the Stage 11 sync contract where appropriate. Preserve outstanding G2/G3/G6 and G10 verification requirements.
+
+**Priority order: Stage 11 → Stage 10; Stages 8 and 9 remain on hold.** The original Stage 11 dependency on Stage 10 and Stage 8 dependency on Stage 7 are superseded. Do not silently reinstate automatic bound grouping or require on-hold stages before the newly approved order. This revision changes the plan only, not application code or gate evidence.
+
 ## Current authority and gates
 
-The owner's Stage 5 rules and Stage 6 assignment supersede the original mastery bands, card-level schedules, L10 90-day interval, whole-unit completion credit and proposed bound recitation grouping. [SPECIFICATION.md](SPECIFICATION.md) is the current rule set. Stage 4 is formally CLOSED/PASS; earlier Android checks remain separately open. Stage 6 is authorized and implemented for desktop; **Stage 7 is not authorized**. G6 core real-content desktop audible playback and scheduling have now been owner-verified on 2026-10-13; remaining detailed manual G6 checks stay open. Empirical results belong in [docs/TEST_RESULTS.md](docs/TEST_RESULTS.md).
+The owner's Stage 5 rules and Stage 6 assignment supersede the original mastery bands, card-level schedules, L10 90-day interval, whole-unit completion credit and proposed bound recitation grouping. [SPECIFICATION.md](SPECIFICATION.md) is the current rule set. Stage 4 is formally CLOSED/PASS; earlier Android checks remain separately open. Stage 6 is authorized and implemented for desktop; **Stage 7 is superseded (no implementation)**. G6 core real-content desktop audible playback and scheduling have now been owner-verified on 2026-10-13; remaining detailed manual G6 checks stay open. Empirical results belong in [docs/TEST_RESULTS.md](docs/TEST_RESULTS.md).
 
 ## Architecture
 
