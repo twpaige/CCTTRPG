@@ -1,5 +1,15 @@
 # SR — Test results
 
+## Android stable playback status correction — 2026-10-15
+
+Owner reports APK **0.2.101701** installed and working great, with distracting layout movement from the progress-save notification. This is general owner feedback, not a claim that every outstanding G10 check passed.
+
+Minor Stage 10 UI correction: successful progress/mastery saves now show **Saved** for the existing 2.5 seconds inside the playback status line. Pending-save information uses that same line; the separate progress paragraph is removed. Status and current-position text use nowrap/hidden overflow/ellipsis, preserving full DOM text for accessibility; the status also exposes its full text as a title. Existing error alerts and all save, scheduling, mastery, playback, navigation, audio, database and backup logic are unchanged.
+
+Focused real-browser regression coverage verifies identical status/control/panel bounds when Saved appears and disappears, preserved error reporting and status semantics, and long-status ellipsis without vertical movement or horizontal page overflow at **320, 360 and 390 px**. Three scenarios added to the previous 386-scenario regression suite. Full-suite and signed-release results will be recorded below after verification.
+
+Remaining Samsung check: update in place, play until progress saves, and confirm the brief inline Saved indicator causes no menu/control movement; check status truncation with the owner's normal display/font settings. Stage 10 remains ACTIVE / G10 OPEN; no next stage begun.
+
 ## Android listening interface and one-touch PLAY — 2026-10-15
 
 **Implementation, 386 automated scenarios, Android build/lint, signing and published-download verification PASS. Samsung acceptance remains OPEN.** Current origin/main was fetched before changes and remained `28ed1bc47987d18198782b854ea819b19a531d77`; prior APK `0.2.101601`. This is Stage 10 only. Historical evidence below is preserved and describes its tested interfaces.

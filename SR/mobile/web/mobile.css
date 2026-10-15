@@ -2,9 +2,10 @@ main { max-width: 680px; padding: .7rem; display: grid; gap: .7rem; }
 section, details { min-width: 0; background: white; border: 1px solid #d5ddd1; border-radius: .6rem; padding: .85rem; }
 #playback-panel { position: sticky; top: 0; z-index: 2; box-shadow: 0 3px 8px #23352f18; }
 #status { background: none; padding: 0; font-weight: 700; margin-bottom: .3rem; }
-#current, #progress { font-size: .85rem; margin-bottom: .5rem; }
-#progress:empty, #current:empty { display: none; }
-#progress:not(:empty), #error:not(:empty) { margin: .6rem 0 0; }
+#status, #current { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#current { font-size: .85rem; margin-bottom: .5rem; }
+#current:empty { display: none; }
+#error:not(:empty) { margin: .6rem 0 0; }
 .primary-controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; margin-bottom: .5rem; }
 .navigation { display: grid; grid-template-columns: repeat(2, 1fr); gap: .5rem; }
 button { min-height: 44px; font-size: .9rem; }

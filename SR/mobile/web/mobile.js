@@ -32,7 +32,7 @@ async function reload() {
   preferences.seriesId = $('series').value;
   preview();
 }
-function notice(message) { clearTimeout(saveTimer); saveMessage = message; saveTimer = setTimeout(() => { saveMessage = ''; render(); }, 2500); }
+function notice() { clearTimeout(saveTimer); saveMessage = 'Saved'; saveTimer = setTimeout(() => { saveMessage = ''; render(); }, 2500); }
 function render() {
   const s = state(), active = s.serviceRunning;
   $('platform').textContent = 'Android ' + s.android + ' · WebView ' + s.webview;
@@ -59,17 +59,17 @@ function render() {
     if (button.dataset.level) button.setAttribute('aria-pressed', String(Number(button.dataset.level) === s.step?.mastery));
   }
   const label = s.status === 'paused' ? 'Paused' : preparing ? 'Preparing' : s.status === 'initializing' ? 'Preparing' : s.status === 'playing' ? 'Playing' : s.status === 'error' || $('error').textContent ? 'Error' : s.prepared ? 'Ready' : 'Stopped';
-  $('status').textContent = (s.mode && s.mode !== 'STATUS' ? s.mode : $('mode').value) + ' · ' + label;
+  $('status').textContent = (s.mode && s.mode !== 'STATUS' ? s.mode : $('mode').value) + ' · ' + label + (s.queuedCount ? ' · Saving ' + s.queuedCount + ' completed steps…' : saveMessage ? ' · ' + saveMessage : '');
+  $('status').title = $('status').textContent;
   $('current').textContent = active && s.step ? 'Card ' + (s.step.cardNumber || 1) + '/' + (s.step.cardTotal || 1) + ' · Step ' + s.step.stepNumber + '/' + (s.step.stepTotal || s.step.stepNumber) + ' · ' + s.action : '';
   $('saved-mastery').textContent = active && s.step ? 'Current step · Mastery ' + s.step.mastery : 'Play a session to adjust its current step.';
-  $('progress').textContent = saveMessage || (s.queuedCount ? 'Saving ' + s.queuedCount + ' completed steps…' : '');
   if (s.bridgeError) $('error').textContent = s.bridgeError;
   if (s.status === 'error') $('error').textContent = s.message || 'Playback error. Resume to retry or Stop.';
 }
 async function drain() {
   let total = 0;
   while (state().queuedCount) { const saved = await reconcileNative(db, native); if (!saved) throw new Error('Native progress is still pending. Retry saving.'); total += saved; await yieldUI(); }
-  if (total) { await reload(); notice('Progress saved'); }
+  if (total) { await reload(); notice(); }
 }
 async function waitFor(predicate) { for (let i = 0; i < 100; i++) { if (predicate(state())) return; await new Promise(resolve => setTimeout(resolve, 50)); } throw new Error('Native control is still pending. Check playback and retry.'); }
 async function run(action) { if (busy) return; busy = true; $('error').textContent = ''; render(); try { while (polling) await new Promise(resolve => setTimeout(resolve, 25)); await action(); } catch (error) { $('error').textContent = error.message; } finally { preparing = false; busy = false; render(); } }
@@ -139,7 +139,7 @@ async function manual(type, level, before) {
     if (state().serviceRunning && state().sessionId === paused.sessionId) sessionCall(native, 'cancelEdit', paused.sessionId);
     throw new Error('Playback was stopped or paused again. Mastery was not changed.');
   }
-  await changeMastery(db, { action, expectedKey: contentKey(snapshot), confirmed: true }); await reload(); notice('Mastery saved');
+  await changeMastery(db, { action, expectedKey: contentKey(snapshot), confirmed: true }); await reload(); notice();
   if (!sameSession()) return;
   await updatePreparedSession(library, [...new Set(plan.members.map(([card]) => card))], native);
   if (sameSession() && !state().refreshRequired) native.command('RESUME');

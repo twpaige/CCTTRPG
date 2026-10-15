@@ -82,7 +82,34 @@ try {
   assert.equal(await page.evaluate(() => nativeTest.s.serviceRunning), true);
   pass('One-touch PLAY prepares authored REVIEW and recall overrides then starts automatically');
   await page.locator('#data-panel summary').click(); await page.locator('#data').click(); assert.match(await page.locator('#error').textContent(), /Stop playback/);
-  await play(); await page.evaluate(() => nativeTest.finish()); await page.waitForFunction(() => nativeTest.queue.length === 0);
+  await play();
+  const geometry = () => page.evaluate(() => ['status', 'playback-panel', 'play', 'mastery-panel', 'session-panel'].map(id => {
+    const r = document.getElementById(id).getBoundingClientRect(); return [r.x, r.y, r.width, r.height];
+  }));
+  const beforeSave = await geometry();
+  await page.evaluate(() => nativeTest.finish()); await page.waitForFunction(() => document.getElementById('status').textContent.endsWith(' · Saved'));
+  assert.deepEqual(await geometry(), beforeSave);
+  assert.equal(await page.locator('#progress').count(), 0);
+  assert.equal(await page.locator('#status').getAttribute('role'), 'status');
+  assert.equal(await page.locator('#status').getAttribute('title'), await page.locator('#status').textContent());
+  pass('Saved appears inside the accessible status line without moving controls or panels');
+  await page.waitForFunction(() => !document.getElementById('status').textContent.includes('Saved'));
+  assert.deepEqual(await geometry(), beforeSave);
+  assert.match(await page.locator('#error').textContent(), /Stop playback/);
+  pass('Saved expires without changing layout or hiding existing errors');
+  for (const width of [320, 360, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    const normal = await geometry();
+    await page.evaluate(() => nativeTest.s.mode = 'Long playback status '.repeat(30));
+    await page.waitForFunction(() => document.getElementById('status').textContent.startsWith('Long playback status'));
+    assert.deepEqual(await geometry(), normal);
+    const status = await page.locator('#status').evaluate(el => ({ css: [getComputedStyle(el).whiteSpace, getComputedStyle(el).overflow, getComputedStyle(el).textOverflow], clipped: el.scrollWidth > el.clientWidth, text: el.textContent, title: el.title }));
+    assert.deepEqual(status.css, ['nowrap', 'hidden', 'ellipsis']); assert(status.clipped); assert.equal(status.text, status.title);
+    assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    await page.evaluate(() => nativeTest.s.mode = 'REVIEW');
+    await page.waitForFunction(() => document.getElementById('status').textContent.startsWith('REVIEW'));
+  }
+  pass('Long status stays one line with ellipsis and full accessible text at 320, 360 and 390px');
   assert.equal((await read()).stepEvents.length, 1); pass('PLAY and visible reconciliation save due progress and guard Data transfer');
   await page.locator('#mastery-panel summary').click();
   const previous = (await read()).stepProgress.find(row => row.stepId === 'step-1');
