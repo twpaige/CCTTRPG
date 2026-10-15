@@ -18,7 +18,7 @@ Nine new domain cases plus two Chrome UI cases cover the owner's exact All-serie
 
 Use the existing complete-suite commands below. `node SR/tests/study.mjs` now runs 71 domain + 22 UI cases. Set `SR_TEST_URL=https://crownandcall.com/SR` for isolated deployed checks. Optional SR_PLAYER_SCREENSHOTS captures the corrected scenario.
 
-Deployment/live verification pending. The commit will use the existing `[web-only]` guard to prevent APK build/publication.
+Implementation **`483c28924831fd0e6b5b2e8c478bc3068452c746`** pushed to `origin/main`. [Pages deployment 38672287212](https://github.com/twpaige/CCTTRPG/actions/runs/38672287212) **PASS**. Deployed Chrome checks: **71/71 domain + 22/22 UI PASS**, including the exact five-step scenario and notification expiry. This repeat verification is not counted again in 338. [Android workflow 38672287505](https://github.com/twpaige/CCTTRPG/actions/runs/38672287505): **build and publish SKIPPED**. No APK published. Final scope/whitespace checks pass.
 
 Owner listening check: reload [SR](https://crownandcall.com/SR/), repeat a card in seven-day REVIEW, and confirm newly saved mastery-9/KNOWN steps disappear only at the next repeat boundary. Confirm changing the final anchor outside the window advances to the next card, and save confirmations disappear while position/phase and errors remain readable. Automated sound is simulated; actual listening and assistive-technology behavior remain owner verification. No new stage or Android acceptance claim.
 
