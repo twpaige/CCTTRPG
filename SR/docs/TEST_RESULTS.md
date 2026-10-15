@@ -2,7 +2,7 @@
 
 ## Android PREPARE / PLAY refinement — 2026-10-15
 
-**Implementation and local automated checks PASS; signed-release build/lint verification follows below when available. Physical Samsung acceptance remains OPEN.** Baseline: current origin/main was fetched and fast-forwarded to `6e63b0bdb81477ac73e42c0c606bc2c3f2b36b29` before implementation. Previous published APK: `0.2.101101`. This is authorized Stage 10 refinement only; Stage 7 remains SUPERSEDED and Stages 8, 9 and 11 ON HOLD.
+**Implementation, 361 automated scenarios, Android build/lint, signing and published-download verification PASS. Physical Samsung acceptance remains OPEN.** Baseline: current origin/main was fetched and fast-forwarded to `6e63b0bdb81477ac73e42c0c606bc2c3f2b36b29` before implementation. Previous published APK: `0.2.101101`. This is authorized Stage 10 refinement only; Stage 7 remains SUPERSEDED and Stages 8, 9 and 11 ON HOLD.
 
 ### Implementation
 
@@ -20,6 +20,12 @@ Focused native tests read every step in the repository's **1,000-card / 5,000-st
 Browser tests cover UTF-16 chunk boundaries/Unicode, preparation failure/cancellation, original-cutoff pruning and no newly introduced material, final/BOUND KNOWN propagation, AUDIT reset, paged updates, real IndexedDB reconciliation, one-touch levels 0–9, mandatory intermediate KNOWN confirmation/cancel, injected save failure/rollback, Stop during confirmation, Pause versus Stop, silent reopen and 390px controls. Existing master/reset, notification/focus, JSON backup/import and migration regressions remain passing. The narrow-screen listening layout was visually inspected.
 
 Environment: Windows, Node 24.19.0, headless Chrome 154.0.0.0, JDK 17.0.20.1; all Android production Java sources compile against API 35. Full Android build/lint/signing run through the unchanged GitHub Actions workflow. Reproduction uses the existing complete-suite commands below; `node SR/mobile/tests/authored.test.mjs` now includes 11 prepared-session tests, and `node SR/tests/native.mjs` runs 19 domain + 12 UI cases. No physical-device result is inferred from automation.
+
+### Published release verification
+
+Implementation commit **`0156ad3999685ed2cda525bc53b7ec90332f4c4e`** is pushed to `origin/main`. [Android workflow 38737739570](https://github.com/twpaige/CCTTRPG/actions/runs/38737739570) completed **build and publish PASS**, including all regression suites, `assembleRelease`, `lintRelease`, signing, application-ID/version/certificate checks against the previous release, and byte-identical release-download verification. [Pages deployment 38737739027](https://github.com/twpaige/CCTTRPG/actions/runs/38737739027) also passed.
+
+Signed APK **0.2.101601** (version code 101601, greater than prior 101101): [download SR.apk](https://github.com/twpaige/CCTTRPG/releases/download/sr-android-101601/SR.apk), [release and build metadata](https://github.com/twpaige/CCTTRPG/releases/tag/sr-android-101601). The published APK was independently downloaded and its SHA-256 matched build-info.json: `586598886a06208f1bed97354f1c106dbfc93d90b8dd796ada1904407f08a17f`. Metadata matches the implementation commit and unchanged app ID `com.crownandcall.srproof`. Signing SHA-256 remains `ee98699416f616b1707fee62d4311a9de26c30c848b6abd6206112db01f0f0cb`. These automated identity checks establish upgrade compatibility, not observed Samsung data preservation.
 
 ### Remaining acceptance and practical limits
 
