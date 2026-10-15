@@ -1,28 +1,27 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'">
-<title>SR Listening</title><link rel="stylesheet" href="shared/speech.css"></head>
-<body><main><p class="eyebrow">SR / LISTEN</p><h1>Your flashcards</h1>
-<p><a id="data" href="data/index.html">Data &amp; JSON Recovery</a> — import your desktop library here. No account required.</p>
-<p id="platform"></p><p id="status" role="status">Opening library…</p><p id="error" role="alert"></p>
-<fieldset id="settings" disabled><legend>Prepare a walk</legend>
+<title>SR Listening</title><link rel="stylesheet" href="shared/styles.css"><link rel="stylesheet" href="mobile.css"></head>
+<body><main>
+<section id="playback-panel" aria-label="Playback">
+<p class="eyebrow">SR · LISTEN</p><p id="status" role="status">Opening library…</p><p id="current"></p>
+<div class="primary-controls" role="group" aria-label="Playback controls"><button id="play" class="primary" disabled>PLAY</button><button id="pause" disabled>PAUSE</button><button id="stop" disabled>STOP</button></div>
+<div class="navigation" role="group" aria-label="Navigate playlist"><button id="previous-fc" disabled>Previous FC</button><button id="previous-step" disabled>Previous Step</button><button id="next-step" disabled>Next Step</button><button id="skip" disabled>Next FC</button></div>
+<p id="progress" role="status"></p><p id="error" role="alert"></p></section>
+<details id="mastery-panel"><summary>Knowledge Mastery</summary><p id="saved-mastery">Play a session to adjust its current step.</p>
+<div id="levels" role="group" aria-label="Current step mastery"></div><div class="toolbar">
+<button data-reset="resetCard">Reset FC</button><button data-reset="resetFinal">Reset Final Step</button><button data-reset="resetObjective">Reset Objective</button></div></details>
+<details id="session-panel"><summary>Choose a Session <span id="session-summary"></span></summary>
+<fieldset id="settings" disabled><legend class="sr-only">Session settings</legend>
 <label>Activity<select id="mode"><option>REVIEW</option><option>AUDIT</option></select></label>
 <label>Series<select id="series"><option value="">ALL series</option></select></label>
-<div id="review-options"><label>Review window<select id="window"><option value="now">Due Now</option><option value="days">Lookahead days</option><option value="max">Max Deferred</option></select></label>
-<label>Days<input id="days" type="number" min="1" step="1" value="7"></label>
-<label><input id="random" type="checkbox">Shuffle UNBOUND cards</label></div>
-<p id="audit-note" hidden>AUDIT repeats KNOWN final steps until Stop. No automatic mastery or scheduling changes.</p>
-<label>Offline English voice<select id="voice"><option value="">Automatic offline English</option></select></label><button id="refresh">Refresh voices</button><p id="voice-message"></p>
-<label>Default recall seconds<input id="recall" type="number" min="0" step="any" value="4"></label>
+<div id="review-options"><label>Review window<select id="window"><option value="now">Due Now</option><option value="days" selected>Lookahead days</option><option value="max">Max Deferred</option></select></label>
+<label>Days<input id="days" type="number" min="1" step="1" value="7"></label><label><input id="random" type="checkbox"> Shuffle UNBOUND cards</label></div>
+<p id="audit-note" hidden>KNOWN final steps · continuous AUDIT</p></fieldset><p id="selection" class="note"></p></details>
+<details id="voice-panel"><summary>Voice &amp; Recall</summary><fieldset id="voice-settings" disabled><legend class="sr-only">Voice and recall settings</legend>
+<label>Offline English voice<select id="voice"><option value="">Automatic offline English</option></select></label><button id="refresh">Refresh voices</button><p id="voice-message" class="note"></p>
 <label>Speaking rate<input id="rate" type="number" min="0.5" max="2" step="0.1" value="0.9"></label>
-<p>Each saved step recall duration overrides the default, including zero.</p><p id="selection"></p></fieldset>
-<section><h2>Playback</h2><div class="controls"><button id="prepare">PREPARE</button><button id="play">PLAY</button><button id="pause">Pause</button><button id="resume">Resume</button><button id="skip">Skip card</button><button id="stop">Stop</button></div>
-<p id="current"></p><p id="progress"></p><button id="save-progress">Save queued progress / retry</button>
-<p>Resume repeats the interrupted speech segment; recall keeps its remaining time. Reopening never starts speech automatically. Unexpected app/phone shutdown can lose unsaved completions, so those steps may be reviewed again.</p></section>
-<section><h2>Mastery — one touch</h2><p>Tap 0–9 to pause, save, and continue at the next eligible step. 10 requires confirmation. Both modes repeat until Stop.</p>
-<label>Flashcard<select id="card"></select></label><label>Step<select id="step"></select></label><p id="saved-mastery"></p>
-<div id="levels" class="controls" aria-label="Mastery levels"></div>
-<button data-reset="resetCard">Reset FC</button><button data-reset="resetFinal">Reset final step only</button><button data-reset="resetObjective">Reset entire flashcard / objective</button>
-<p>Reset actions confirm their scope. Cards and text are read-only here. Stop discards the prepared session; Pause retains it.</p></section>
-<dialog id="confirmation"><form method="dialog"><h2>Confirm mastery change</h2><p id="confirmation-text"></p><button value="cancel">Cancel</button><button value="confirm">Confirm</button></form></dialog>
+<label>Default recall seconds<input id="recall" type="number" min="0" step="any" value="4"></label><p class="note">Saved per-step recall overrides this default.</p></fieldset></details>
+<details id="data-panel"><summary>Data &amp; JSON Recovery</summary><p><a id="data" href="data/index.html">Open JSON import, export &amp; backups</a></p><button id="save-progress">Save pending progress / retry</button><p id="platform" class="note"></p></details>
+<dialog id="confirmation"><form method="dialog"><h2>Confirm mastery change</h2><p id="confirmation-text"></p><div class="toolbar"><button value="cancel">Cancel</button><button value="confirm">Confirm</button></div></form></dialog>
 </main><script type="module" src="mobile.js"></script></body></html>

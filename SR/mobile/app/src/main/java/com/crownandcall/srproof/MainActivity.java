@@ -14,7 +14,7 @@ import java.util.*;
 
 public final class MainActivity extends Activity {
     private static final String ORIGIN = "https://sr.invalid/";
-    private static final Set<String> ASSETS = new HashSet<>(Arrays.asList("index.html", "mobile.js", "shared/sample.js", "shared/speech.css", "shared/playback-plan.js",
+    private static final Set<String> ASSETS = new HashSet<>(Arrays.asList("index.html", "mobile.js", "mobile.css", "preferences.js", "shared/styles.css", "shared/sample.js", "shared/speech.css", "shared/playback-plan.js",
         "data/index.html", "data/panel.js", "data/files.js", "poc/speech.css", "js/db.js", "js/repository.js", "js/validation.js", "js/backup.js", "js/scheduler.js", "js/mastery.js", "js/native-study.js"));
     private static final int OPEN_BACKUP = 30, SAVE_BACKUP = 31, MAX_BACKUP = 32 * 1024 * 1024;
     private String pendingBackup;
@@ -102,7 +102,7 @@ public final class MainActivity extends Activity {
                 SessionStore prepared = PlaybackService.prepared;
                 JSONObject result = running ? new JSONObject(PlaybackService.snapshot) : new JSONObject().put("status", "stopped");
                 android.content.SharedPreferences prefs = getSharedPreferences(PlaybackService.PREFS, MODE_PRIVATE);
-                return result.put("prepared", prepared != null).put("preparedCount", prepared == null ? 0 : prepared.size()).put("serviceRunning", running || PlaybackService.launching).put("queuedCount", PlaybackService.completions.size()).put("queueLimit", CompletionQueue.LIMIT).put("voices", new JSONArray(voices)).put("voiceMessage", voiceMessage)
+                return result.put("stopGeneration", PlaybackService.stopGeneration).put("prepared", prepared != null).put("preparedCount", prepared == null ? 0 : prepared.size()).put("serviceRunning", running || PlaybackService.launching).put("queuedCount", PlaybackService.completions.size()).put("queueLimit", CompletionQueue.LIMIT).put("voices", new JSONArray(voices)).put("voiceMessage", voiceMessage)
                     .put("bridgeError", bridgeError).put("android", Build.VERSION.RELEASE)
                     .put("webview", WebView.getCurrentWebViewPackage() == null ? "unknown" : WebView.getCurrentWebViewPackage().versionName)
                     .put("lastStatus", new JSONObject(prefs.getString("lastStatus", "{}")))
@@ -122,13 +122,19 @@ public final class MainActivity extends Activity {
             runOnUiThread(() -> {
                 if (!visible) return;
                 if (PlaybackService.instance != null) PlaybackService.instance.command(action);
-                else if ("STOP".equals(action)) { String error = PlaybackService.session("abort", ""); if (!error.isEmpty()) bridgeError = error; }
+                else if ("STOP".equals(action)) { PlaybackService.stopGeneration++; PlaybackService.preparedPlan = null; PlaybackService.launching = false; String error = PlaybackService.session("abort", ""); if (!error.isEmpty()) bridgeError = error; }
             });
         }
         @JavascriptInterface public String session(String operation, String argument) {
             java.util.concurrent.FutureTask<String> task = new java.util.concurrent.FutureTask<>(() -> {
                 if (!visible && !operation.equals("abort")) return "ERROR: Return to SR to prepare or change the session.";
                 if (filePending) return "ERROR: Finish file transfer first.";
+                if (operation.equals("announce")) {
+                    if (PlaybackService.instance != null || PlaybackService.launching) return "ERROR: Stop current playback first.";
+                    if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) { requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1); return "ERROR: Enable notifications, then press PLAY."; }
+                    try { PlaybackService.preparedPlan = new Plan(new JSONObject(argument)); PlaybackService.launching = true; bridgeError = ""; startForegroundService(new Intent(MainActivity.this, PlaybackService.class).setAction("START")); return ""; }
+                    catch (Exception error) { PlaybackService.launching = false; PlaybackService.preparedPlan = null; return "ERROR: " + error.getMessage(); }
+                }
                 if (operation.equals("play")) {
                     if (PlaybackService.instance != null || PlaybackService.launching || PlaybackService.prepared == null || PlaybackService.completions.size() != 0) return "ERROR: Prepare and save pending progress before PLAY.";
                     if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) { requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1); return "ERROR: Enable notifications, then press PLAY."; }

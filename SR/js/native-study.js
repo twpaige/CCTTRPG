@@ -2,6 +2,7 @@
 import { selectReview, selectAudit, recallSeconds, progressMap, progressKey, validTime, cutoff } from './scheduler.js';
 import { completeStep } from './mastery.js';
 import { validateSnapshot, requireValue } from './validation.js';
+import { contentKey } from './backup.js';
 export const MAX_PLAN_BYTES = 16 * 1024 * 1024;
 export function buildNativePlan(snapshot, { mode = 'REVIEW', seriesId, window = { type: 'now' }, random = false,
   now = Date.now(), rng = Math.random, recall = 4, rate = .9, voiceName = '', sessionId = crypto.randomUUID(), streamed = false } = {}) {
@@ -11,12 +12,13 @@ export function buildNativePlan(snapshot, { mode = 'REVIEW', seriesId, window = 
   recallSeconds({}, recall);
   const selected = mode === 'AUDIT' ? selectAudit(snapshot, { seriesId }) : selectReview(snapshot, { seriesId, window, random, now, rng });
   const progress = progressMap(snapshot), units = [];
-  for (const selectedCard of selected) {
+  for (const [cardIndex, selectedCard] of selected.entries()) {
     const card = snapshot.flashcards.find(row => row.id === selectedCard.cardId);
     for (const step of card.steps.filter(row => selectedCard.stepIds.includes(row.id))) {
       const row = progress.get(progressKey(card.id, step.id));
       units.push({ id: String(units.length), cardId: card.id, stepId: step.id, name: card.name, stepNumber: step.position + 1,
         question: step.question, answer: step.answer, recallMs: Math.round(recallSeconds(step, recall) * 1000),
+        cardNumber: cardIndex + 1, cardTotal: selected.length, stepTotal: card.steps.length,
         cardRevision: card.revision, progressRevision: row.revision, mastery: row.mastery, nextDueAt: row.nextDueAt });
     }
   }
@@ -30,9 +32,18 @@ export function sessionCall(native, operation, argument = '') {
   requireValue(typeof result === 'string' && !result.startsWith('ERROR:'), result || 'Native session operation failed.');
   return result;
 }
+// Reuse only a ready, never-started native playlist in this process. STOP still disposes it.
+export async function playlistValidationKey(snapshot, options) {
+  const selected = buildNativePlan(snapshot, { ...options, random: false, streamed: true });
+  const { now, rng, sessionId, ...configuration } = options;
+  const material = JSON.stringify([contentKey(snapshot), configuration, selected.units.map(row => [row.cardId, row.stepId])]);
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(material));
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+}
 export async function prepareNativeSession(snapshot, options, native, yieldUI = () => new Promise(resolve => setTimeout(resolve, 0)), continuing = () => true) {
   const now = options.now ?? Date.now(), plan = buildNativePlan(snapshot, { ...options, now, streamed: true });
   const { units, ...header } = plan;
+  if (options.validationKey) header.validationKey = options.validationKey;
   header.cutoff = plan.mode === 'REVIEW' ? (Number.isFinite(cutoff(now, options.window)) ? cutoff(now, options.window) : null) : null;
   requireValue(continuing(), 'Preparation stopped.');
   sessionCall(native, 'begin', JSON.stringify(header));

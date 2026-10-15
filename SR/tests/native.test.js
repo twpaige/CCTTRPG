@@ -2,7 +2,8 @@ import { openDatabase, request } from '../js/db.js';
 import { exportSnapshot, exportJSON, restoreJSON, contentKey } from '../js/backup.js';
 import { migrateSnapshot } from '../js/validation.js';
 import { legacyFixture, createLegacy } from './mastery.test.js';
-import { buildNativePlan, reconcileNative, prepareNativeSession, preparedPatches, updatePreparedSession } from '../js/native-study.js';
+import { buildNativePlan, reconcileNative, prepareNativeSession, preparedPatches, updatePreparedSession, playlistValidationKey } from '../js/native-study.js';
+import { readPreferences, savePreferences, normalize } from '../mobile/web/preferences.js';
 import { selectReview, selectAudit, nextDue } from '../js/scheduler.js';
 import { changeMastery } from '../js/mastery.js';
 const tests = [], fixtures = [], time = 2000000000000;
@@ -123,6 +124,29 @@ test('Prepared update streams every manifest batch in original order before acti
   const units = Array.from({ length: 100 }, (_, id) => ({ ...unit, id: String(id) })), written = []; let activated = false;
   const native = { session(op, arg) { if (op === 'manifest') return JSON.stringify({ header: { mode: 'REVIEW', cutoff: time }, count: units.length, units: units.slice(Number(arg), Number(arg) + 32) }); if (op === 'updateStep') written.push(JSON.parse(arg)); if (op === 'updateFinish') { check(written.length === 100); activated = true; } return ''; } };
   await updatePreparedSession(snapshot, [], native); check(activated); equal(written.map(row => row.id), units.map(row => row.id));
+});
+test('Playlist reuse remains valid over time only while library, choices and eligibility match', async () => {
+  const snapshot = migrateSnapshot(legacyFixture());
+  for (const row of snapshot.stepProgress.filter(row => row.flashcardId === 'card-1')) { row.mastery = 0; row.nextDueAt = time + 100; }
+  const options = { mode: 'REVIEW', window: { type: 'now' }, now: time };
+  const key = await playlistValidationKey(snapshot, options);
+  equal(key, await playlistValidationKey(snapshot, { ...options, now: time + 1 }));
+  check(key !== await playlistValidationKey(snapshot, { ...options, now: time + 100 }));
+  check(key !== await playlistValidationKey(snapshot, { ...options, rate: 1.2 }));
+  const changed = structuredClone(snapshot); changed.flashcards[0].steps[0].answer += ' Changed';
+  check(key !== await playlistValidationKey(changed, options));
+  changed.libraryGeneration = 'new-import'; check(key !== await playlistValidationKey(changed, options));
+});
+test('Device-local preferences round-trip every choice without touching the library schema', () => {
+  const rows = new Map(), storage = { getItem: key => rows.get(key), setItem: (key, value) => rows.set(key, value) };
+  const choices = { mode: 'AUDIT', seriesId: 'states', window: { type: 'max', days: 14 }, random: true, voiceName: 'offline', rate: 1.2, recall: 90 };
+  savePreferences(storage, choices); equal(readPreferences(storage), choices); check(rows.size === 1);
+  equal(normalize({ rate: NaN, recall: -1, window: { type: 'invalid', days: 0 } }), normalize());
+});
+test('Corrupt or unavailable preference storage falls back safely; failed writes are visible', async () => {
+  equal(readPreferences({ getItem() { throw new Error('Unavailable'); } }), normalize());
+  equal(readPreferences({ getItem: () => 'not JSON' }), normalize());
+  await rejects(() => savePreferences({ setItem() { throw new Error('No space'); } }, normalize()));
 });
 export async function run() {
   const results = [];

@@ -90,6 +90,7 @@ public final class PreparedSessionTest {
                 host.engine.start(small, false, true); host.engine.skip(); // first step skipped, later pass must still count
                 for (int i = 0; i < 30; i++) host.next();
                 check(queue.size() == 3 && host.ends == 0 && host.starts > 6);
+                host.engine.navigate(-1, false); for (int i = 0; i < 9; i++) host.next(); check(queue.size() == 3);
                 pass("Continuous REVIEW credits a skipped step on a later pass once, with no WebView");
                 long stale = host.token; host.engine.pause("manual"); host.engine.done(stale); check(queue.size() == 3);
                 host.engine.revise(small, 1); check(host.engine.unitIndex == 2 && host.engine.status.equals("paused"));

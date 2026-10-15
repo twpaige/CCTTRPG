@@ -17,12 +17,12 @@ try {
   await page.evaluate(async () => { const { createLegacy } = await import('./mastery.test.js'); await createLegacy('SRLearning'); });
   // Map the packaged Android paths to the exact source assets without changing production imports.
   await page.route('**/mobile/web/js/**', route => route.continue({ url: route.request().url().replace('/mobile/web/js/', '/js/') }));
-  await page.route('**/mobile/web/shared/speech.css', route => route.continue({ url: base + '/poc/speech.css' }));
+  await page.route('**/mobile/web/shared/styles.css', route => route.continue({ url: base + '/styles.css' }));
   await page.addInitScript(() => {
-    const s = { status: 'stopped', serviceRunning: false, prepared: false, ready: true, controlGeneration: 0, voices: [], android: 'simulated', webview: 'test' };
+    const s = { status: 'stopped', serviceRunning: false, prepared: false, ready: true, controlGeneration: 0, stopGeneration: 0, voices: [{name:'Offline test',language:'en-GB'}], android: 'simulated', webview: 'test' };
     const queue = [], finished = new Set(); let plan, current = 0, part = '', revised = [], after;
-    const activate = () => { const row = plan.units[current]; s.step = row; s.card = row.name; s.action = 'Question'; s.text = row.question; s.occurrenceId = String(current); s.startedAt = Date.now(); s.sessionId = plan.sessionId; };
-    globalThis.nativeTest = { s, queue, plan: () => plan, finish() {
+    const activate = () => { const row = plan.units[current]; s.step = row; s.unit = current + 1; s.card = row.name; s.action = 'Question'; s.text = row.question; s.occurrenceId = String(current); s.startedAt = Date.now(); s.sessionId = plan.sessionId; };
+    globalThis.nativeTest = { s, queue, calls: [], announcements: [], plan: () => plan, finish() {
       const row = s.step;
       if (!finished.has(row.id) && plan.mode === 'REVIEW') queue.push({ ...row, queueId: s.sessionId + ':' + row.id, sessionId: s.sessionId, occurrenceId: 'step:' + row.id, libraryGeneration: plan.libraryGeneration, mode: plan.mode, startedAt: s.startedAt, completedAt: Date.now() });
       finished.add(row.id); current = (current + 1) % plan.units.length; activate();
@@ -30,6 +30,8 @@ try {
     globalThis.SRNative = {
       status: () => JSON.stringify({ ...s, queuedCount: queue.length, preparedCount: plan?.units.length || 0 }),
       session(op, arg) {
+        nativeTest.calls.push(op);
+        if (op === 'announce') nativeTest.announcements.push(JSON.parse(arg).phrase);
         if (op === 'pause') this.command('PAUSE');
         if (op === 'cancelEdit') s.refreshRequired = false;
         if (nativeTest.failOperation === op) return 'ERROR: Injected storage failure';
@@ -48,9 +50,12 @@ try {
       },
       command(action) {
         if (['PAUSE', 'STOP', 'SKIP'].includes(action)) s.controlGeneration++;
-        if (action === 'STOP') { s.status = 'stopped'; s.serviceRunning = false; s.prepared = false; s.step = null; s.refreshRequired = false; }
+        if (action === 'STOP') { s.stopGeneration++; s.status = 'stopped'; s.serviceRunning = false; s.prepared = false; s.step = null; s.refreshRequired = false; }
         if (action === 'PAUSE') s.status = 'paused';
         if (action === 'RESUME' && !s.refreshRequired) s.status = 'playing';
+        if (action === 'NEXT_STEP') { current = (current + 1) % plan.units.length; activate(); }
+        if (action === 'PREVIOUS_STEP' && current > 0) { current--; activate(); }
+        if (action === 'PREVIOUS_FC') { const card = s.step.cardId; let target = current; while (target > 0 && plan.units[target - 1].cardId === card) target--; if (target > 0) { target--; const previous = plan.units[target].cardId; while (target > 0 && plan.units[target - 1].cardId === previous) target--; current = target; activate(); } }
         if (action === 'SKIP') { const card = s.step.cardId; do { current++; } while (current < plan.units.length && plan.units[current].cardId === card); if (current === plan.units.length) current = 0; activate(); }
       },
       completions: () => JSON.stringify(queue.slice(0, 32)),
@@ -58,19 +63,28 @@ try {
     };
   });
   await page.goto(base + '/mobile/web/index.html'); await ready();
+  assert.equal(await page.locator('details[open]').count(), 0);
+  assert.equal(await page.locator('#prepare').count(), 0);
+  assert(await page.locator('#play').isVisible());
+  await page.locator('#mastery-panel summary').focus(); await page.keyboard.press('Enter');
+  assert.equal(await page.locator('#mastery-panel').evaluate(el => el.open), true);
+  await page.keyboard.press('Enter');
+  pass('Playback is first and expanded; other panels collapse with native keyboard access');
   const read = () => page.evaluate(async () => { const { openDatabase } = await import('./js/db.js'); const { exportSnapshot } = await import('./js/backup.js'); const db = await openDatabase(); try { const snapshot = await exportSnapshot(db); delete snapshot.exportedAt; return snapshot; } finally { db.close(); } });
-  const prepare = async () => { await page.locator('#prepare').click(); await page.waitForFunction(() => !document.getElementById('play').disabled); };
-  const play = async () => { await page.locator('#play').click(); await page.waitForFunction(() => nativeTest.s.serviceRunning); };
+  const prepare = async () => { await page.locator('#play').click(); await page.waitForFunction(() => nativeTest.s.serviceRunning); };
+  const play = async () => { await page.waitForFunction(() => nativeTest.s.serviceRunning); await idle(); };
   const stop = async () => { await page.locator('#stop').click(); await ready(); };
   const idle = () => page.waitForFunction(() => !document.querySelector('[data-level="0"]').disabled);
+  await page.locator('#session-panel summary').click(); await page.locator('#voice-panel summary').click();
   await page.locator('#window').selectOption('max'); await page.locator('#recall').fill('3600'); await prepare();
   let plan = await page.evaluate(() => nativeTest.plan());
   assert.equal(plan.units.length, 5); assert.equal(plan.units[0].recallMs, 3600000); assert.equal(plan.units[1].recallMs, 1800000);
-  assert.equal(await page.evaluate(() => nativeTest.s.serviceRunning), false);
-  pass('PREPARE freezes authored REVIEW and recall overrides without starting speech');
-  await page.locator('#data').click(); assert.match(await page.locator('#error').textContent(), /Stop the prepared session/);
+  assert.equal(await page.evaluate(() => nativeTest.s.serviceRunning), true);
+  pass('One-touch PLAY prepares authored REVIEW and recall overrides then starts automatically');
+  await page.locator('#data-panel summary').click(); await page.locator('#data').click(); assert.match(await page.locator('#error').textContent(), /Stop playback/);
   await play(); await page.evaluate(() => nativeTest.finish()); await page.waitForFunction(() => nativeTest.queue.length === 0);
   assert.equal((await read()).stepEvents.length, 1); pass('PLAY and visible reconciliation save due progress and guard Data transfer');
+  await page.locator('#mastery-panel summary').click();
   const previous = (await read()).stepProgress.find(row => row.stepId === 'step-1');
   await page.locator('[data-level="8"]').click(); await idle();
   const changed = (await read()).stepProgress.find(row => row.stepId === 'step-1');
@@ -89,20 +103,20 @@ try {
   assert.equal(await page.evaluate(() => nativeTest.s.status), 'paused'); assert.deepEqual(await read(), beforeCancel);
   await page.evaluate(() => restorePut()); await stop();
   pass('Failed mastery transaction leaves progress unchanged and playback paused');
-  await page.locator('#card').selectOption('card-1'); await page.locator('#step').selectOption('step-4'); await page.locator('[data-level="10"]').click();
+  await page.locator('#session-panel summary').click(); await page.locator('#mode').selectOption('AUDIT'); await prepare(); await play(); await page.locator('[data-level="10"]').click();
   await page.locator('#confirmation').waitFor({ state: 'visible' }); assert.match(await page.locator('#confirmation-text').textContent(), /entire BOUND series/);
-  await page.locator('#confirmation button[value="confirm"]').click(); await ready(); assert((await read()).stepProgress.every(row => row.mastery === 10));
-  await page.locator('#mode').selectOption('AUDIT'); await prepare(); await play();
+  await page.locator('#confirmation button[value="confirm"]').click(); await idle(); assert((await read()).stepProgress.every(row => row.mastery === 10));
+
   assert.equal(await page.evaluate(() => nativeTest.plan().units.length), 1); assert.equal(await page.evaluate(() => nativeTest.s.step.cardId), 'card-1');
   pass('Confirmed final KNOWN propagates through BOUND series; AUDIT selects comprehensive final');
   await page.locator('[data-reset="resetObjective"]').click(); await page.locator('#confirmation').waitFor({ state: 'visible' });
   await page.locator('#confirmation button[value="confirm"]').click(); await ready(); assert((await read()).stepProgress.every(row => row.mastery === 0));
   assert.equal(await page.evaluate(() => nativeTest.s.serviceRunning), false);
   pass('AUDIT objective reset preserves scope and ends a now-empty prepared session');
-  await page.locator('#mode').selectOption('REVIEW'); await prepare(); await play();
+  await page.locator('#session-panel summary').click(); await page.locator('#mode').selectOption('REVIEW'); await prepare(); await play();
   await page.locator('#pause').click(); const pausedId = await page.evaluate(() => nativeTest.s.step.id);
-  await page.locator('#resume').click(); assert.equal(await page.evaluate(() => nativeTest.s.step.id), pausedId);
-  await stop(); assert(await page.locator('#play').isDisabled());
+  await page.locator('#pause').click(); assert.equal(await page.evaluate(() => nativeTest.s.step.id), pausedId);
+  await stop(); assert(await page.locator('#play').isEnabled());
   pass('Ordinary Pause/Resume preserves position; Stop requires new preparation');
   for (let level = 0; level < 10; level++) {
     await prepare(); await play(); const step = await page.evaluate(() => nativeTest.s.step);
@@ -111,19 +125,98 @@ try {
     assert.equal(await page.evaluate(() => nativeTest.s.status), 'playing'); await stop();
   }
   pass('Every mastery level 0–9 completes with one tap');
-  await page.evaluate(() => nativeTest.failOperation = 'part'); await page.locator('#prepare').click();
+  await page.evaluate(() => nativeTest.failOperation = 'part'); await page.locator('#play').click();
   await page.waitForFunction(() => document.getElementById('error').textContent.includes('Injected storage failure'));
-  assert(await page.locator('#play').isDisabled()); assert.equal(await page.evaluate(() => nativeTest.s.prepared), false);
+  assert(await page.locator('#play').isEnabled()); assert.equal(await page.evaluate(() => nativeTest.s.prepared), false);
   await page.evaluate(() => nativeTest.failOperation = undefined); await prepare(); await play();
   await page.locator('[data-level="10"]').click(); await page.locator('#confirmation').waitFor({ state: 'visible' });
   const beforeStop = await read(); await page.evaluate(() => SRNative.command('STOP'));
   await page.locator('#confirmation button[value="confirm"]').click(); await ready();
   assert.deepEqual(await read(), beforeStop); assert.equal(await page.evaluate(() => nativeTest.s.status), 'stopped');
-  pass('Preparation failure never enables PLAY; Stop during confirmation prevents save or restart');
+  pass('Preparation failure never starts speech; Stop during confirmation prevents save or restart');
   await page.reload(); await ready(); assert.equal(await page.evaluate(() => nativeTest.s.serviceRunning), false);
   pass('Reopening never resumes speech');
-  if (process.env.SR_NATIVE_SCREENSHOT) await page.screenshot({ path: process.env.SR_NATIVE_SCREENSHOT, fullPage: true });
+  await page.locator('#session-panel summary').click(); await page.locator('#voice-panel summary').click();
+  await page.locator('#window').selectOption('max'); await page.locator('#voice').selectOption('Offline test');
+  await page.locator('#rate').fill('1.2'); await page.locator('#rate').blur();
+  await page.locator('#recall').fill('12'); await page.locator('#recall').blur();
+  await page.locator('#days').evaluate(el => { el.value = '9'; el.dispatchEvent(new Event('change')); });
+  await page.locator('#series').selectOption('states'); await page.locator('#random').check();
+  await page.reload(); await ready();
+  assert.equal(await page.locator('#series').inputValue(), 'states'); assert.equal(await page.locator('#window').inputValue(), 'max');
+  assert.equal(await page.locator('#days').inputValue(), '9'); assert.equal(await page.locator('#rate').inputValue(), '1.2');
+  assert.equal(await page.locator('#recall').inputValue(), '12'); assert.equal(await page.locator('#voice').inputValue(), 'Offline test');
+  assert(await page.locator('#random').isChecked()); assert.equal(await page.evaluate(() => nativeTest.calls.length), 0);
+  pass('All saved configuration restores without preparing or speaking on reopen');
+  await page.evaluate(() => nativeTest.failOperation = 'play'); await page.locator('#play').click();
+  await page.waitForFunction(() => document.getElementById('error').textContent.includes('Injected storage failure'));
+  assert.equal(await page.evaluate(() => nativeTest.s.prepared), true);
+  const builds = await page.evaluate(() => nativeTest.calls.filter(op => op === 'begin').length);
+  await page.evaluate(() => nativeTest.failOperation = undefined); await prepare(); await play();
+  assert.equal(await page.evaluate(() => nativeTest.calls.filter(op => op === 'begin').length), builds);
+  assert.equal(await page.evaluate(() => nativeTest.announcements.filter(text => text === 'Preparing playlist.').length), 1);
+  pass('Failed PLAY can reuse validated ready material without unnecessary preparation announcements');
+  const operational = await page.locator('#playback-panel').textContent();
+  assert(!/Delaware|Original Q|Original A|Final comprehensive|PRIVATE NAME/.test(operational));
+  assert.match(operational, /Card 1\/2.*Step 1\/5/);
+  const eventCount = (await read()).stepEvents.length;
+  await page.locator('#next-step').click(); assert.equal(await page.evaluate(() => nativeTest.s.step.stepNumber), 2);
+  await page.locator('#previous-step').click(); assert.equal(await page.evaluate(() => nativeTest.s.step.stepNumber), 1);
+  await page.locator('#skip').click(); assert.equal(await page.evaluate(() => nativeTest.s.step.cardNumber), 2);
+  await page.locator('#previous-fc').click(); assert.equal(await page.evaluate(() => nativeTest.s.step.cardNumber), 1);
+  assert.equal((await read()).stepEvents.length, eventCount);
+  await stop();
+  pass('Operational status hides authored content; four navigation controls never credit interruptions');
+  const failReady = async () => {
+    await page.evaluate(() => nativeTest.failOperation = 'play'); await page.locator('#play').click();
+    await page.waitForFunction(() => document.getElementById('error').textContent.includes('Injected storage failure'));
+    await page.evaluate(() => nativeTest.failOperation = undefined);
+    return page.evaluate(() => nativeTest.calls.filter(op => op === 'begin').length);
+  };
+  let prior = await failReady();
+  await page.locator('#voice-panel summary').click(); await page.locator('#rate').fill('1.1'); await page.locator('#rate').blur();
+  await prepare(); await play(); assert.equal(await page.evaluate(() => nativeTest.calls.filter(op => op === 'begin').length), prior + 1); await stop();
+  pass('Changed settings invalidate ready playlist material');
+  prior = await failReady();
+  await page.evaluate(async () => { const { openDatabase } = await import('./js/db.js'); const { exportSnapshot, contentKey } = await import('./js/backup.js'); const { changeMastery } = await import('./js/mastery.js'); const db = await openDatabase(); try { const snapshot = await exportSnapshot(db); await changeMastery(db, { action: { type: 'step', cardId: 'card-0', stepId: 'step-0', level: 4 }, expectedKey: contentKey(snapshot) }); } finally { db.close(); } });
+  await prepare(); await play(); assert.equal(await page.evaluate(() => nativeTest.calls.filter(op => op === 'begin').length), prior + 1); await stop();
+  pass('Changed mastery invalidates prepared material before PLAY');
+  prior = await failReady();
+  await page.evaluate(async () => { const { openDatabase } = await import('./js/db.js'); const { exportJSON, restoreJSON } = await import('./js/backup.js'); const db = await openDatabase(); try { const json = await exportJSON(db); await restoreJSON(db, json, { confirmed: true, safetyJSON: json }); } finally { db.close(); } });
+  await prepare(); await play(); assert.equal(await page.evaluate(() => nativeTest.calls.filter(op => op === 'begin').length), prior + 1); await stop();
+  pass('Identical-content library replacement invalidates prepared generation');
+  await page.evaluate(() => {
+    const session = SRNative.session.bind(SRNative);
+    SRNative.session = (op, arg) => { const result = session(op, arg); if (op === 'step') SRNative.command('STOP'); return result; };
+  });
+  await page.locator('#play').click(); await ready();
+  assert.equal(await page.evaluate(() => nativeTest.s.serviceRunning), false);
+  assert.equal(await page.evaluate(() => nativeTest.s.prepared), false);
+  pass('Stop during preparation prevents automatic PLAY and discards partial material');
+  await page.reload(); await ready();
+  await page.locator('#session-panel summary').click(); await page.locator('#window').selectOption('now');
+  await page.locator('#play').click(); await ready();
+  assert.equal(await page.evaluate(() => nativeTest.announcements.at(-1)), 'No reviews available.');
+  assert.equal(await page.evaluate(() => nativeTest.s.serviceRunning), false);
+  pass('Empty REVIEW speaks the native no-reviews status and never starts flashcards');
+  await page.locator('#window').selectOption('max');
+  await page.locator('#mastery-panel summary').click(); await page.locator('#voice-panel summary').click(); await page.locator('#data-panel summary').click();
+  await page.evaluate(() => scrollTo(0, document.body.scrollHeight));
+  assert((await page.locator('#playback-panel').boundingBox()).y >= 0);
+  pass('Playback panel stays visible while scrolling narrow-screen settings');
+  if (process.env.SR_NATIVE_SCREENSHOT) { await page.reload(); await ready(); await page.screenshot({ path: process.env.SR_NATIVE_SCREENSHOT, fullPage: true }); }
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)); assert.deepEqual(errors, []);
   pass('390px controls fit without uncaught JavaScript errors');
+  await context.close();
+  context = await chromium.launchPersistentContext(profile, { headless: true, executablePath: process.env.SR_BROWSER || undefined, viewport: { width: 390, height: 900 } });
+  page = await context.newPage();
+  await page.route('**/mobile/web/js/**', route => route.continue({ url: route.request().url().replace('/mobile/web/js/', '/js/') }));
+  await page.route('**/mobile/web/shared/styles.css', route => route.continue({ url: base + '/styles.css' }));
+  await page.addInitScript(() => { globalThis.SRNative = { status: () => JSON.stringify({ status: 'stopped', serviceRunning: false, prepared: false, queuedCount: 0, voices: [{ name: 'Offline test', language: 'en-GB' }] }), completions: () => '[]' }; });
+  await page.goto(base + '/mobile/web/index.html'); await ready();
+  assert.equal(await page.locator('#series').inputValue(), 'states'); assert.equal(await page.locator('#window').inputValue(), 'max');
+  assert.equal(await page.locator('#rate').inputValue(), '1.1'); assert.equal(await page.locator('#recall').inputValue(), '12');
+  assert.equal(await page.locator('#voice').inputValue(), 'Offline test'); assert(await page.locator('#random').isChecked());
+  pass('Preferences survive an actual isolated browser-process restart without automatic speech');
   console.log(results.length + '/' + results.length + ' native integration domain tests + ' + count + '/' + count + ' mobile UI tests passed. Bridge/audio simulated; IndexedDB real.');
 } finally { await context?.close(); await rm(profile, { recursive: true, force: true }); }

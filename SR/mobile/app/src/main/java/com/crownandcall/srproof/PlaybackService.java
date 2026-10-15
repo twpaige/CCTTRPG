@@ -15,6 +15,7 @@ public final class PlaybackService extends Service implements PlaybackEngine.Hos
     static final CompletionQueue completions = new CompletionQueue();
     static volatile Plan preparedPlan;
     static volatile boolean launching;
+    static volatile long stopGeneration;
     static volatile SessionStore prepared;
     static SessionStore draft, update;
     static java.io.File runtimeDirectory;
@@ -35,18 +36,19 @@ public final class PlaybackService extends Service implements PlaybackEngine.Hos
     static String session(String operation, String argument) {
         try {
             PlaybackService service = instance;
+            boolean statusSession = service != null && service.plan != null ? service.plan.statusOnly : preparedPlan != null && preparedPlan.statusOnly;
             switch (operation) {
                 case "pause": if (service != null) service.command("PAUSE"); return "";
                 case "cancelEdit":
                     if (service == null || !service.plan.sessionId.equals(argument) || !service.engine.status.equals("paused")) throw new IllegalStateException("Session changed.");
                     service.refreshRequired = false; service.changed(); return "";
                 case "begin":
-                    if (service != null || launching || completions.size() != 0) throw new IllegalStateException("Stop and save pending progress first.");
+                    if (((service != null || launching) && !statusSession) || completions.size() != 0) throw new IllegalStateException("Stop and save pending progress first.");
                     discardPrepared(); draft = new SessionStore(runtimeDirectory, new JSONObject(argument)); return "";
                 case "part": if (draft == null) throw new IllegalStateException("No preparation in progress."); draft.part(argument); return "";
                 case "step": if (draft == null) throw new IllegalStateException("No preparation in progress."); draft.finishUnit(); return "";
                 case "finish": if (draft == null) throw new IllegalStateException("No preparation in progress."); draft.seal(); prepared = draft; draft = null; return "";
-                case "abort": if (service != null) throw new IllegalStateException("Stop playback first."); discardPrepared(); return "";
+                case "abort": if (service != null && !statusSession) throw new IllegalStateException("Stop playback first."); discardPrepared(); return "";
                 case "manifest": if (prepared == null) throw new IllegalStateException("Prepare a session first."); return prepared.manifest(Integer.parseInt(argument)).toString();
                 case "edit":
                     JSONObject edit = new JSONObject(argument);
@@ -119,7 +121,8 @@ public final class PlaybackService extends Service implements PlaybackEngine.Hos
             try {
                 plan = preparedPlan; preparedPlan = null; launching = false;
                 if (plan == null) throw new IllegalStateException("No prepared session. Open SR and press Start.");
-                engine.start(plan.units, true, plan.store != null || plan.mode.equals("AUDIT"));
+                engine.start(plan.units, true, plan.store != null || plan.mode.equals("AUDIT"),
+                    plan.store != null ? Collections.singletonList("Starting playlist.") : plan.intro, plan.store != null);
                 long init = ++initialization;
                 control.postDelayed(() -> { if (!ready && !destroyed && init == initialization) engine.fail("TTS initialization timed out. Stop and try again."); }, 15000);
                 tts = new TextToSpeech(this, status -> control.post(() -> initializeTts(status, init)));
@@ -160,16 +163,22 @@ public final class PlaybackService extends Service implements PlaybackEngine.Hos
     }
     void command(String command) {
         if (destroyed) return;
-        if ("PAUSE".equals(command) || "STOP".equals(command) || "SKIP".equals(command)) controlGeneration++;
+        if (!"RESUME".equals(command)) controlGeneration++;
         focusRecovery.cancel();
         if (engine.status.equals("paused")) releaseResources();
         try { switch (command == null ? "STOP" : command) {
             case "PAUSE": interrupt("Paused. Resume repeats interrupted speech; recall keeps remaining time."); break;
             case "RESUME": if (ready && !refreshRequired) resumePlayback(); break;
             case "SKIP": if (ready && !refreshRequired) { pendingMastery = null; engine.skip(); } break;
+            case "NEXT_STEP": if (ready && !refreshRequired) { pendingMastery = null; engine.navigate(1, false); } break;
+            case "PREVIOUS_STEP": if (ready && !refreshRequired) { pendingMastery = null; engine.navigate(-1, false); } break;
+            case "PREVIOUS_FC": if (ready && !refreshRequired) { pendingMastery = null; engine.navigate(-1, true); } break;
             case "RESTART":
                 if (ready && plan != null && !plan.authored) { restartCount++; engine.start(plan.units, true); pendingPause = false; resumePlayback(); } break;
-            case "STOP": pendingMastery = null; engine.stop(); break;
+            case "STOP":
+                stopGeneration++; preparedPlan = null; launching = false; pendingMastery = null; engine.stop();
+                try { discardPrepared(); } catch (java.io.IOException error) { engine.fail("Session cleanup failed: " + error.getMessage()); }
+                break;
         } } catch (RuntimeException error) { engine.fail("Playback control failed: " + error.getMessage()); }
     }
     private void resumePlayback() {
@@ -272,6 +281,7 @@ public final class PlaybackService extends Service implements PlaybackEngine.Hos
             snapshot = new JSONObject().put("status", ready ? engine.status : engine.status.equals("paused") ? "initializing" : engine.status)
                 .put("ready", ready)
                 .put("controlGeneration", controlGeneration)
+                .put("statusOnly", plan != null && plan.statusOnly).put("announcing", engine.announcing())
                 .put("autoResumePending", focusRecovery.waiting())
                 .put("message", engine.message).put("unit", engine.unitIndex + 1).put("total", engine.unitCount())
                 .put("card", engine.unitName()).put("action", action == null ? "" : action.label())
@@ -279,10 +289,10 @@ public final class PlaybackService extends Service implements PlaybackEngine.Hos
                 .put("sessionId", plan == null ? "" : plan.sessionId).put("occurrenceId", occurrenceId == null || !engine.stepStarted() ? "" : occurrenceId)
                 .put("mode", plan == null ? "" : plan.mode).put("refreshRequired", refreshRequired)
                 .put("pendingMastery", pendingMastery == null ? JSONObject.NULL : pendingMastery.getJSONObject("action").getInt("level"))
-                .put("step", (engine.status.equals("playing") || engine.status.equals("paused")) && plan != null && plan.authored && engine.unitIndex < plan.units.size() ? plan.descriptor(engine.unitIndex) : JSONObject.NULL)
+                .put("step", !engine.announcing() && (engine.status.equals("playing") || engine.status.equals("paused")) && plan != null && plan.authored && engine.unitIndex < plan.units.size() ? plan.descriptor(engine.unitIndex) : JSONObject.NULL)
                 .put("updatedAt", System.currentTimeMillis()).toString();
             getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString("lastStatus", snapshot).apply();
-            ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).notify(1, notification(engine.status + " · " + engine.unitName()));
+            ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).notify(1, notification(engine.status + (engine.announcing() ? " · Status" : " · Step " + (engine.unitIndex + 1))));
         } catch (JSONException error) { android.util.Log.e("SR", "Status encoding failed", error); }
     }
     private void releaseResources() {
@@ -307,7 +317,7 @@ public final class PlaybackService extends Service implements PlaybackEngine.Hos
         launching = false;
         cancel(); releaseResources(); ready = false;
         if (tts != null) { tts.shutdown(); tts = null; }
-        try { discardPrepared(); } catch (java.io.IOException error) { android.util.Log.e("SR", "Session cleanup failed", error); }
+        if (plan == null || !plan.statusOnly) try { discardPrepared(); } catch (java.io.IOException error) { android.util.Log.e("SR", "Session cleanup failed", error); }
         stopForeground(STOP_FOREGROUND_REMOVE); stopSelf();
     }
     @Override public void onDestroy() {
@@ -315,7 +325,7 @@ public final class PlaybackService extends Service implements PlaybackEngine.Hos
         destroyed = true; initialization++; control.removeCallbacksAndMessages(null);
         cancel(); releaseResources(); if (tts != null) tts.shutdown();
         unregisterReceiver(noisy); stopForeground(STOP_FOREGROUND_REMOVE); instance = null;
-        try { discardPrepared(); } catch (java.io.IOException error) { android.util.Log.e("SR", "Session cleanup failed", error); }
+        if (plan == null || !plan.statusOnly) try { discardPrepared(); } catch (java.io.IOException error) { android.util.Log.e("SR", "Session cleanup failed", error); }
         super.onDestroy();
     }
     @Override public IBinder onBind(Intent intent) { return null; }

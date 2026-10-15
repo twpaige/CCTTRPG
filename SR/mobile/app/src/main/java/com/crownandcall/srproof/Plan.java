@@ -11,6 +11,8 @@ final class Plan {
     final String mode, libraryGeneration;
     final Map<String, JSONObject> descriptors = new HashMap<>();
     SessionStore store;
+    boolean statusOnly;
+    List<String> intro = java.util.Collections.emptyList();
     final float rate;
     List<PlaybackEngine.Unit> units = new ArrayList<>();
     Plan(String json) throws JSONException { this(json, false); }
@@ -44,6 +46,7 @@ final class Plan {
                 actions = new StepActions(required(unit, "question"), required(unit, "answer"), recall);
                 JSONObject descriptor = new JSONObject();
                 for (String key : new String[]{"cardId", "stepId", "cardRevision", "progressRevision", "mastery", "nextDueAt", "stepNumber"}) descriptor.put(key, unit.get(key));
+                for (String key : new String[]{"cardNumber", "cardTotal", "stepTotal"}) if (unit.has(key)) descriptor.put(key, unit.get(key));
                 descriptors.put(id, descriptor);
                 units.add(new PlaybackEngine.Unit(id, unit.getString("name"), actions, unit.getString("cardId")));
                 continue;
@@ -68,6 +71,14 @@ final class Plan {
         sessionId = required(root, "sessionId"); voiceName = root.getString("voiceName");
         mode = required(root, "mode"); libraryGeneration = required(root, "libraryGeneration");
         rate = (float)root.getDouble("rate"); authored = true;
+    }
+    Plan(JSONObject announcement) throws JSONException {
+        sessionId = "status"; voiceName = announcement.getString("voiceName"); mode = "STATUS"; libraryGeneration = "";
+        rate = (float) announcement.getDouble("rate"); authored = false; statusOnly = true;
+        String phrase = announcement.getString("phrase");
+        if (!phrase.equals("Preparing playlist.") && !phrase.equals("No reviews available.")) throw new JSONException("Unknown status announcement.");
+        if (!Float.isFinite(rate) || rate < .5 || rate > 2) throw new JSONException("Invalid speech rate.");
+        intro = java.util.Collections.singletonList(phrase);
     }
     JSONObject descriptor(int position) { return store == null ? descriptors.get(units.get(position).id()) : store.descriptor(position); }
     private static String required(JSONObject row, String key) throws JSONException {

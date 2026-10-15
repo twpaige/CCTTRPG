@@ -13,6 +13,12 @@ Current Stage 10 Android implementation · 2026-10-14
 
 **Current priority: Stage 10 only.** The prior Stage 11-first decision and original Stage 9 prerequisite are superseded. Stage 7 remains superseded; Stages 8, 9 and 11 remain on hold. Their unperformed qualification checks are not passed. Stop after Stage 10; another stage requires explicit authorization.
 
+### Current refinement — compact Android and one-touch PLAY, 2026-10-15
+
+Implement the owner-approved always-open playback panel, four collapsed panels, device-local saved choices, automatic preparation on PLAY, conservative ready-playlist validation/reuse, Previous/Next Step/FC and native spoken status. Reuse selectors, mastery APIs, native batching, TTS/focus and completion overflow. No speech on reopen; announcements never schedule. STOP and process death dispose material. The [current specification](SPECIFICATION.md#android-one-touch-play--current-authority-2026-10-15) supersedes the visible PREPARE control below.
+
+Work packages: layout/preferences/PLAY; engine navigation and announcements; regression/focused tests; docs/build/lint/sign/publish; Samsung checklist. Retain the previous 361 scenarios, adapting intentionally replaced controls, and add focused coverage. Stage 10 ACTIVE, 7 SUPERSEDED, 8/9/11 ON HOLD. Stop after this release; no new stage.
+
 ### Stage 10 implementation contract — PREPARE / PLAY, 2026-10-15
 
 Implement the owner-approved [PREPARE / PLAY contract](SPECIFICATION.md#android-prepare--play--owner-approved-2026-10-15): streamed app-private prepared material, native batches and continuous REVIEW/AUDIT, first-successful-completion credit per stable step, bounded memory completions with temporary overflow, and immediate single-touch mastery with guarded paused revisions. Original cutoff/order and completion flags survive pruning; Stop discards playback material but retains queued credit. No arbitrary session count/duration limit, autonomous JavaScript runtime, crash journal or automatic restart.

@@ -21,8 +21,10 @@ const stressPlan = buildNativePlan(stress, { window: { type: 'max' }, now: 20000
 const stressFile = join(directory, 'stress-plan.json'); await writeFile(stressFile, JSON.stringify(stressPlan));
 const jdk = process.env.SR_JAVA_HOME || process.env.JAVA_HOME;
 const executable = name => jdk ? join(jdk, 'bin', name + (process.platform === 'win32' ? '.exe' : '')) : name;
-execFileSync(executable('javac'), ['-cp', jar, '-d', directory, ...['PlaybackEngine', 'CompletionQueue', 'Plan', 'SessionStore', 'FocusRecovery', 'BackupDocument'].map(name => `SR/mobile/app/src/main/java/com/crownandcall/srproof/${name}.java`), 'SR/mobile/tests/AuthoredPlaybackTest.java', 'SR/mobile/tests/PreparedSessionTest.java'], { stdio: 'inherit' });
+execFileSync(executable('javac'), ['-cp', jar, '-d', directory, ...['PlaybackEngine', 'CompletionQueue', 'Plan', 'SessionStore', 'FocusRecovery', 'BackupDocument'].map(name => `SR/mobile/app/src/main/java/com/crownandcall/srproof/${name}.java`), 'SR/mobile/tests/AuthoredPlaybackTest.java', 'SR/mobile/tests/PreparedSessionTest.java', 'SR/mobile/tests/ListeningInterfaceTest.java'], { stdio: 'inherit' });
 execFileSync(executable('java'), ['-cp', directory + delimiter + jar, 'com.crownandcall.srproof.AuthoredPlaybackTest', fixture, stressFile, String(stressPlan.units.length)], { stdio: 'inherit' });
 
 
 execFileSync(executable('java'), ['-cp', directory + delimiter + jar, 'com.crownandcall.srproof.PreparedSessionTest', stressFile], { stdio: 'inherit' });
+
+execFileSync(executable('java'), ['-cp', directory + delimiter + jar, 'com.crownandcall.srproof.ListeningInterfaceTest'], { stdio: 'inherit' });

@@ -25,9 +25,16 @@ public final class PlaybackEngine {
     public int unitIndex, actionIndex;
     private long token, deadline, remaining;
     private boolean began, repeat;
+    private boolean announcePasses;
+    private final java.util.ArrayDeque<String> announcements = new java.util.ArrayDeque<>();
+    public boolean announcing() { return !announcements.isEmpty(); }
 
     public PlaybackEngine(Host host) { this.host = host; }
-    public Action action() { return (status.equals("playing") || status.equals("paused")) && unitIndex < units.size() ? units.get(unitIndex).actions().get(actionIndex) : null; }
+    public Action action() {
+        if (!status.equals("playing") && !status.equals("paused")) return null;
+        if (announcing()) return new Action("speak", announcements.peek(), 0, "Status");
+        return unitIndex < units.size() ? units.get(unitIndex).actions().get(actionIndex) : null;
+    }
     public String unitName() { try { return unitIndex < units.size() ? units.get(unitIndex).name() : ""; } catch (RuntimeException error) { return "Unavailable"; } }
     public int unitCount() { return units.size(); }
     public boolean stepStarted() { return began && unitIndex < units.size(); }
@@ -38,7 +45,11 @@ public final class PlaybackEngine {
         start(plan, paused, false);
     }
     public void start(List<Unit> plan, boolean paused, boolean repeat) {
+        start(plan, paused, repeat, java.util.Collections.emptyList(), false);
+    }
+    public void start(List<Unit> plan, boolean paused, boolean repeat, List<String> intro, boolean announcePasses) {
         invalidate(); units = plan; unitIndex = actionIndex = 0;
+        announcements.clear(); announcements.addAll(intro); this.announcePasses = announcePasses;
         began = false; this.repeat = repeat;
         status = paused ? "paused" : "playing"; message = "";
         if (paused) { remaining = plan.isEmpty() ? 0 : plan.get(0).actions().get(0).milliseconds(); host.changed(); }
@@ -50,7 +61,11 @@ public final class PlaybackEngine {
     }
     private void executeReady(boolean remainingWait) {
         if (!status.equals("playing")) return;
-        if (unitIndex >= units.size() && repeat && !units.isEmpty()) unitIndex = 0;
+        if (announcing()) { long current = ++token; host.changed(); host.speak(announcements.peek(), current); return; }
+        if (unitIndex >= units.size() && repeat && !units.isEmpty()) {
+            unitIndex = 0;
+            if (announcePasses) { announcements.add("Playlist complete."); announcements.add("Replaying playlist."); execute(false); return; }
+        }
         if (unitIndex >= units.size()) { status = "finished"; invalidate(); host.changed(); host.ended(); return; }
         if (!began) {
             if (!host.canBegin()) { status = "paused"; message = "Open SR to save completed steps, then Resume. A mastery change requires a fresh Start."; host.changed(); return; }
@@ -72,6 +87,7 @@ public final class PlaybackEngine {
         if (completedToken != token || !status.equals("playing")) return;
         // Invalidate first, so duplicate onDone cannot complete a unit twice.
         invalidate();
+        if (announcing()) { announcements.remove(); execute(false); return; }
         if (actionIndex + 1 == units.get(unitIndex).actions().size()) {
             try { host.completed(units.get(unitIndex).id()); }
             catch (RuntimeException error) { fail("Could not retain completion: " + error.getMessage()); return; }
@@ -92,20 +108,35 @@ public final class PlaybackEngine {
         status = "playing"; message = ""; execute(began && wasPaused && action() != null && action().type().equals("wait"));
     }
     public void skip() {
+        navigate(1, true);
+    }
+    public void navigate(int direction, boolean cardNavigation) {
         if (!status.equals("playing") && !status.equals("paused") && !status.equals("error")) return;
+        if (units.isEmpty()) return;
         boolean paused = status.equals("paused") || status.equals("error");
-        String card = unitIndex < units.size() ? units.get(unitIndex).cardId() : "";
-        invalidate(); do { unitIndex++; } while (unitIndex < units.size() && units.get(unitIndex).cardId().equals(card));
+        int target = unitIndex;
+        if (cardNavigation) {
+            String card = units.get(unitIndex).cardId();
+            if (direction > 0) { do { target++; } while (target < units.size() && units.get(target).cardId().equals(card)); }
+            else {
+                while (target > 0 && units.get(target - 1).cardId().equals(card)) target--;
+                if (target == 0) return;
+                target--; String previous = units.get(target).cardId();
+                while (target > 0 && units.get(target - 1).cardId().equals(previous)) target--;
+            }
+        } else target += direction;
+        if (target < 0) return;
+        invalidate(); announcements.clear(); unitIndex = target;
         actionIndex = 0; began = false; message = "";
-        if (unitIndex >= units.size() && repeat) unitIndex = 0;
+        if (unitIndex >= units.size() && repeat) { unitIndex = 0; if (announcePasses) announcements.add("Replaying playlist."); }
         if (unitIndex >= units.size()) { status = "finished"; host.changed(); host.ended(); }
         else if (paused) { status = "paused"; host.changed(); }
         else execute(false);
     }
-    public void stop() { invalidate(); status = "stopped"; message = ""; host.changed(); host.ended(); }
+    public void stop() { invalidate(); announcements.clear(); status = "stopped"; message = ""; host.changed(); host.ended(); }
     public void revise(List<Unit> next, int afterId) {
         if (!status.equals("paused")) throw new IllegalStateException("Pause before updating a session.");
-        invalidate(); units = next;
+        invalidate(); announcements.clear(); units = next;
         int low = 0, high = units.size();
         while (low < high) { int middle = low + (high - low) / 2; if (Integer.parseInt(units.get(middle).id()) <= afterId) low = middle + 1; else high = middle; }
         unitIndex = low;
