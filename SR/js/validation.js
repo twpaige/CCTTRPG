@@ -52,6 +52,26 @@ export function validateProgress(row) {
   requireValue((row.lastReviewedAt === null || timestamp(row.lastReviewedAt)) && timestamp(row.nextDueAt), 'Invalid review timestamps; nextDueAt must be numeric.');
   requireValue(integer(row.revision) && row.revision >= 1, 'Invalid progress revision.');
 }
+// Lightweight authoring input, deliberately distinct from a full recovery snapshot.
+export function validateFlashcardInput(input) {
+  fields(input, ['flashcards']);
+  requireValue(Array.isArray(input.flashcards) && input.flashcards.length > 0, 'flashcards must contain at least one card.');
+  input.flashcards.forEach((card, index) => {
+    try {
+      fields(card, ['name', 'steps']);
+      requireValue(text(card.name), 'Enter a nonblank name.');
+      requireValue(Array.isArray(card.steps) && card.steps.length > 0, 'At least one step is required.');
+      card.steps.forEach((step, number) => {
+        try {
+          fields(step, ['question', 'answer'], ['recallSeconds']);
+          requireValue(text(step.question) && text(step.answer), 'Question and answer must be nonblank text.');
+          if ('recallSeconds' in step) requireValue(Number.isFinite(step.recallSeconds) && step.recallSeconds >= 0, 'recallSeconds must be a nonnegative number.');
+        } catch (error) { throw new Error(`Step ${number + 1}: ${error.message}`); }
+      });
+    } catch (error) { throw new Error(`Flashcard ${index + 1}: ${error.message}`); }
+  });
+  return input;
+}
 export function validateStepProgress(row) {
   fields(row, ['flashcardId', 'stepId', 'mastery', 'lastReviewedAt', 'nextDueAt', 'revision']);
   requireValue(text(row.flashcardId) && text(row.stepId) && Number.isInteger(row.mastery) && row.mastery >= 0 && row.mastery <= 10, 'Invalid step progress identity/mastery.');

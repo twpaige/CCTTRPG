@@ -1,5 +1,5 @@
 import { request, transaction } from './db.js';
-import { fields, requireValue, timestamp, validateSeries, validateCard, validateProgress, validatePreset, validateSetting } from './validation.js';
+import { fields, requireValue, timestamp, validateSeries, validateCard, validateProgress, validatePreset, validateSetting, validateFlashcardInput } from './validation.js';
 import { nextDue } from './scheduler.js';
 
 const sorted = rows => rows.sort((a, b) => a.position - b.position);
@@ -29,6 +29,9 @@ async function addClonedCard(tx, original, seriesId, position, name) {
   const ids = new Map(original.steps.map(step => [step.id, crypto.randomUUID()]));
   row.steps = row.steps.map(step => ({ ...step, id: ids.get(step.id) }));
   if (row.recitationStepIds) row.recitationStepIds = row.recitationStepIds.map(id => ids.get(id));
+  return addCardRecords(tx, row);
+}
+async function addCardRecords(tx, row) {
   validateCard(row);
   await request(tx.objectStore('flashcards').add(row));
   await request(tx.objectStore('progress').add({ flashcardId: row.id, mastery: 0, lastReviewedAt: null, nextDueAt: 0, revision: 1 }));
@@ -109,6 +112,28 @@ export class Repository {
       for (const step of row.steps) if (!previous.has(step.id)) tx.objectStore('stepProgress').add({ flashcardId: id, stepId: step.id, mastery: 0, lastReviewedAt: null, nextDueAt: nextDue(0, row.updatedAt), revision: 1 });
       if (old.seriesId !== row.seriesId) reorder(store, sorted(await request(store.index('bySeries').getAll(old.seriesId))));
       return row;
+    });
+  }
+  async importCards(input, destination) {
+    input = clone(input); destination = clone(destination);
+    validateFlashcardInput(input);
+    if (Object.hasOwn(destination, 'seriesId')) fields(destination, ['seriesId']);
+    else { fields(destination, ['name', 'bound']); requireValue(typeof destination.bound === 'boolean', 'Choose BOUND or UNBOUND.'); }
+    return this.write(['series', 'flashcards', 'progress', 'stepProgress'], async tx => {
+      const seriesStore = tx.objectStore('series'), cards = tx.objectStore('flashcards');
+      let series;
+      if (Object.hasOwn(destination, 'seriesId')) series = existing(await request(seriesStore.get(destination.seriesId)));
+      else {
+        series = fresh({ ...destination, position: await request(seriesStore.count()) });
+        validateSeries(series); await request(seriesStore.add(series));
+      }
+      const start = await request(cards.index('bySeries').count(series.id)), imported = [];
+      for (const [index, card] of input.flashcards.entries()) {
+        const row = fresh({ name: card.name, seriesId: series.id, position: start + index,
+          steps: card.steps.map((step, position) => ({ ...step, id: crypto.randomUUID(), position })) });
+        imported.push(await addCardRecords(tx, row));
+      }
+      return { series, cards: imported };
     });
   }
   cloneCard(id, count, expectedRevision) {

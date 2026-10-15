@@ -1,11 +1,12 @@
 import { openDatabase, DATA_STORES } from './db.js';
 import { Repository } from './repository.js';
+import { validateFlashcardInput, text } from './validation.js';
 import { exportSnapshot, exportJSON, contentKey, readSnapshot } from './backup.js';
 
 const $ = id => document.getElementById(id);
 const copy = value => structuredClone(value);
 let db, repo, snapshot, selected, draft, dirty = false, busy = false, pendingDelete, databaseOptions;
-let seriesPage = 0, cardPage = 0, pendingClone;
+let seriesPage = 0, cardPage = 0, pendingClone, pastePreview;
 const pageSize = 50;
 function node(tag, text, className) {
   const element = document.createElement(tag);
@@ -30,7 +31,11 @@ function markDirty() { dirty = true; draftState(); }
 function draftState() { $('draft-state').textContent = dirty ? 'Unsaved changes' : draft ? 'Saved content · editing' : ''; }
 function abandon() { return !dirty || confirm('Discard unsaved changes? Choose Cancel to keep editing.'); }
 function clearDraft() { draft = undefined; dirty = false; draftState(); }
-function controls() { $('workspace').disabled = !db || !snapshot || busy; $('delete-confirm').disabled = $('clone-confirm').disabled = busy; }
+function controls() {
+  $('workspace').disabled = !db || !snapshot || busy;
+  $('delete-confirm').disabled = $('clone-confirm').disabled = busy;
+  $('paste-fields').disabled = !db || busy; $('paste-confirm').disabled = !pastePreview || busy;
+}
 async function run(action) {
   if (busy) return;
   busy = true; controls(); $('error').textContent = '';
@@ -84,9 +89,10 @@ function renderLists() {
   const series = snapshot.series.find(row => row.id === selected);
   $('current-series').textContent = series?.name || 'Select a series';
   $('binding').textContent = series ? series.bound ? 'Bound — keep this meaningful sequence together in future reviews.' : 'Unbound — cards may be reviewed independently or randomly in future reviews.' : '';
-  if (!series) return;
+  if (!series) { $('series-actions').append(button('Paste Flashcards', openPaste)); return; }
   const cards = cardsFor(series.id);
   $('series-actions').append(button('Edit series', () => openSeries(series)), button('Clone Series', () => confirmClone('series', series)), button('New flashcard', () => openCard()));
+  $('series-actions').append(button('Paste Flashcards', openPaste));
   if (!cards.length) $('card-list').append(node('p', 'This series is empty. Add your first flashcard.'));
   paged($('card-list'), cards, cardPage, value => { cardPage = value; }, row => {
     const item = node('div', undefined, 'list-item');
@@ -193,6 +199,54 @@ async function save() {
     await mutate(async () => { const row = original ? await repo.updateCard(original.id, patch, original.revision) : await repo.createCard(patch); selected = row.seriesId; }, `Flashcard saved — ${value.steps.length} steps. Review progress preserved.`);
   }
 }
+function invalidatePaste() { pastePreview = undefined; $('paste-preview').textContent = 'Validate to preview the import.'; controls(); }
+function openPaste() {
+  if (dirty) { error('Save or cancel your unsaved changes before importing flashcards.'); return; }
+  $('paste-series').replaceChildren(...snapshot.series.map(series => {
+    const option = node('option', series.name); option.value = series.id; return option;
+  }), new Option('Create a new series…', ''));
+  $('paste-series').value = selected || ''; $('paste-new').hidden = !!$('paste-series').value;
+  $('paste-error').textContent = ''; invalidatePaste(); $('paste-dialog').showModal(); $('paste-json').focus();
+}
+for (const id of ['paste-json', 'paste-series', 'paste-name', 'paste-bound']) $(id).oninput = () => {
+  invalidatePaste(); $('paste-error').textContent = ''; $('paste-new').hidden = !!$('paste-series').value;
+};
+$('paste-validate').onclick = () => run(async () => {
+  invalidatePaste(); $('paste-error').textContent = '';
+  try {
+    const input = validateFlashcardInput(JSON.parse($('paste-json').value));
+    const destination = $('paste-series').value ? { seriesId: $('paste-series').value } : { name: $('paste-name').value, bound: $('paste-bound').checked };
+    if (!destination.seriesId && !text(destination.name)) throw new Error('Enter a name for the new series.');
+    // A new preview refreshes its snapshot guard; no records are written here.
+    await load();
+    const series = snapshot.series.find(row => row.id === destination.seriesId);
+    if (destination.seriesId && !series) throw new Error('Destination series was removed. Cancel and choose a current destination.');
+    const steps = input.flashcards.reduce((total, card) => total + card.steps.length, 0);
+    pastePreview = { input, destination, repo };
+    $('paste-preview').textContent = `${input.flashcards.length} flashcards · ${steps} steps → ${series?.name || destination.name}${series ? ' (append)' : destination.bound ? ' (new BOUND series)' : ' (new UNBOUND series)'}. All steps start at mastery 0, due in 15 minutes.`;
+  } catch (reason) { $('paste-error').textContent = reason.message; }
+});
+$('paste-confirm').onclick = () => run(async () => {
+  if (!pastePreview) return;
+  const preview = pastePreview; $('paste-error').textContent = '';
+  let result;
+  try {
+    await mutate(async () => {
+      result = await preview.repo.importCards(preview.input, preview.destination);
+      selected = result.series.id; seriesPage = Math.floor(result.series.position / pageSize); cardPage = Math.floor(result.cards[0].position / pageSize);
+    }, `Imported ${preview.input.flashcards.length} flashcards. Existing content and progress preserved.`);
+    invalidatePaste(); $('paste-json').value = ''; $('paste-dialog').close();
+    openCard(snapshot.flashcards.find(row => row.id === result.cards[0].id));
+  } catch (reason) {
+    invalidatePaste();
+    if (result) {
+      $('paste-json').value = ''; $('paste-dialog').close();
+      error('Import saved, but the editor could not refresh. Reload saved library before continuing. ' + reason.message);
+    } else $('paste-error').textContent = reason.message + ' Validate & Preview again before retrying. Your pasted text is retained.';
+  }
+});
+$('paste-cancel').onclick = () => { if (!busy) { invalidatePaste(); $('paste-dialog').close(); } };
+$('paste-dialog').oncancel = event => { if (busy) event.preventDefault(); else invalidatePaste(); };
 function confirmClone(kind, original) {
   if (dirty) { error('Save or cancel your unsaved changes before cloning. Cloning uses saved content.'); return; }
   pendingClone = { kind, original };
@@ -243,7 +297,7 @@ $('backup').onclick = () => run(async () => {
   setTimeout(() => URL.revokeObjectURL(url), 10000);
   message('Backup download requested for saved content. Unsaved drafts are not included. Keep and verify the file outside this browser.');
 });
-window.addEventListener('beforeunload', event => { if (dirty || busy) { event.preventDefault(); event.returnValue = ''; } });
+window.addEventListener('beforeunload', event => { if (dirty || busy || $('paste-dialog').open && $('paste-json').value) { event.preventDefault(); event.returnValue = ''; } });
 window.addEventListener('pagehide', () => db?.close());
 window.addEventListener('pageshow', event => {
   if (event.persisted) run(async () => {

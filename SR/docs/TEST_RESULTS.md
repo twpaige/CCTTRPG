@@ -1,5 +1,13 @@
 # SR — Test results
 
+## Website Paste Flashcards — 2026-10-15
+
+Additive authoring dialog accepts one strict JSON format, previews counts/destination without writes, and confirms an atomic append to an existing or newly created BOUND/UNBOUND series. Existing rows/history are preserved; new cards/steps have ordinary identities, timestamps and mastery-0 progress due in 15 minutes. Unsupported fields and full-library backups are rejected. Dirty drafts block opening, input changes invalidate preview, and stale confirmation requires fresh validation while retaining the text. No database/backup format, restore behavior, playback/mastery policy or Android UI change.
+
+**57/57 editor scenarios PASS**, retaining the previous 39 plus **18 paste scenarios**. Real disposable IndexedDB/browser tests cover 1/3/1,000 cards into both existing/new destinations; exact text, order, IDs and recall; default progress; backup round trips/native-plan compatibility; malformed/unsupported input; partial-write rollback; normal editing/reordering/moving/cloning/mastery/deletion; history preservation on move; locks, concurrent writes and restore-generation guards; no-write preview/cancel; dirty drafts; validation invalidation; failure retention; 390/320px keyboard/scroll layout; post-commit refresh failure without accidental retry duplication. **434/434 total automated scenarios PASS** (previous 416 plus 18 paste cases): editor, storage, mastery, desktop/shared/native playback, Android UI, Data/recovery and release-safety suites. Speech/providers are simulated; browser IndexedDB is real and disposable. Desktop/narrow dialog screenshots visually inspected. Live deployment evidence follows publication.
+
+Remaining owner verification: generate a small JSON batch, paste/preview it in the disposable editor, confirm destination/order/wording, and edit/move/clone a card. Transfer through the existing full-backup/OneDrive workflow when desired. Actual Samsung transfer and personal-library acceptance are not inferred from synthetic tests. Website-only release; no APK requested or published and no next feature/stage begun.
+
 ## Android JSON picker bridge correction — 2026-10-15
 
 Owner reported **Error invoking openBackup: Method not found** on Samsung. The native annotated method is present as `openBackup()`; export is `saveBackup(String)`. Shared recovery simplification commit `2b5b51c` replaced the earlier direct zero-argument call with `nativeFile(method, json)`, which always invoked `native[method](json)`. Import therefore supplied one undefined argument to the zero-argument Java method. Method names match; argument count did not. The previous plain JavaScript mock silently accepted extra arguments.

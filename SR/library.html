@@ -20,4 +20,13 @@
 <div id="clone-quantity"><label>Number of copies (1–10)<input id="clone-count" type="number" min="1" max="10" step="1" value="1" required></label></div>
 <div class="toolbar"><button id="clone-cancel" type="button">Cancel</button><button id="clone-confirm" type="submit" class="primary">Create copies</button></div>
 </form></dialog>
+<dialog id="paste-dialog" aria-labelledby="paste-title">
+<h2 id="paste-title">Paste Flashcards</h2><p>Add cards without replacing your library. Paste a JSON object with a flashcards array; complete backups belong in Data &amp; recovery.</p>
+<p id="paste-error" role="alert"></p><fieldset id="paste-fields"><legend class="sr-only">Paste and preview</legend>
+<label>Flashcard JSON<textarea id="paste-json" rows="8" spellcheck="false"></textarea></label>
+<label>Destination series<select id="paste-series"></select></label>
+<div id="paste-new" hidden><label>New series name<input id="paste-name"></label><label><input id="paste-bound" type="checkbox"> BOUND — preserve card sequence</label></div>
+<p id="paste-preview" role="status">Validate to preview the import.</p>
+<div class="toolbar"><button id="paste-validate" type="button">Validate &amp; Preview</button><button id="paste-confirm" type="button" class="primary" disabled>Confirm Import</button><button id="paste-cancel" type="button">Cancel</button></div>
+</fieldset></dialog>
 </main><script type="module" src="js/editor.js"></script></body></html>

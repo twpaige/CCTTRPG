@@ -11,6 +11,33 @@ Open **https://crownandcall.com/SR/library.html** in desktop Chrome, or choose *
 
 All controls are native keyboard controls: Tab/Shift+Tab to navigate, Enter/Space to activate buttons, arrow keys for selects/number inputs. Ordering never requires dragging. Lists show up to 50 items per page; only the selected card's chain is rendered.
 
+## Paste Flashcards
+
+Choose **Paste Flashcards** near the card-management controls. Paste the JSON below, choose an existing destination or **Create a new series…**, then **Validate & Preview**. A new series needs a name and BOUND setting (unchecked means UNBOUND). Check the card/step counts and destination, then **Confirm Import**. Cards append in the supplied order and the first imported card opens for editing. Validation and cancellation create no records.
+
+```json
+{
+  "flashcards": [
+    {
+      "name": "Delaware",
+      "steps": [
+        { "question": "What is the first state?", "answer": "Delaware" },
+        { "question": "What is its capital?", "answer": "Dover", "recallSeconds": 4 },
+        { "question": "Name the first state and its capital.", "answer": "Delaware — Dover" }
+      ]
+    }
+  ]
+}
+```
+
+Copy only the JSON object, without Markdown fences. Include one or more cards. Names, questions and answers must be nonblank strings; text is preserved exactly, including Unicode, whitespace and line breaks. The only optional step property is a finite nonnegative numeric `recallSeconds` (zero is valid). Omit it to use the session default. IDs, dates, positions, mastery, annotations and all other fields are rejected. This authoring format is separate from complete-library backups, which still go through **Data & recovery**.
+
+This import adds ordinary cards; it never replaces existing content or progress. Each card and step gets a new ID, fresh timestamps and independent mastery-0 progress due in 15 minutes. Creating a destination series and all its cards is one atomic operation. No empty series or partial batch remains if it fails. Imports of 1,000 cards are tested.
+
+Save or cancel any unsaved editor draft before opening the dialog. Validation errors retain the pasted text. Changing input or destination invalidates the preview. If another tab changes/restores the library after preview, confirmation refuses the stale import: **Validate & Preview** again to review the current destination before retrying. Stop playback before importing. Cancel retains the text while this page remains open; save it elsewhere before closing the page if you need it later.
+
+Imported cards support the same editing, step reordering, moving, cloning, mastery and deletion actions as other cards. Moving preserves their IDs, content, mastery and history. Normal complete JSON export includes them for manual transfer to Android; no APK update is required for this website feature.
+
 ## Clone saved templates
 
 Open a saved flashcard and choose **Clone FC** beside Save, Cancel and Delete. Confirm **1–10 copies** (default 1). Copies appear immediately after the original, with consecutive positions and names such as `Ten Commandments (Copy 1)`. Repeated cloning, including cloning a copy, uses the first unused numbered suffix for that base name in the series; it does not restrict names you enter yourself. The first new copy opens for editing.
