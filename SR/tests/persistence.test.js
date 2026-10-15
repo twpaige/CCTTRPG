@@ -1,6 +1,6 @@
 import { openDatabase, request, transaction, ALL_STORES, DB_VERSION } from '../js/db.js';
 import { Repository } from '../js/repository.js';
-import { exportJSON, exportSnapshot, restoreJSON, recoveryJSON, contentKey, previewImport } from '../js/backup.js';
+import { exportJSON, exportSnapshot, restoreJSON, contentKey, previewImport } from '../js/backup.js';
 import { parseSnapshot } from '../js/validation.js';
 const check = (ok, message = 'Assertion failed') => { if (!ok) throw new Error(message); };
 const equal = (a, b) => check(JSON.stringify(a) === JSON.stringify(b), `Different values: ${JSON.stringify(a)} / ${JSON.stringify(b)}`);
@@ -119,11 +119,11 @@ test('Confirmation and matching safety backup are both required', async () => {
   await f.repo.setSetting('rate', 1.1); const before = contentKey(await exportSnapshot(f.db));
   await rejects(() => restoreJSON(f.db, json, { confirmed: true, safetyJSON: json })); equal(contentKey(await exportSnapshot(f.db)), before);
 });
-test('Pre-import backup restores the previous library after a successful replacement', async () => {
+test('External outgoing backup restores previous library without creating an internal recovery copy', async () => {
   const f = await fixture(); await seed(f); const original = await exportJSON(f.db), other = await fixture();
   await restoreJSON(f.db, await exportJSON(other.db), { confirmed: true, safetyJSON: original });
-  equal(contentKey(parseSnapshot(await recoveryJSON(f.db))), contentKey(parseSnapshot(original)));
-  await restoreJSON(f.db, await recoveryJSON(f.db), { confirmed: true, safetyJSON: await exportJSON(f.db) });
+  equal(await historicalJSON(f.db), undefined);
+  await restoreJSON(f.db, original, { confirmed: true, safetyJSON: await exportJSON(f.db) });
   equal((await exportSnapshot(f.db)).flashcards.length, 2);
 });
 const invalid = [
@@ -151,15 +151,16 @@ for (const [name, mutate] of invalid) test(`Invalid import (${name}) leaves the 
 });
 test('Mid-restore write failure after clears rolls back library and prior recovery', async () => {
   const f = await fixture(); await seed(f); const json = await exportJSON(f.db);
+  await transaction(f.db, ['recovery'], 'readwrite', tx => request(tx.objectStore('recovery').put({ key: 'pre-import', snapshot: JSON.parse(json) })));
   await restoreJSON(f.db, json, { confirmed: true, safetyJSON: json });
-  const safe = await exportJSON(f.db), recovery = await recoveryJSON(f.db), original = IDBObjectStore.prototype.add;
+  const safe = await exportJSON(f.db), recovery = await historicalJSON(f.db), original = IDBObjectStore.prototype.add;
   IDBObjectStore.prototype.add = function (...args) {
     if (this.name === 'progress') throw new DOMException('Simulated disk full', 'QuotaExceededError');
     return original.apply(this, args);
   };
   try { await rejects(() => restoreJSON(f.db, json, { confirmed: true, safetyJSON: safe })); }
   finally { IDBObjectStore.prototype.add = original; }
-  equal(contentKey(await exportSnapshot(f.db)), contentKey(parseSnapshot(safe))); equal(await recoveryJSON(f.db), recovery);
+  equal(contentKey(await exportSnapshot(f.db)), contentKey(parseSnapshot(safe))); equal(await historicalJSON(f.db), recovery);
 });
 test('Blocked upgrade waits for old connection; aborted upgrade preserves version/data', async () => {
   const f = await fixture(); await seed(f); const safe = await exportJSON(f.db); f.db.close();
@@ -227,4 +228,10 @@ export async function exampleBackup() {
   const db = await openDatabase({ name });
   try { await seed({ db, repo: new Repository(db) }); return await exportJSON(db); }
   finally { db.close(); await request(indexedDB.deleteDatabase(name)); }
+}
+
+// Test-only inspection: obsolete records must survive updates without an application export API.
+async function historicalJSON(db, key = 'pre-import') {
+  const row = await request(db.transaction('recovery').objectStore('recovery').get(key));
+  return row ? JSON.stringify(row.snapshot) : undefined;
 }

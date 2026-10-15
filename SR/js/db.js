@@ -32,6 +32,7 @@ export function openDatabase({ name = DB_NAME, onBlocked = () => {}, onVersionCh
         events.createIndex('bySessionUnit', ['sessionId', 'unitId'], { unique: true });
         events.createIndex('byCompletedAt', 'completedAt');
         db.createObjectStore('meta', { keyPath: 'key' });
+        // Retain the schema-2 store for compatibility; old records stay inert.
         db.createObjectStore('recovery', { keyPath: 'key' });
         opening.transaction.objectStore('meta').add({ key: 'library', libraryId: crypto.randomUUID(), libraryGeneration: crypto.randomUUID() });
       }
@@ -40,7 +41,7 @@ export function openDatabase({ name = DB_NAME, onBlocked = () => {}, onVersionCh
         const steps = db.createObjectStore('stepProgress', { keyPath: ['flashcardId', 'stepId'] });
         steps.createIndex('byCard', 'flashcardId'); steps.createIndex('byDue', 'nextDueAt');
         db.createObjectStore('stepEvents', { keyPath: 'id' });
-        // All reads, validation, recovery and new records share the versionchange transaction.
+        // All reads, validation and new records share the versionchange transaction.
         Promise.all(['series', 'flashcards', 'progress', 'presets', 'settings', 'reviewEvents', 'meta'].map(name => request(tx.objectStore(name).getAll())))
           .then(([series, flashcards, progress, presets, settings, reviewEvents, meta]) => {
             const identity = meta.find(row => row.key === 'library');
@@ -50,7 +51,6 @@ export function openDatabase({ name = DB_NAME, onBlocked = () => {}, onVersionCh
               flashcards: flashcards.sort((a, b) => a.seriesId < b.seriesId ? -1 : a.seriesId > b.seriesId ? 1 : a.position - b.position),
               progress, presets, settings: Object.fromEntries(settings.map(row => [row.key, row.value])), reviewEvents };
             const converted = migrateSnapshot(before);
-            if (event.oldVersion === 1) tx.objectStore('recovery').put({ key: 'pre-migration', snapshot: before });
             for (const row of converted.stepProgress) steps.add(row);
           }).catch(error => { upgradeError = error; try { tx.abort(); } catch { /* already aborted */ } });
       }

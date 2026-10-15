@@ -15,9 +15,10 @@ import java.util.*;
 public final class MainActivity extends Activity {
     private static final String ORIGIN = "https://sr.invalid/";
     private static final Set<String> ASSETS = new HashSet<>(Arrays.asList("index.html", "mobile.js", "shared/sample.js", "shared/speech.css", "shared/playback-plan.js",
-        "data/index.html", "data/panel.js", "poc/speech.css", "js/db.js", "js/repository.js", "js/validation.js", "js/backup.js", "js/scheduler.js", "js/mastery.js", "js/native-study.js"));
+        "data/index.html", "data/panel.js", "data/files.js", "poc/speech.css", "js/db.js", "js/repository.js", "js/validation.js", "js/backup.js", "js/scheduler.js", "js/mastery.js", "js/native-study.js"));
     private static final int OPEN_BACKUP = 30, SAVE_BACKUP = 31, MAX_BACKUP = 32 * 1024 * 1024;
     private String pendingBackup;
+    private android.net.Uri incomingBackup;
     private boolean filePending;
     private WebView web;
     private TextToSpeech inventory;
@@ -85,7 +86,7 @@ public final class MainActivity extends Activity {
         }));
     }
     private void startPlan(String json) {
-        if (!visible || PlaybackService.instance != null || PlaybackService.launching || PlaybackService.completions.size() != 0) { bridgeError = "Stop playback and save queued progress before starting a new session."; return; }
+        if (!visible || filePending || PlaybackService.instance != null || PlaybackService.launching || PlaybackService.completions.size() != 0) { bridgeError = "Stop playback and save queued progress before starting a new session."; return; }
         try {
             PlaybackService.preparedPlan = new Plan(json);
             PlaybackService.launching = true;
@@ -149,6 +150,8 @@ public final class MainActivity extends Activity {
         Intent intent = new Intent(json == null ? Intent.ACTION_OPEN_DOCUMENT : Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE).setType("application/json");
         if (json != null) {
+            // Hint only: OPEN_DOCUMENT grants no write access to its parent.
+            if (incomingBackup != null) intent.putExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI, incomingBackup);
             android.content.SharedPreferences names = getSharedPreferences("backup_names", MODE_PRIVATE);
             Date now = new Date(); String base = BackupDocument.name(now, 0);
             int suffix = base.equals(names.getString("last", "")) ? names.getInt("suffix", 0) + 1 : 0;
@@ -192,6 +195,7 @@ public final class MainActivity extends Activity {
                             bytes.write(buffer, 0, count);
                         }
                         response.put("json", bytes.toString(StandardCharsets.UTF_8.name()));
+                        incomingBackup = uri;
                     }
                 }
                 runOnUiThread(() -> { filePending = false; fileResult(response); });

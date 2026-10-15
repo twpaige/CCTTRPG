@@ -1,5 +1,50 @@
 # SR — Test results
 
+## Data & Recovery simplification — 2026-10-14
+
+**Implementation and available automation PASS; Samsung update retention and real OneDrive/Downloads picker behavior require owner verification.** This is the authorized shared Data correction, not Stage 8, 9 or 11. Baseline: current main `b6614e4`. Historical evidence below is retained as originally tested; its old recovery controls are no longer current instructions.
+
+### Changes and safety
+
+- `data/index.html` / `panel.js`: one shared two-action page, validated incoming counts, automatic complete outgoing backup, one modal Cancel/Confirm Import, prominent success and actual backup filename. New small `data/files.js` implements desktop local-time names and exact UTF-8 read-back. Chrome needs a fresh **Choose Backup Destination** click after validation; its picker receives the incoming handle as a folder hint. Android automatically opens its existing system creation picker with the incoming document location hint.
+- `js/backup.js` / `db.js`: remove historical-copy export and new pre-import/pre-migration snapshot creation. Keep the same schema/version/store definition; existing records remain untouched. Atomic live-store replacement, exact stale-snapshot check, format-1/2 conversion, step progress and receipts remain.
+- Import holds the existing library lock through backup and confirmation, refuses active native playback, reconciles available Android completions before export, and blocks replacement if more completions appear. No playback engine/service/queue change. Cancellation keeps legitimate completion credit and any already-verified external file.
+- `MainActivity.java`: add the bundled file helper to its existing asset allowlist, pass SAF's incoming-document location hint, and reject new playback while a document operation is pending. App ID, origin, signing setup, version allocation and release workflow are unchanged.
+- Update storage, authoring, listening, specification and build-plan instructions. Adapt retired recovery-control tests to external backup and inert-record preservation; extend the existing Data runner and add a small headless picker helper backed by disposable real files. No new framework.
+
+### Executed tests
+
+Windows, Node 24.19.0, installed Google Chrome **155.0.0.0** headless, JDK 17.0.20.1, Android API 35. **282/282 grouped scenarios PASS.** This is the previous 256 total with the old 10 Data scenarios replaced by 35 expanded scenarios, plus one historical-record preservation scenario. Tests use disposable profiles/databases/files; no personal library was opened.
+
+| Suite | Passed |
+|---|---:|
+| Desktop speech / shared plans / release guards / original native engine | 33 + 6 + 6 + 16 |
+| IndexedDB persistence / desktop editor | 38 + 17 |
+| Mastery domain / UI | 40 + 7 |
+| Desktop study domain / UI | 30 + 7 |
+| Authored native Java, focus and document stream regressions | 28 |
+| Native integration domain / mobile listening UI | 13 + 6 |
+| Shared Data desktop / Android workflow | 35 |
+
+The Data suite covers both platforms' two-action UI/removal/parity, validation-before-backup, input and destination cancellation, write/read-back failure, complete empty backup, confirmation cancellation, old-tab mutations before/after verification, exclusive playback/write locking, atomic rollback, populated version-1 import, version-2 mastery round trip, empty import, native active/late/unreconcilable completions and successful pending-credit reconciliation, local timestamps/suffixes, same-folder hints and refusal to overwrite existing files. Existing browser-process restart, offline storage and page-close-during-transaction rollback also pass. Existing historical pre-import and pre-migration records survive migration/reopen/replacement unchanged.
+
+`gradlew.bat --no-daemon assembleRelease lintRelease` **PASS** locally: 0 lint errors, 2 existing warnings (`SetJavaScriptEnabled`, `DataExtractionRules`). Existing deprecated-API compiler note remains. Local SDK emitted a missing platform-tools/license warning but completed the build successfully; no license or signing configuration was changed. Local APK is unsigned; the existing CI signs/releases the distributable APK.
+
+Reproduce using the existing commands: `node SR/tests/run.mjs`, mobile `plan.test.mjs`, `release.test.mjs`, `authored.test.mjs`, `run-native.ps1`; run `node SR/tests/serve.mjs`, then browser runners `browser.mjs`, `editor.mjs`, `mastery.mjs`, `study.mjs`, `native.mjs`, `android-recovery.mjs`. Configure `SR_PLAYWRIGHT`, `SR_BROWSER` and `SR_JAVA_HOME` as in earlier sections. CI runs the same suites with its existing pinned tools.
+
+### Limits and owner checks
+
+Chrome DOM/IndexedDB/Web Locks and desktop temporary-file writes/readbacks were exercised. Headless system pickers and Android bridge/provider responses are simulated; native document stream failure cases run in host Java. No audible test, real OneDrive cloud sync, actual directory-picker selection, or physical APK update retention is claimed here.
+
+1. Open [desktop Data](https://crownandcall.com/SR/data/index.html) in Windows Chrome. Reload old tabs. Use **Save Complete JSON Backup** for a dated external backup. For a disposable test library use [isolated Data](https://crownandcall.com/SR/data/index.html?test=SRLearning-test-owner), not your personal library.
+2. Import valid populated and empty JSON: check counts, choose the incoming folder in **Choose Backup Destination**, verify the timestamped file, cancel confirmation once, then repeat and Confirm Import. Test OneDrive and local Downloads, including two saves in the same minute, and compare exported representative content/mastery/dates. The picker may ignore the initial-location hint; explicitly choose the intended folder. Read-back does not certify cloud sync.
+3. Before updating Android, keep a complete external backup. Install the signed update **over the existing app without uninstalling/clearing storage**. Verify counts, exact representative Q/A, step mastery/dates, close/reopen and export. This physical update/data-preservation check remains open.
+4. On Samsung, Stop playback, open Data and perform the same import/cancel/confirm checks in OneDrive and Downloads. Confirm the automatic backup contains outgoing data and pending completed-step credit. Check the actual backup folder and filename; wait for OneDrive sync before another device. Verify existing locked-screen/Bluetooth listening still works.
+
+### Publication
+
+Pending the implementation push and existing signed GitHub Actions workflow; release evidence will be recorded after completion.
+
 ## Stage 10 corrections — notification recovery and Android import, 2026-10-14
 
 **G10: core authored locked-screen Samsung playback OWNER-VERIFIED on 0.2.100701; these corrections still require physical verification.** Stage 10 remains ACTIVE. Stage 7 is superseded; 8, 9 and 11 remain on hold.

@@ -2,20 +2,18 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; base-uri 'none'">
 <title>SR — Data and recovery</title><link rel="stylesheet" href="../poc/speech.css"></head>
-<body><main><p class="eyebrow">SR / STAGE 3</p><h1>Data and recovery</h1>
-<p>Your library stays on this device. A JSON import replaces the entire library, progress, presets and preferences. Keep dated backups outside this app.</p>
-<p id="status" role="status">Opening local storage…</p><p id="error" role="alert"></p>
-<section><h2>Export</h2><button id="export" disabled>Save complete JSON backup</button>
-<button id="recovery" disabled>Save previous pre-import backup</button>
-<button id="migration-backup" disabled>Save original pre-migration backup</button>
-<p id="export-note">Downloads alone do not prove a backup was saved. Open the saved file again below before replacing data.</p></section>
-<section><h2>Restore from JSON</h2><ol id="instructions"><li>Stop playback and close other speech pages.</li><li>Choose and preview the file to restore.</li><li>Save a current backup, then choose that saved file as your safety backup.</li><li>Confirm replacement.</li></ol>
-<button id="choose-import" disabled>Choose JSON to restore</button><input id="import-file" type="file" accept=".json,application/json" hidden>
-<p role="status"><strong id="preview">No restore file selected.</strong></p>
-<button id="choose-safety" disabled>Verify saved current backup</button><input id="safety-file" type="file" accept=".json,application/json" hidden>
-<p id="safety-status">No safety backup verified.</p>
-<div id="confirmation"><label><input id="confirm" type="checkbox"> I stopped playback and want to replace all local learning data with the previewed file.</label></div>
-<button id="replace" disabled>Replace local library</button></section>
-<p>For OneDrive: select OneDrive in Android's file picker, or save desktop exports in your synced OneDrive folder. Wait for syncing before opening the file on another device. Local files work without a Microsoft account. Imports replace; they never merge independent desktop/phone changes. Keep both backups if desktop content changed after transfer.</p>
-<p>A previous pre-import copy is kept locally after a successful restore. Clearing browser/app storage removes it too. File limit: 32 MiB. On Android, stop playback and save queued progress on the Listening page before transferring files.</p>
+<body><main><h1>Data and recovery</h1>
+<p>Your library stays on this device. JSON files transfer the complete library, mastery, review progress and settings.</p>
+<p id="status" role="status">Opening local storage…</p><h2 id="error" role="alert"></h2>
+<section aria-label="Backup and import"><button id="export" disabled>Save Complete JSON Backup</button>
+<button id="choose-import" disabled>Import JSON Library</button></section>
+<section aria-live="polite"><h2 id="preview"></h2><p id="backup-status"></p>
+<button id="destination" hidden>Choose Backup Destination</button></section>
+<dialog id="confirmation" aria-labelledby="confirm-title"><h2 id="confirm-title">Import this library?</h2>
+<p id="counts"></p><p>Your existing flashcards, mastery, review progress and settings will be replaced.</p>
+<p>A verified backup of your previous library has been saved as:</p><p><strong id="backup-name"></strong></p>
+<button id="cancel-import">Cancel</button><button id="confirm-import">Confirm Import</button></dialog>
+<p>Import validates your file, saves and reads back a complete backup, then asks you to confirm once. Stop playback first; completed Android steps are saved automatically before backup.</p>
+<p>The backup picker suggests the incoming file’s location when supported. Check the destination: choose the same OneDrive folder, or Downloads. A selected file does not grant permission to write to its parent folder. SR never chooses a different folder silently.</p>
+<p>On desktop use Chrome on HTTPS or localhost and allow the file picker. On Android use the system file picker. Wait for OneDrive synchronization before using files on another device. Imports replace; they do not merge. File limit: 32 MiB.</p>
 <p id="back"></p></main><script type="module" src="panel.js"></script></body></html>

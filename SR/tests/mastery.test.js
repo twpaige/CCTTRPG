@@ -1,6 +1,6 @@
 import { openDatabase, request, transaction, ALL_STORES } from '../js/db.js';
 import { Repository } from '../js/repository.js';
-import { exportSnapshot, exportJSON, restoreJSON, recoveryJSON, contentKey } from '../js/backup.js';
+import { exportSnapshot, exportJSON, restoreJSON, contentKey } from '../js/backup.js';
 import { migrateSnapshot, validateSnapshot } from '../js/validation.js';
 import { nextDue, cutoff, selectReview, selectAudit, progressMap, progressKey, auditCursor, recallSeconds } from '../js/scheduler.js';
 import { planMastery, changeMastery, prepareCompletion, completeStep, StepCompletionController } from '../js/mastery.js';
@@ -94,12 +94,25 @@ test('Actual v1 upgrade copies every progress field without changing content or 
   equal(after.flashcards, before.flashcards); equal(after.series, before.series); equal(after.progress, before.progress); equal(after.libraryGeneration, before.libraryGeneration);
   for (const row of after.stepProgress) { const old = before.progress.find(old => old.flashcardId === row.flashcardId); equal({ ...row, stepId: undefined }, { ...old, nextDueAt: old.mastery === 10 ? null : old.nextDueAt, stepId: undefined }); }
   equal(progress(after).mastery, 7); equal(progress(after, 'card-1').mastery, 10);
-  equal(contentKey(JSON.parse(await recoveryJSON(f.db, 'pre-migration'))), contentKey(before)); equal(JSON.parse(await recoveryJSON(f.db)), before);
+  equal(await historicalJSON(f.db, 'pre-migration'), undefined); equal(JSON.parse(await historicalJSON(f.db)), before);
 });
 test('Migration and converter are idempotent; second open preserves recovery and independent step edits', async () => {
-  const f = await fixture(); await change(f.db, action('card-0', 'step-0', 2)); const before = await exportSnapshot(f.db), recovery = await recoveryJSON(f.db, 'pre-migration');
+  const f = await fixture();
+  await transaction(f.db, ['recovery'], 'readwrite', tx => request(tx.objectStore('recovery').put({ key: 'pre-migration', snapshot: legacyFixture() })));
+  await change(f.db, action('card-0', 'step-0', 2)); const before = await exportSnapshot(f.db), recovery = await historicalJSON(f.db, 'pre-migration');
   equal(migrateSnapshot(before), before); f.db.close(); const db = await openDatabase({ name: f.name }); databases.push({ db });
-  equal(contentKey(await exportSnapshot(db)), contentKey(before)); equal(await recoveryJSON(db, 'pre-migration'), recovery);
+  equal(contentKey(await exportSnapshot(db)), contentKey(before)); equal(await historicalJSON(db, 'pre-migration'), recovery);
+});
+test('Existing historical copies survive migration and successful external-file replacement unchanged', async () => {
+  const name = `SRLearning-test-history-${crypto.randomUUID()}`; databases.push({ name });
+  await createLegacy(name); const old = await request(indexedDB.open(name, 1));
+  const historical = { ...legacyFixture(), appVersion: 'original-history' };
+  await transaction(old, ['recovery'], 'readwrite', tx => request(tx.objectStore('recovery').put({ key: 'pre-migration', snapshot: historical })));
+  old.close(); const db = await openDatabase({ name }); databases.push({ db });
+  equal(JSON.parse(await historicalJSON(db, 'pre-migration')), historical);
+  const safe = await exportJSON(db); await restoreJSON(db, safe, { confirmed: true, safetyJSON: safe });
+  equal(JSON.parse(await historicalJSON(db, 'pre-migration')), historical);
+  equal(JSON.parse(await historicalJSON(db)), legacyFixture());
 });
 test('Corrupt legacy progress aborts upgrade without altering v1 records or stores', async () => {
   const name = `SRLearning-test-corrupt-${crypto.randomUUID()}`, old = legacyFixture(); databases.push({ name }); old.progress.pop(); await createLegacy(name, old);
@@ -238,4 +251,10 @@ export async function runMasteryTests(report = () => {}) {
     report(results.at(-1));
   }
   return results;
+}
+
+// Test-only inspection: obsolete records must survive updates without an application export API.
+async function historicalJSON(db, key = 'pre-import') {
+  const row = await request(db.transaction('recovery').objectStore('recovery').get(key));
+  return row ? JSON.stringify(row.snapshot) : undefined;
 }

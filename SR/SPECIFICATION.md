@@ -9,7 +9,13 @@ Stages 8 (focused selections/presets), 9 (desktop qualification) and 11 (automat
 
 ### Stage 10 owner-authorized corrections — 2026-10-14
 
-Duckable audio-focus loss may pause and automatically resume on focus gain. Ambiguous transient/permanent loss, calls, disconnects and user Pause/Stop remain manual; no timer or crash restart. Android import automatically saves a timestamped external backup through the system creation picker and verifies its bytes before one replacement confirmation. Desktop recovery and atomic/stale-library safeguards are unchanged. See [Android guide](docs/ANDROID_LISTENING.md) and [owner/automated evidence](docs/TEST_RESULTS.md). These are Stage 10 corrections, not a new stage.
+Duckable audio-focus loss may pause and automatically resume on focus gain. Ambiguous transient/permanent loss, calls, disconnects and user Pause/Stop remain manual; no timer or crash restart. The initial Android backup correction is superseded by the shared Data correction below. See [Android guide](docs/ANDROID_LISTENING.md) and [owner/automated evidence](docs/TEST_RESULTS.md). These are authorized corrections, not a new stage.
+
+### Owner-authorized Data simplification — 2026-10-14
+
+Both platforms expose **Save Complete JSON Backup** and **Import JSON Library** as their two primary Data actions. Fully validate incoming JSON, display counts, automatically save and read back a complete external outgoing backup, then show one Cancel/Confirm Import dialog. Use local-minute filenames with collision suffixes; refuse nonempty destinations. Prefer the incoming folder through picker hints, with explicit owner destination selection. Chrome requires a fresh destination-button gesture; Android uses its existing document-creation picker.
+
+Remove obsolete manual verification/checkbox/Replace controls and historical recovery-copy creation/export functions. Existing recovery records remain inert; retain the schema-2 store definition without a destructive migration. Refuse active playback, reconcile Android completions before backup, hold the existing library lock through confirmation, and preserve final stale-snapshot checks and atomic rollback. Schema, JSON versions, app ID, signing and native listening remain unchanged. No new stage or cloud integration. This supersedes older internal-copy requirements below; current instructions are in [STORAGE.md](docs/STORAGE.md).
 
 ## Purpose and scope
 
@@ -117,9 +123,9 @@ An exclusive Web Lock protects one player per origin/database, including paused/
 
 One versioned IndexedDB database per origin/profile. Schema 2 adds **stepProgress** keyed by [flashcardId, stepId] and **stepEvents** receipts. Content, stable IDs, positions and existing stores remain. Original card-level **progress** is retained as a legacy recovery archive, not active scheduling authority. Old optional metadata is not discarded.
 
-Approved migration: validate the complete version-1 library, save a pre-migration recovery snapshot and copy each card's mastery, last-reviewed time, due date and revision to every step in one upgrade transaction. Mastery 10 becomes KNOWN with null due; **no cross-card/BOUND-series propagation during migration**. Reopening version 2 never reapplies the copy. Any validation/write/abort failure leaves the version-1 database intact. After migration, every step changes independently.
+Approved migration: validate the complete version-1 library and copy each card's mastery, last-reviewed time, due date and revision to every step in one upgrade transaction. Existing recovery records remain untouched; no new internal snapshot is created. Mastery 10 becomes KNOWN with null due; **no cross-card/BOUND-series propagation during migration**. Reopening version 2 never reapplies the copy. Any validation/write/abort failure leaves the version-1 database intact. After migration, every step changes independently.
 
-Export complete version-2 snapshots. Accept validated version-1 backups through the same idempotent conversion; require safety export/reselection and explicit replacement. Preserve the previous pre-import copy and the original pre-migration copy separately. Version-2 backups are not readable by older APKs; update the APK before transfer. Unsupported/corrupt data fails closed without partial replacement. Clearing browser/app storage or uninstalling can destroy local copies: retain dated external files. Details and API: [STORAGE.md](docs/STORAGE.md).
+Export complete version-2 snapshots. Accept validated version-1 backups through the same idempotent conversion; require automatic external backup/read-back and one explicit import confirmation. Existing historical recovery copies remain untouched; no new internal copies are created. Version-2 backups are not readable by older APKs; update the APK before transfer. Unsupported/corrupt data fails closed without partial replacement. Clearing browser/app storage or uninstalling can destroy local copies: retain dated external files. Details and API: [STORAGE.md](docs/STORAGE.md).
 
 ## Audio/platform boundary
 

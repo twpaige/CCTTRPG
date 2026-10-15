@@ -7,7 +7,7 @@ Open **https://crownandcall.com/SR/library.html** in desktop Chrome, or choose *
 3. Use **Add step**, **Insert after**, **Up**, **Down** and **Delete step** to build the chain. There is no fixed step limit; 100-step authoring is tested. Set **Recall duration in seconds** if this step needs a custom pause; blank uses the session default, zero is valid, and long recitations are supported in storage. Review the complete chain and choose **Save**. At least one nonblank question/answer pair must remain.
 4. Reopen a saved card from the list to continue editing. Choose a different series to move it; its default destination is the end. Change **Position** (1 means first), or use **Move up/down**, then **Save**. **Edit series** provides the same ordering controls for series.
 5. **Cancel** discards a draft only after confirmation if it has changed. Switching editors, reloading or leaving the page also warns about unsaved changes. These browser warnings cannot protect drafts against crashes or forced termination: save regularly.
-6. **Save JSON backup** downloads all saved content, independent step progress, legacy progress, completion receipts, presets and preferences in version-2 format. Unsaved drafts are excluded. Version-1 backups are still importable through the approved conversion. Use **Data & recovery** for validation, safety-file verification and explicit replacement. Keep desktop and phone backups separately; restoration replaces rather than merges. Update an older Android APK before transferring a version-2 file.
+6. **Save JSON backup** downloads all saved content, independent step progress, legacy progress, completion receipts, presets and preferences in version-2 format. Unsaved drafts are excluded. Version-1 backups are still importable through the approved conversion. Use **Data & recovery** for automatic outgoing backup, read-back verification and one import confirmation. Keep desktop and phone backups separately; restoration replaces rather than merges. Update an older Android APK before transferring a version-2 file.
 
 All controls are native keyboard controls: Tab/Shift+Tab to navigate, Enter/Space to activate buttons, arrow keys for selects/number inputs. Ordering never requires dragging. Lists show up to 50 items per page; only the selected card's chain is rendered.
 
@@ -33,7 +33,7 @@ Open **Knowledge Mastery** from the library, or go to **https://crownandcall.com
 | 7 | 2 weeks |
 | 8 | 1 calendar month |
 | 9 | 3 calendar months |
-| 10 | KNOWN — no normal REVIEW due date |
+| 10 | KNOWN â€” no normal REVIEW due date |
 
 Dates restart from the explicit change time. Days/weeks are elapsed time; months use UTC calendar arithmetic with month-end clamping. Dates display in your local timezone. Playing will not automatically increase mastery.
 
@@ -51,7 +51,7 @@ The **REVIEW / AUDIT preview** shows what later playback will select:
 
 The approved migration copies each existing card's mastery, last-reviewed time and due date to **every step**. Level 10 becomes KNOWN with no due date. It does not propagate to other cards, recalculate old dates, rewrite content or change identifiers/order. After migration, steps are independent. The upgrade is atomic and never reapplied on reopen. If another SR tab blocks it, close that tab; do not clear storage.
 
-Keep a dated export before an update when possible. After upgrading, **Data & recovery → Save original pre-migration backup** downloads the preserved version-1 library; this is separate from **Save previous pre-import backup**. Save these files externally. Confirm your real States/Delaware content and copied progress in the same profile; synthetic test fixtures are not a substitute for that owner check. Never uninstall or clear storage as an update procedure.
+Keep a dated export before an update when possible. Use **Data & recovery → Save Complete JSON Backup** for the complete current library. Historical private recovery records are retained but their old export actions are retired. Confirm your real States/Delaware content and copied progress in the same profile; synthetic test fixtures are not a substitute for that owner check. Never uninstall or clear storage as an update procedure.
 
 The desktop [REVIEW / AUDIT player](PLAYBACK.md) and Stage 10 [Android listening client](ANDROID_LISTENING.md) use the same Stage 5 rules. Android supports long authored text and recall overrides through its native service; physical Samsung qualification remains separate. Author/edit on desktop, export a dated full JSON snapshot to OneDrive or another location, then import on Android using the system picker. After listening, Stop/save queued progress before exporting back. Full snapshots replace rather than merge: keep both files if desktop content changed independently. Desktop cold offline launch remains on hold in Stage 9; Android bundles its listening assets.
 

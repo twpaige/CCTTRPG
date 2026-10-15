@@ -1,6 +1,7 @@
 // Development-only Playwright runner. No browser library ships with SR.
+import { installPickers } from './file-pickers.mjs';
 import { createRequire } from 'node:module';
-import { mkdtemp, rm, readFile } from 'node:fs/promises';
+import { mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 const require = createRequire(import.meta.url);
@@ -41,6 +42,7 @@ try {
   });
   if (persisted !== 7) throw new Error('Offline storage failed');
   await context.setOffline(false);
+  await installPickers(page, profile);
   await page.goto(`${url}/data/index.html?test=SRLearning-test-panel`);
   await page.waitForFunction(() => document.getElementById('status').textContent.includes('Saved locally'));
   const original = await page.evaluate(async () => {
@@ -51,23 +53,19 @@ try {
     const json = await exportJSON(db); db.close(); return json;
   });
   await page.reload(); await page.waitForFunction(() => document.getElementById('status').textContent.includes('1 cards'));
-  const downloading = page.waitForEvent('download'); await page.locator('#export').click();
-  const download = await downloading, safetyPath = join(profile, 'safety.json'); await download.saveAs(safetyPath);
-  const saved = JSON.parse(await readFile(safetyPath, 'utf8')); if (saved.flashcards[0].name !== 'Original') throw new Error('Downloaded wrong backup');
+  await page.locator('#export').click();
+  await page.waitForFunction(() => document.getElementById('preview').textContent.includes('Complete Backup Saved'));
+  const saved = JSON.parse(await readFile(join(profile, 'backup.json'), 'utf8')); if (saved.flashcards[0].name !== 'Original') throw new Error('Wrong backup');
+  await writeFile(join(profile, 'backup.json'), '');
   const incoming = JSON.parse(original); incoming.flashcards[0].name = 'Restored';
-  await page.locator('#import-file').setInputFiles({ name: 'incoming.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(incoming)) });
-  await page.waitForFunction(() => document.getElementById('preview').textContent.includes('Replace with'));
-  if (await page.locator('#replace').isEnabled()) throw new Error('Replace enabled without safety/confirmation');
-  await page.locator('#safety-file').setInputFiles(safetyPath);
-  await page.waitForFunction(() => document.getElementById('safety-status').textContent.includes('matched'));
-  await page.locator('#confirm').check(); await page.locator('#replace').click();
-  await page.waitForFunction(() => document.getElementById('preview').textContent.includes('Restore committed'));
-  const recovering = page.waitForEvent('download'); await page.locator('#recovery').click();
-  const recovery = await recovering, recoveryPath = join(profile, 'recovery.json'); await recovery.saveAs(recoveryPath);
-  if (JSON.parse(await readFile(recoveryPath, 'utf8')).flashcards[0].name !== 'Original') throw new Error('Wrong recovery backup');
+  await page.evaluate(json => { picker.incoming = json; }, JSON.stringify(incoming));
+  await page.locator('#choose-import').click(); await page.locator('#destination').click();
+  await page.locator('#confirm-import').click();
+  await page.waitForFunction(() => document.getElementById('preview').textContent.includes('Library Imported Successfully'));
+  if (JSON.parse(await readFile(join(profile, 'backup.json'), 'utf8')).flashcards[0].name !== 'Original') throw new Error('Wrong automatic outgoing backup');
   await page.reload(); await page.waitForFunction(() => document.getElementById('status').textContent.includes('1 cards'));
   const errors = await page.locator('#error').textContent(); if (errors) throw new Error(errors);
-  console.log('PASS Data panel download, file reselection, preview, confirmation, replacement, recovery download and reload');
+  console.log('PASS Data panel manual/automatic external backup, readback, confirmation, replacement and reload');
   // Hold an actual replacement transaction open, destroy its page, then verify rollback.
   await page.evaluate(async () => {
     const { openDatabase } = await import('../js/db.js'); const { exportJSON, restoreJSON } = await import('../js/backup.js');

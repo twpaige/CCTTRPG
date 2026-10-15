@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { mkdtemp, rm, readFile } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 const { chromium } = createRequire(import.meta.url)(process.env.SR_PLAYWRIGHT || 'playwright');
@@ -54,8 +54,10 @@ try {
   state = await read(); assert.equal(state.flashcards.find(card => card.id === 'card-0').steps[0].recallSeconds, 3600);
   console.log('PASS UI one-hour recall override saved and reopened without changing wording');
   await page.goto(`${base}/data/index.html?test=${name}`); await page.waitForFunction(() => document.getElementById('status').textContent.includes('Saved locally'));
-  const download = page.waitForEvent('download'); await page.locator('#migration-backup').click(); const file = await download; const target = join(profile, 'original.json'); await file.saveAs(target);
-  const original = JSON.parse(await readFile(target, 'utf8')); assert.equal(original.formatVersion, 1); assert.deepEqual(original.flashcards, content);
-  console.log('PASS UI downloads original version-1 pre-migration recovery without modifying current data');
+  assert.equal(await page.locator('#migration-backup, #recovery, #choose-safety, #confirm, #replace').count(), 0);
+  assert.equal(await page.locator('section[aria-label="Backup and import"] button').count(), 2);
+  const retained = await page.evaluate(async name => { const { openDatabase, request } = await import('../js/db.js'); const db = await openDatabase({ name }); try { return await request(db.transaction('recovery').objectStore('recovery').get('pre-import')); } finally { db.close(); } }, name);
+  assert.equal(retained.snapshot.formatVersion, 1); assert.deepEqual(retained.snapshot.flashcards, content);
+  console.log('PASS simplified Data UI preserves inert original recovery records and removes obsolete controls');
   console.log(`${results.tests.length}/${results.tests.length} Stage 5 domain/storage scenarios and 7/7 UI scenarios passed. No physical Android test claimed.`);
 } finally { await context?.close(); assert.equal(dirname(profile), tmpdir()); assert(profile.includes('sr-mastery-test-')); await rm(profile, { recursive: true, force: true }); }

@@ -1,4 +1,4 @@
-import { DATA_STORES, ALL_STORES, request, transaction } from './db.js';
+import { DATA_STORES, request, transaction } from './db.js';
 import { FORMAT, parseSnapshot, validateSnapshot, migrateSnapshot, requireValue } from './validation.js';
 
 export async function readSnapshot(tx) {
@@ -37,11 +37,10 @@ export async function restoreJSON(db, json, { confirmed = false, safetyJSON } = 
   requireValue(confirmed === true, 'Explicit Replace confirmation is required.');
   const safety = migrateSnapshot(parseSnapshot(safetyJSON));
   const expected = contentKey(safety);
-  return transaction(db, ALL_STORES, 'readwrite', async tx => {
+  return transaction(db, DATA_STORES, 'readwrite', async tx => {
     const current = await readSnapshot(tx);
     requireValue(contentKey(current) === expected, 'Library changed after the safety export. Export and verify a new safety backup.');
-    // Recovery and replacement commit together; quota/abort retains the previous library and recovery copy.
-    await request(tx.objectStore('recovery').put({ key: 'pre-import', snapshot: current }));
+    // Replacement is atomic; historical recovery records remain untouched.
     for (const name of DATA_STORES) tx.objectStore(name).clear();
     for (const name of ['series', 'flashcards', 'progress', 'presets', 'reviewEvents', 'stepProgress', 'stepEvents'])
       for (const row of incoming[name]) tx.objectStore(name).add(row);
@@ -50,9 +49,4 @@ export async function restoreJSON(db, json, { confirmed = false, safetyJSON } = 
     tx.objectStore('meta').add({ key: 'library', libraryId: incoming.libraryId, libraryGeneration });
     return { libraryGeneration, cards: incoming.flashcards.length };
   });
-}
-export async function recoveryJSON(db, key = 'pre-import') {
-  const row = await transaction(db, ['recovery'], 'readonly', tx => request(tx.objectStore('recovery').get(key)));
-  requireValue(row, `No ${key} recovery copy exists yet.`);
-  return JSON.stringify(validateSnapshot(row.snapshot), null, 2);
 }

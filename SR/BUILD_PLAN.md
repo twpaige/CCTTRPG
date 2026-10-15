@@ -25,7 +25,13 @@ Incremental work packages: (1) shared plan and bounded queue/native tests; (2) n
 
 ### Stage 10 owner-authorized corrections — 2026-10-14
 
-Duckable audio-focus loss may pause and automatically resume on focus gain. Ambiguous transient/permanent loss, calls, disconnects and user Pause/Stop remain manual; no timer or crash restart. Android import automatically saves a timestamped external backup through the system creation picker and verifies its bytes before one replacement confirmation. Desktop recovery and atomic/stale-library safeguards are unchanged. See [Android guide](docs/ANDROID_LISTENING.md) and [owner/automated evidence](docs/TEST_RESULTS.md). These are Stage 10 corrections, not a new stage.
+Duckable audio-focus loss may pause and automatically resume on focus gain. Ambiguous transient/permanent loss, calls, disconnects and user Pause/Stop remain manual; no timer or crash restart. The initial Android backup correction is superseded by the shared Data correction below. See [Android guide](docs/ANDROID_LISTENING.md) and [owner/automated evidence](docs/TEST_RESULTS.md). These are authorized corrections, not a new stage.
+
+### Owner-authorized Data simplification — 2026-10-14
+
+Both platforms expose **Save Complete JSON Backup** and **Import JSON Library** as their two primary Data actions. Fully validate incoming JSON, display counts, automatically save and read back a complete external outgoing backup, then show one Cancel/Confirm Import dialog. Use local-minute filenames with collision suffixes; refuse nonempty destinations. Prefer the incoming folder through picker hints, with explicit owner destination selection. Chrome requires a fresh destination-button gesture; Android uses its existing document-creation picker.
+
+Remove obsolete manual verification/checkbox/Replace controls and historical recovery-copy creation/export functions. Existing recovery records remain inert; retain the schema-2 store definition without a destructive migration. Refuse active playback, reconcile Android completions before backup, hold the existing library lock through confirmation, and preserve final stale-snapshot checks and atomic rollback. Schema, JSON versions, app ID, signing and native listening remain unchanged. No new stage or cloud integration. This supersedes older internal-copy requirements below; current instructions are in [STORAGE.md](docs/STORAGE.md).
 
 ## Current authority and gates
 
