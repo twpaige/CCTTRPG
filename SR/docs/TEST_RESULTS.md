@@ -1,5 +1,27 @@
 # SR — Test results
 
+## Repeat eligibility and transient save confirmation — 2026-10-14
+
+**Focused web correction; baseline `bae3601873884896c4493b73f13a5a95cf719484`.** Investigation confirmed both repeat modes reused the initial eligible-step list. `ReviewController._advance` restarted it without consulting committed progress; `player.js` rendered the retained `masterySaved` on every update indefinitely. The reported causes are confirmed from the implementation and reproduced with isolated tests.
+
+### Changes
+
+- `js/review.js` adds a cancellable asynchronous repetition-boundary read after successful completion. `js/study.js` rereads guarded committed data and calls the existing `selectReview` using the active window/current boundary time, with randomization disabled for this lookup. FC repeat rebuilds only the current card's ordered eligible steps. If the final anchor is ineligible, it clears repeat and advances in the existing prepared card order. Step repeat checks that anchor and current step, continuing normally when the step no longer qualifies. The current pass is never interrupted by refresh. AUDIT has no new refresh hook and remains unchanged.
+- Existing practice tracking/atomic receipts prevent repeats from rescheduling completed steps. Refresh failure pauses in a visible error state; retry rereads eligibility without rewriting completion. Pending reads honor Pause/Resume, unchecking, navigation and Stop through existing generations. No shared scheduler, mastery interval, database/backup or Android changes.
+- `js/player.js` shows one separate save confirmation for 2.5 seconds, without restarting its timer on status renders; Stop/Restart clear it. Old expiry callbacks cannot clear newer confirmations. `js/study.js` suppresses delayed notifications whose occurrence/session is no longer current while retaining valid committed credit. Errors remain separate and persistent. `js/player-status.js` labels the short boundary read. PLAYBACK, SPECIFICATION and BUILD_PLAN describe the correction.
+
+### Verification
+
+**338/338 distinct automated scenarios PASS**, including 71 study domain + 22 UI cases. Other full regression suites PASS: original speech 33, persistence 38, editor 17, mastery 40 + 7 UI, Data 35, shared plan 6, release 6, native executor 16, authored native/focus/document 28, native integration 13 + mobile UI 6; lifecycle/offline/transaction-close checks pass. Windows, Node 24.19.0, Chrome 155.0.0.0, JDK 17.0.20.1. Disposable databases/profiles and simulated speech only; no personal library accessed.
+
+Nine new domain cases plus two Chrome UI cases cover the owner's exact All-series/seven-day/five-step-second-FC scenario, mastery-9 exclusion of Steps 1/2, ordered remaining steps, final-anchor exit, early/due-only/KNOWN eligibility, both repeat modes, no duplicate receipts, refresh read failure/retry, Pause/uncheck/navigation/Stop during a delayed refresh, delayed save acknowledgements, and transient/replaced/out-of-order notification expiry. Existing tests that intentionally repeat beyond the due window now explicitly use Max Deferred; KNOWN repeat expectations are updated to exit, while explicit Previous practice remains protected. AUDIT and all other regressions retain their original semantics. The Chrome five-step scenario and transient messages pass; narrow-screen status/control screenshot inspected.
+
+Use the existing complete-suite commands below. `node SR/tests/study.mjs` now runs 71 domain + 22 UI cases. Set `SR_TEST_URL=https://crownandcall.com/SR` for isolated deployed checks. Optional SR_PLAYER_SCREENSHOTS captures the corrected scenario.
+
+Deployment/live verification pending. The commit will use the existing `[web-only]` guard to prevent APK build/publication.
+
+Owner listening check: reload [SR](https://crownandcall.com/SR/), repeat a card in seven-day REVIEW, and confirm newly saved mastery-9/KNOWN steps disappear only at the next repeat boundary. Confirm changing the final anchor outside the window advances to the next card, and save confirmations disappear while position/phase and errors remain readable. Automated sound is simulated; actual listening and assistive-technology behavior remain owner verification. No new stage or Android acceptance claim.
+
 ## Detailed web playback status — 2026-10-14
 
 **Implementation and automated checks PASS; owner listening comparison remains optional verification.** Baseline `0c09ac5498f109f289ac3a85a74ed2c41cf2a5b3`. Presentation only: no audio controller, scheduling, selection, navigation, repetition, database, JSON, voice or Android changes.

@@ -10,7 +10,7 @@ export function playbackStatus(state, library) {
   }
   const seconds = Math.ceil(Math.max(0, state.remainingMs || 0) / 1000);
   const phase = state.phase === 'recall' ? `Recall: ${seconds} seconds remaining`
-    : { question: 'Question', answer: 'Answer', prepare: 'Preparing step', commit: 'Saving', cycle: 'Preparing session' }[state.phase];
+    : { question: 'Question', answer: 'Answer', prepare: 'Preparing step', commit: 'Saving', cycle: 'Preparing session', repeat: 'Checking repeat eligibility' }[state.phase];
   const status = state.starting ? 'Preparing session'
     : state.status === 'paused' ? `Paused${phase ? ` (${phase})` : ''}`
       : { stopped: 'Stopped', finished: 'Completed', error: 'Error', idle: 'Ready' }[state.status] || phase;

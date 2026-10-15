@@ -94,7 +94,7 @@ export class StudySession {
           token.completedAt ??= this.now();
           return this.track(this.completion.finish(token, token.completedAt).then(result => {
             this.practiced.add(JSON.stringify([token.prepared.cardId, token.prepared.stepId]));
-            if (token.pending) {
+            if (token.pending && epoch === this.epoch && this.completion.current === token) {
               token.masterySaved = true;
               const card = JSON.parse(token.prepared.expectedKey).flashcards.find(row => row.id === token.prepared.cardId);
               this.masterySaved = { level: token.pending.action.level, card: card.name,
@@ -104,6 +104,14 @@ export class StudySession {
             return result;
           }));
         },
+        refreshRepeat: options.mode === 'REVIEW' ? state => this.track((async () => {
+          const current = await guard();
+          // Refresh only this card; keep the prepared session's card order intact.
+          const unit = selectReview(current, { ...options, random: false, now: this.now() }).find(unit => unit.cardId === state.card.id);
+          if (!unit) return null;
+          const card = current.flashcards.find(card => card.id === unit.cardId);
+          return { ...card, steps: card.steps.filter(step => unit.stepIds.includes(step.id)) };
+        })()) : undefined,
         nextCycle: options.mode === 'AUDIT' ? () => this.track((async () => {
           const current = await guard(); ++this.cycle; return this.select(current);
         })()) : undefined,

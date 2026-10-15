@@ -111,7 +111,7 @@ The reusable controller queues a mastery choice until that step finishes success
 
 ### Desktop playback contract
 
-One existing `ReviewController` performs preparation → question → recall → answer → completion write, with cancellable generations. REVIEW freezes its eligible pass at Start; Restart starts a fresh eligible pass using the captured settings and retains previous credit. AUDIT refreshes between cycles. IDs, authored order and full wording remain unchanged.
+One existing `ReviewController` performs preparation → question → recall → answer → completion write, with cancellable generations. REVIEW freezes its eligible pass at Start; automatic Step/FC repetitions refresh committed eligibility at their safe boundaries using the active window and final-step anchor; Restart starts a fresh eligible pass using the captured settings and retains previous credit. AUDIT refreshes between cycles. IDs, authored order and full wording remain unchanged.
 
 The player segments long text into at most 400 Unicode code points per utterance, preferring whitespace boundaries and retaining every character. Resume repeats the interrupted segment only. Recall uses the full step override/default and remaining time after pauses, chaining waits above the browser's signed 32-bit timer limit. Unrepresentable durations fail visibly before speech; there is no 120-second recall cap. Each speech segment keeps the established 120-second missing-callback watchdog. No receipt precedes the final answer segment's successful end. A failed scheduling write keeps the same token/completion timestamp for Resume / retry without replaying speech.
 

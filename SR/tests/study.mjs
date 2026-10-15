@@ -25,6 +25,9 @@ try {
   assert(results.every(row => row.pass), 'Stage 6 domain tests failed');
   await page.evaluate(async name => { const { seed } = await import('./study.test.js'); const db = await seed(name); db.close(); }, name);
   await context.addInitScript(() => {
+    const timeout = window.setTimeout.bind(window);
+    globalThis.testNoticeCallbacks = [];
+    window.setTimeout = (fn, delay, ...args) => { if (delay === 2500) testNoticeCallbacks.push(fn); return timeout(fn, delay, ...args); };
     globalThis.testSynth = new class extends EventTarget {
       current = null; spoken = []; voices = []; overlaps = 0;
       getVoices() { return this.voices; }
@@ -125,7 +128,7 @@ try {
   assert.equal(await page.locator('#session-panel').evaluate(el=>el.open), false);
   await page.reload(); assert.equal(await page.locator('#session-panel').evaluate(el=>el.open), false); await ready(); await page.evaluate(()=>testVoices());
   pass('vertical session panel initially collapses, Start stays collapsed, manual toggles preserve audio, Stop stays collapsed; controls belong to card');
-  await fresh(); assert(await page.locator('#previous-step').isDisabled());
+  await fresh(); await press('stop'); await ready(); await page.locator('#window').selectOption('max'); await press('start'); await spoken(); assert(await page.locator('#previous-step').isDisabled());
   await page.locator('#repeat-step').check(); await press('level-7'); await end(); await phase('answer'); await end(); await spoken(); await page.waitForFunction(()=>document.getElementById('mastery-saved').textContent.includes('Saved mastery 7'));
   assert.match(await page.evaluate(()=>testSynth.current.text), /question 0/); const once = await read();
   for(let i=0;i<2;i++){ await end(); await phase('answer'); await end(); await spoken(); }
@@ -202,5 +205,38 @@ try {
   await end(); await phase('answer'); await end(); await spoken(); assert.match(await page.locator('#status').textContent(),/Step 3\/3 · Question$/);
   await end(); await phase('answer'); await end(); await ready(); assert.equal(await page.locator('#status').textContent(),'REVIEW · Completed');
   assert.deepEqual(errors,[]); pass('Error, Stopped, Restart and Completed status preserve error details and actual playback');
+  await fresh(); await press('stop'); await ready();
+  await page.evaluate(async ({name,original})=>{
+    const {openDatabase}=await import('./js/db.js'); const {restoreJSON,exportJSON}=await import('./js/backup.js'); const db=await openDatabase({name});
+    try { const card=original.flashcards.find(c=>c.id==='b');
+      for(const i of [3,4]) {card.steps.push({id:`b${i}`,position:i,question:`b question ${i}`,answer:`b answer ${i}`}); original.stepProgress.push({...original.stepProgress.find(p=>p.stepId==='b0'),stepId:`b${i}`});}
+      await restoreJSON(db,JSON.stringify(original),{confirmed:true,safetyJSON:await exportJSON(db)});
+    } finally {db.close();}
+  },{name,original:before});
+  await page.reload(); await ready(); await page.evaluate(()=>testVoices()); await page.locator('#recall').fill('0');
+  assert.equal(await page.locator('#window').inputValue(),'days'); assert.equal(await page.locator('#days').inputValue(),'7'); assert.equal(await page.locator('#series').inputValue(),'');
+  await press('start'); await spoken(); await press('skip'); await spoken(); await page.locator('#repeat-fc').check();
+  for(let i=0;i<5;i++) {assert.match(await page.locator('#status').textContent(),new RegExp(`Card 2/2 · Step ${i+1}/5 · Question$`)); if(i<2) await press('level-9'); await end(); await phase('answer'); await end(); await spoken();}
+  assert.match(await page.locator('#status').textContent(),/Step 3\/5 · Question$/); assert.equal((await read()).stepProgress.find(p=>p.stepId==='b0').mastery,9); assert.equal((await read()).stepProgress.find(p=>p.stepId==='b1').mastery,9);
+  const repeatSaved=await read(); for(let i=0;i<3;i++){await end(); await phase('answer'); await end(); await spoken();}
+  assert.match(await page.locator('#status').textContent(),/Step 3\/5 · Question$/); assert.deepEqual((await read()).stepEvents,repeatSaved.stepEvents);
+  await page.locator('#repeat-fc').uncheck();
+  for(let i=0;i<2;i++){await end(); await phase('answer'); await end(); await spoken();}
+  await page.locator('#repeat-fc').check(); await press('level-9'); await end(); await phase('answer'); await end(); await spoken();
+  assert.match(await page.locator('#status').textContent(),/Unbound \(synthetic\) · Card 1\/2 · Step 1\/1 · Question$/); assert(!(await page.locator('#repeat-fc').isChecked()));
+  if(process.env.SR_PLAYER_SCREENSHOTS) await page.screenshot({path:join(process.env.SR_PLAYER_SCREENSHOTS,'repeat-eligibility.png'),fullPage:true});
+  await press('stop'); await ready(); pass('owner seven-day five-step FC scenario: mastery-9 exclusions, ordered repeat without credit, final-anchor exit');
+  await fresh(); await press('level-3'); await end(); await phase('answer'); await end(); await spoken();
+  assert.equal(await page.locator('#mastery-saved').textContent(),'Saved mastery 3.'); const oldNotice=await page.evaluate(()=>testNoticeCallbacks.length-1);
+  assert(!(await page.locator('#status').textContent()).includes('Saved'));
+  await press('level-4'); await end(); await phase('answer'); await end(); await spoken(); assert.equal(await page.locator('#mastery-saved').textContent(),'Saved mastery 4.');
+  await page.evaluate(i=>testNoticeCallbacks[i](),oldNotice); assert.equal(await page.locator('#mastery-saved').textContent(),'Saved mastery 4.');
+  await press('pause'); await phase('paused'); await press('resume'); await phase('question');
+  await page.waitForFunction(()=>document.getElementById('mastery-saved').textContent==='');
+  await end(); await phase('answer'); assert.equal(await page.locator('#mastery-saved').textContent(),'');
+  await page.evaluate(()=>testSynth.current.onerror({error:'test failure'})); await phase('error');
+  await page.evaluate(()=>testNoticeCallbacks.forEach(fn=>fn())); assert(await page.locator('#error').isVisible()); assert.equal(await page.locator('#mastery-saved').textContent(),'');
+  await press('stop'); await ready(); assert.equal(await page.locator('#mastery-saved').textContent(),'');
+  assert.deepEqual(errors,[]); pass('save notices expire, replace rather than accumulate, ignore old timers, never overwrite status or hide errors');
   console.log(`${results.length}/${results.length} Stage 6 domain scenarios + ${count}/${count} UI scenarios. ${await page.evaluate(() => navigator.userAgent)}. Simulated speech; no audible claim.`);
 } finally { await context?.close(); assert.equal(dirname(profile), tmpdir()); assert(profile.includes('sr-study-test-')); await rm(profile, { recursive: true, force: true }); }

@@ -7,6 +7,7 @@ import { englishVoices, selectVoice, voiceKey, watchVoices, PREFERRED_VOICE } fr
 import { INTERVAL_LABELS, selectReview, selectAudit } from './scheduler.js';
 const $ = id => document.getElementById(id);
 let db, session, library, inventory = [], busy = false, watcher, countdown, displayedToken, displayedProgress, voiceSelected = false;
+let savedNotice, noticeTimer;
 const option = (value, label) => { const node = document.createElement('option'); node.value = value; node.textContent = label; return node; };
 const error = reason => { $('error').textContent = reason.message || String(reason); };
 const shortIntervals = ['15m', '3h', '6h', '1d', '2d', '3d', '1w', '2w', '1mo', '3mo', 'KNOWN'];
@@ -26,7 +27,18 @@ function masteryDisplay(state, token) {
     button.classList.toggle('pending-level', state.pending !== undefined && level === selected);
   }
   $('pending').textContent = state.pending === undefined ? '' : `Mastery ${state.pending} pending until answer completion.`;
-  $('mastery-saved').textContent = state.masterySaved ? `Saved mastery ${state.masterySaved.level}.` : '';
+  if (state.masterySaved !== savedNotice) {
+    savedNotice = state.masterySaved;
+    clearTimeout(noticeTimer);
+    $('mastery-saved').textContent = savedNotice ? `Saved mastery ${savedNotice.level}.` : '';
+    if (savedNotice) {
+      const notice = savedNotice;
+      noticeTimer = setTimeout(() => { if (savedNotice === notice) $('mastery-saved').textContent = ''; }, 2500);
+    }
+  }
+  if (state.starting || ['idle', 'stopped'].includes(state.status)) {
+    clearTimeout(noticeTimer); $('mastery-saved').textContent = '';
+  }
 }
 function options() {
   if ($('recall').value === '' || $('rate').value === '') throw new Error('Enter a recall duration and speech rate.');
@@ -132,7 +144,7 @@ $('reload').onclick = () => run(load);
 for (const [id, type] of [['reset', 'resetCard'], ['reset-final', 'resetFinal'], ['reset-objective', 'resetObjective']])
   $(id).onclick = () => run(() => session.special(type, message => confirm(message)));
 $('refresh-voices').onclick = () => watcher?.refresh();
-window.addEventListener('pagehide', () => { clearTimeout(countdown); watcher?.dispose(); void session?.stop().finally(() => db?.close()); });
+window.addEventListener('pagehide', () => { clearTimeout(countdown); clearTimeout(noticeTimer); watcher?.dispose(); void session?.stop().finally(() => db?.close()); });
 window.addEventListener('pageshow', event => { if (event.persisted) location.reload(); });
 await run(async () => {
   const name = new URLSearchParams(location.search).get('test');

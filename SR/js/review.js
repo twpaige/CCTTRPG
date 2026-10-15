@@ -7,13 +7,13 @@ const defaultClock = {
 // One pending action at a time. Every replacement invalidates its old continuation.
 export class ReviewController {
   constructor(cards, speech, { clock = defaultClock, onChange = () => {}, onEvent = () => {},
-    prepareStep, completeStep, discardStep = () => {}, nextCycle, segment = text => [text], recall = (_step, settings) => settings.recallMs } = {}) {
+    prepareStep, completeStep, refreshRepeat, discardStep = () => {}, nextCycle, segment = text => [text], recall = (_step, settings) => settings.recallMs } = {}) {
     this.cards = cards;
     this.speech = speech;
     this.clock = clock;
     this.onChange = onChange;
     this.onEvent = onEvent;
-    this.hooks = { prepareStep, completeStep, discardStep, nextCycle, segment, recall };
+    this.hooks = { prepareStep, completeStep, refreshRepeat, discardStep, nextCycle, segment, recall };
     this.part = 0;
     this.status = 'idle';
     this.phase = 'question';
@@ -165,11 +165,29 @@ export class ReviewController {
   resetCurrentStep() { this.repeatCurrent = this.repeatCard = false; this.pause(); this._newStep(); this._publish('step-reset'); }
 
   _advance() {
+    if (this.hooks.refreshRepeat && (this.repeatCurrent || this.repeatCard && this.stepIndex === this.cards[this.cardIndex].steps.length - 1)) {
+      this._newStep(); this.phase = 'repeat'; return;
+    }
     if (this.repeatCurrent) { this._newStep(); return; }
     if (++this.stepIndex >= this.cards[this.cardIndex].steps.length) {
       this.stepIndex = 0;
       if (!this.repeatCard) ++this.cardIndex;
     }
+    this._newStep();
+  }
+
+  _repeatReady(card) {
+    // A checkbox may have changed while the read was pending or playback paused.
+    if (!this.repeatCurrent && !this.repeatCard) { this._advance(); return; }
+    if (!card) {
+      this.repeatCurrent = this.repeatCard = false; ++this.cardIndex; this.stepIndex = 0;
+    } else if (this.repeatCurrent) {
+      if (!card.steps.some(step => step.id === this.snapshot.step.id)) {
+        this.repeatCurrent = false; this._advance(); return;
+      }
+    } else if (this.stepIndex === this.cards[this.cardIndex].steps.length - 1) {
+      this.cards[this.cardIndex] = card; this.stepIndex = 0;
+    } else { this._advance(); return; }
     this._newStep();
   }
 
@@ -186,7 +204,7 @@ export class ReviewController {
     }
     const token = ++this.generation;
     const stillCurrent = () => token === this.generation && this.status === 'playing';
-    if (['prepare', 'commit', 'cycle'].includes(this.phase)) {
+    if (['prepare', 'commit', 'cycle', 'repeat'].includes(this.phase)) {
       const phase = this.phase;
       this._publish(`${phase}-start`);
       // Retain in-flight work over Pause/Resume. Retry failed commits with the same receipt.
@@ -194,7 +212,7 @@ export class ReviewController {
         try {
           const result = phase === 'prepare' ? this.hooks.prepareStep(this.snapshot)
             : phase === 'commit' ? this.hooks.completeStep(this.context)
-              : this.hooks.nextCycle();
+              : phase === 'repeat' ? this.hooks.refreshRepeat(this.snapshot) : this.hooks.nextCycle();
           this.work = Promise.resolve(result);
         } catch (error) { this._error(error); return; }
       }
@@ -203,6 +221,7 @@ export class ReviewController {
         this.work = undefined;
         if (phase === 'prepare') { this.context = result; this.phase = 'question'; }
         else if (phase === 'commit') this._advance();
+        else if (phase === 'repeat') this._repeatReady(result);
         else {
           this.cards = result; this.cardIndex = this.stepIndex = 0;
           if (!result.length) return this._finish();
