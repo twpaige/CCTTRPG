@@ -18,6 +18,25 @@ function insert(rows, row, position = rows.length) {
   requireValue(Number.isInteger(position) && position >= 0 && position <= rows.length, 'Position is outside the collection.');
   rows.splice(position, 0, row); return position;
 }
+function copiedName(name, names) {
+  const base = name.replace(/(?: \(Copy(?: \d+)?\))+$/, '');
+  let number = 1;
+  while (names.has(`${base} (Copy ${number})`)) number++;
+  const result = `${base} (Copy ${number})`; names.add(result); return result;
+}
+async function addClonedCard(tx, original, seriesId, position, name) {
+  const row = fresh({ ...clone(original), id: crypto.randomUUID(), seriesId, position, name });
+  const ids = new Map(original.steps.map(step => [step.id, crypto.randomUUID()]));
+  row.steps = row.steps.map(step => ({ ...step, id: ids.get(step.id) }));
+  if (row.recitationStepIds) row.recitationStepIds = row.recitationStepIds.map(id => ids.get(id));
+  validateCard(row);
+  await request(tx.objectStore('flashcards').add(row));
+  await request(tx.objectStore('progress').add({ flashcardId: row.id, mastery: 0, lastReviewedAt: null, nextDueAt: 0, revision: 1 }));
+  for (const step of row.steps) await request(tx.objectStore('stepProgress').add({
+    flashcardId: row.id, stepId: step.id, mastery: 0, lastReviewedAt: null, nextDueAt: nextDue(0, row.createdAt), revision: 1
+  }));
+  return row;
+}
 
 export class Repository {
   constructor(db, { writeGuard, guardStores = [] } = {}) { this.db = db; this.writeGuard = writeGuard; this.guardStores = guardStores; }
@@ -90,6 +109,34 @@ export class Repository {
       for (const step of row.steps) if (!previous.has(step.id)) tx.objectStore('stepProgress').add({ flashcardId: id, stepId: step.id, mastery: 0, lastReviewedAt: null, nextDueAt: nextDue(0, row.updatedAt), revision: 1 });
       if (old.seriesId !== row.seriesId) reorder(store, sorted(await request(store.index('bySeries').getAll(old.seriesId))));
       return row;
+    });
+  }
+  cloneCard(id, count, expectedRevision) {
+    requireValue(Number.isInteger(count) && count >= 1 && count <= 10, 'Choose a whole number of clones from 1 to 10.');
+    return this.write(['series', 'flashcards', 'progress', 'stepProgress'], async tx => {
+      const store = tx.objectStore('flashcards'), original = existing(await request(store.get(id)));
+      revision(original, expectedRevision);
+      existing(await request(tx.objectStore('series').get(original.seriesId)));
+      const rows = sorted(await request(store.index('bySeries').getAll(original.seriesId)));
+      const names = new Set(rows.map(row => row.name)), copies = [];
+      for (let i = 0; i < count; i++) copies.push(await addClonedCard(tx, original, original.seriesId,
+        original.position + i + 1, copiedName(original.name, names)));
+      rows.splice(original.position + 1, 0, ...copies); reorder(store, rows);
+      return copies;
+    });
+  }
+  cloneSeries(id, expectedRevision) {
+    return this.write(['series', 'flashcards', 'progress', 'stepProgress'], async tx => {
+      const store = tx.objectStore('series'), original = existing(await request(store.get(id)));
+      revision(original, expectedRevision);
+      const rows = sorted(await request(store.getAll()));
+      const row = fresh({ ...clone(original), id: crypto.randomUUID(), name: original.name + ' (Copy)', position: original.position + 1 });
+      validateSeries(row); await request(store.add(row));
+      const cards = sorted(await request(tx.objectStore('flashcards').index('bySeries').getAll(id)));
+      const copies = [];
+      for (const card of cards) copies.push(await addClonedCard(tx, card, row.id, card.position, card.name));
+      rows.splice(row.position, 0, row); reorder(store, rows);
+      return { series: row, cards: copies };
     });
   }
   async updateProgress(id, patch, expectedRevision) {

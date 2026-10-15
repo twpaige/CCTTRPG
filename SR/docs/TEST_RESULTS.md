@@ -1,5 +1,13 @@
 # SR — Test results
 
+## Desktop Library Editor cloning — 2026-10-15
+
+Website-only Clone FC (1–10) and Clone Series (exactly one), using saved content and one atomic repository transaction. Copies insert immediately after the original with contiguous integer positions, new identifiers/timestamps, remapped recitation references and mastery-0 progress due in 15 minutes. No existing progress/history is copied or modified. Dirty drafts block cloning. Existing action-row styling and dialogs are reused; the first copy is selected for editing.
+
+Focused disposable-browser/IndexedDB tests cover one/ten FCs at beginning/middle/end, exact text/annotations/order/recall, distinct IDs, original preservation, fresh scheduling, readable repeat-copy names, invalid counts/revisions, BOUND/UNBOUND and empty series, middle/end series insertion, independent edits/deletion, JSON restore equality, mid-copy and post-copy reorder rollback, ID collision, locks, concurrent writes, generation guards, confirmation cancellation, drafts and 1440/390/320px layout. **411/411 automated scenarios PASS**: previous 389 retained plus 22 cloning scenarios (editor suite now 39). Existing storage, mastery, Data/recovery, desktop/shared/native playback, Android UI and release-safety suites all passed. Chrome/Node/JDK in the same local test environment as the preceding release; real disposable IndexedDB, simulated speech. Desktop and narrow layouts visually inspected. Live deployment verification follows publication.
+
+Owner verification remaining: try a real template in the disposable editor or after making a dated backup; customize copies and optionally delete the template. Confirm keyboard/dialog usability and expected names/order. Physical JSON transfer to Android remains owner verification; no APK is built or published for this feature. No other feature/stage begun.
+
 ## Android stable playback status correction — 2026-10-15
 
 Owner reports APK **0.2.101701** installed and working great, with distracting layout movement from the progress-save notification. This is general owner feedback, not a claim that every outstanding G10 check passed.

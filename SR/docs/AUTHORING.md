@@ -11,6 +11,16 @@ Open **https://crownandcall.com/SR/library.html** in desktop Chrome, or choose *
 
 All controls are native keyboard controls: Tab/Shift+Tab to navigate, Enter/Space to activate buttons, arrow keys for selects/number inputs. Ordering never requires dragging. Lists show up to 50 items per page; only the selected card's chain is rendered.
 
+## Clone saved templates
+
+Open a saved flashcard and choose **Clone FC** beside Save, Cancel and Delete. Confirm **1–10 copies** (default 1). Copies appear immediately after the original, with consecutive positions and names such as `Ten Commandments (Copy 1)`. Repeated cloning, including cloning a copy, uses the first unused numbered suffix for that base name in the series; it does not restrict names you enter yourself. The first new copy opens for editing.
+
+Choose **Clone Series** beside Edit series to confirm exactly one complete copy, including an empty series. It appears immediately after the original with `(Copy)` appended to the series name, preserving BOUND/UNBOUND status, card names and order. Its first card opens for editing, or the series editor opens if empty.
+
+Both actions use saved content. Save or cancel any unsaved draft first; cloning never silently discards it. All questions, answers, step order, recall overrides and supported annotations are copied exactly. Copies receive new series/card/step identifiers as applicable, fresh timestamps and independent mastery-0 progress due in 15 minutes. Recitation references point to the new steps. Mastery, prior due dates, review history and receipts are not copied; original progress is unchanged. Each entire operation, including position updates, either commits or rolls back. Concurrent library changes or active playback block cloning through the existing safeguards.
+
+Edit each copy independently, then optionally delete the original template. Copies remain compatible with existing JSON export/import and Android playback; transfer through the usual manual backup workflow. This is a website authoring feature, with no Android UI or APK update required.
+
 Deletion shows the saved content name, affected card names, step/progress counts and the number of affected presets. **Keep content** cancels. **Delete permanently** removes the selected card, or a series and all its cards, together with their progress and preset references. The presets themselves remain. Export first if you might need to recover it.
 
 If a save fails, the draft stays in the form. Correct validation errors or retry after resolving a storage/quota failure. If another tab changes or restores the library, even a change elsewhere in the library, the stale save is refused. Copy text you want to retain, choose **Reload saved library**, confirm discarding the stale draft, and reopen the current record before reapplying it. There is no automatic merge. Keep one authoring tab for ordinary work. A database version change closes the connection; copy your draft text before reloading the page.

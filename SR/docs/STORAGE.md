@@ -32,6 +32,8 @@ db.close();
 
 The desktop editor uses this API. The Data panel itself has no authoring controls.
 
+Desktop cloning uses `cloneCard(id, count, expectedRevision)` (1–10 copies, returns cards) and `cloneSeries(id, expectedRevision)` (one copy, returns `{series, cards}`). Each runs one repository write transaction over series, flashcards, legacy progress and stepProgress, plus the existing editor guard stores. Reads and sibling renumbering occur inside that transaction. New rows use add/constraint failure rather than overwriting an existing ID. Authored fields are copied, step IDs and recitation references remapped, and fresh progress follows the normal new-card contract. Original content/progress/history is retained; shifted siblings receive normal position/revision updates. Existing Web Locks and canonical snapshot/generation guards apply. No schema, JSON or scheduling changes.
+
 | Method | Contract |
 |---|---|
 | `createSeries({name,bound,id?,position?,recitationPrompt?})` | Generated UUID unless explicit stable ID supplied; append unless inserting at a specified zero-based position |

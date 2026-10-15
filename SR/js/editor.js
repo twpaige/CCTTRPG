@@ -5,7 +5,7 @@ import { exportSnapshot, exportJSON, contentKey, readSnapshot } from './backup.j
 const $ = id => document.getElementById(id);
 const copy = value => structuredClone(value);
 let db, repo, snapshot, selected, draft, dirty = false, busy = false, pendingDelete, databaseOptions;
-let seriesPage = 0, cardPage = 0;
+let seriesPage = 0, cardPage = 0, pendingClone;
 const pageSize = 50;
 function node(tag, text, className) {
   const element = document.createElement(tag);
@@ -30,7 +30,7 @@ function markDirty() { dirty = true; draftState(); }
 function draftState() { $('draft-state').textContent = dirty ? 'Unsaved changes' : draft ? 'Saved content · editing' : ''; }
 function abandon() { return !dirty || confirm('Discard unsaved changes? Choose Cancel to keep editing.'); }
 function clearDraft() { draft = undefined; dirty = false; draftState(); }
-function controls() { $('workspace').disabled = !db || !snapshot || busy; $('delete-confirm').disabled = busy; }
+function controls() { $('workspace').disabled = !db || !snapshot || busy; $('delete-confirm').disabled = $('clone-confirm').disabled = busy; }
 async function run(action) {
   if (busy) return;
   busy = true; controls(); $('error').textContent = '';
@@ -86,7 +86,7 @@ function renderLists() {
   $('binding').textContent = series ? series.bound ? 'Bound — keep this meaningful sequence together in future reviews.' : 'Unbound — cards may be reviewed independently or randomly in future reviews.' : '';
   if (!series) return;
   const cards = cardsFor(series.id);
-  $('series-actions').append(button('Edit series', () => openSeries(series)), button('New flashcard', () => openCard()));
+  $('series-actions').append(button('Edit series', () => openSeries(series)), button('Clone Series', () => confirmClone('series', series)), button('New flashcard', () => openCard()));
   if (!cards.length) $('card-list').append(node('p', 'This series is empty. Add your first flashcard.'));
   paged($('card-list'), cards, cardPage, value => { cardPage = value; }, row => {
     const item = node('div', undefined, 'list-item');
@@ -175,6 +175,7 @@ function renderEditor() {
   const bar = node('div', undefined, 'toolbar editor-actions'), saveButton = node('button', 'Save', 'primary'); saveButton.type = 'submit'; saveButton.id = 'save';
   bar.append(saveButton, button('Cancel', () => { if (abandon()) { clearDraft(); renderEditor(); } }));
   if (original) bar.append(button(`Delete ${kind === 'card' ? 'flashcard' : 'series'}`, () => confirmDelete(), { className: 'danger' }));
+  if (original && kind === 'card') bar.append(button('Clone FC', () => confirmClone('card', original)));
   form.prepend(bar); editor.append(form);
 }
 async function save() {
@@ -192,6 +193,33 @@ async function save() {
     await mutate(async () => { const row = original ? await repo.updateCard(original.id, patch, original.revision) : await repo.createCard(patch); selected = row.seriesId; }, `Flashcard saved — ${value.steps.length} steps. Review progress preserved.`);
   }
 }
+function confirmClone(kind, original) {
+  if (dirty) { error('Save or cancel your unsaved changes before cloning. Cloning uses saved content.'); return; }
+  pendingClone = { kind, original };
+  $('clone-title').textContent = `Clone ${kind === 'card' ? 'flashcard' : 'series'} “${original.name}”?`;
+  $('clone-detail').textContent = kind === 'card' ? 'Copies will be inserted immediately after this flashcard. Every copied step starts at mastery 0, due in 15 minutes.' :
+    `Create one independent series with ${cardsFor(original.id).length} flashcards, immediately after this series. Every copied step starts at mastery 0, due in 15 minutes.`;
+  $('clone-quantity').hidden = kind === 'series'; $('clone-count').disabled = kind === 'series'; $('clone-count').value = '1';
+  $('clone-confirm').textContent = kind === 'card' ? 'Create copies' : 'Create series copy';
+  $('clone-dialog').showModal(); (kind === 'card' ? $('clone-count') : $('clone-cancel')).focus();
+}
+$('clone-cancel').onclick = () => { pendingClone = undefined; $('clone-dialog').close(); };
+$('clone-dialog').oncancel = () => { pendingClone = undefined; };
+$('clone-form').onsubmit = event => {
+  event.preventDefault();
+  if (!pendingClone || !$('clone-form').reportValidity()) return;
+  const { kind, original } = pendingClone, count = Number($('clone-count').value);
+  pendingClone = undefined; $('clone-dialog').close();
+  void run(async () => {
+    let first, series;
+    await mutate(async () => {
+      if (kind === 'card') { [first] = await repo.cloneCard(original.id, count, original.revision); selected = first.seriesId; cardPage = Math.floor(first.position / pageSize); }
+      else { const result = await repo.cloneSeries(original.id, original.revision); series = result.series; [first] = result.cards; selected = series.id; seriesPage = Math.floor(series.position / pageSize); cardPage = 0; }
+    }, kind === 'card' ? `Created ${count} flashcard ${count === 1 ? 'copy' : 'copies'}.` : 'Series copy created.');
+    if (first) openCard(snapshot.flashcards.find(row => row.id === first.id));
+    else openSeries(snapshot.series.find(row => row.id === series.id));
+  });
+};
 function confirmDelete() {
   if (!abandon()) return;
   const { kind, original } = draft;

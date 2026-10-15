@@ -15,4 +15,9 @@
 <section id="editor" aria-label="Editor"><h2>Make a place for your memories</h2><p>Create a series, then add a flashcard with an ordered chain of questions and answers.</p></section></div>
 </fieldset>
 <dialog id="delete-dialog" aria-labelledby="delete-title"><h2 id="delete-title">Confirm deletion</h2><div id="delete-detail"></div><p>This cannot be undone here. Export a backup first if you may need this content again.</p><div class="toolbar"><button id="delete-cancel">Keep content</button><button id="delete-confirm" class="danger">Delete permanently</button></div></dialog>
+<dialog id="clone-dialog" aria-labelledby="clone-title"><form id="clone-form">
+<h2 id="clone-title">Clone saved content</h2><p id="clone-detail"></p>
+<div id="clone-quantity"><label>Number of copies (1–10)<input id="clone-count" type="number" min="1" max="10" step="1" value="1" required></label></div>
+<div class="toolbar"><button id="clone-cancel" type="button">Cancel</button><button id="clone-confirm" type="submit" class="primary">Create copies</button></div>
+</form></dialog>
 </main><script type="module" src="js/editor.js"></script></body></html>
