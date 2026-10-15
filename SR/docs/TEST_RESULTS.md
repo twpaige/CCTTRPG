@@ -30,7 +30,7 @@ Reproduce using the full-suite commands below. The study runner now executes 50 
 
 ### Owner verification and deployment
 
-Publication and live-site verification are pending at this implementation commit; results will be recorded after deployment. No APK should be published for this task.
+Implementation **`fa85acc63c25c0ad5f8a47416e45e8f31c464129`** is pushed to `origin/main`. [Pages deployment 38666649565](https://github.com/twpaige/CCTTRPG/actions/runs/38666649565) **PASS**. The deployed player passed **50/50 domain + 15/15 UI scenarios** in Chrome using isolated data and simulated speech; this repeat run is not counted again in the 310 total. [Android workflow 38666649636](https://github.com/twpaige/CCTTRPG/actions/runs/38666649636) confirms both **build and publish SKIPPED**. No APK was published for this task. Final review and whitespace checks pass.
 
 Open [the desktop player](https://crownandcall.com/SR/) in Chrome and reload after deployment. With material you intend to review, start and confirm settings collapse. Expand them during audio, then try Skip Step and Previous during question, recall and answer. Repeat through several full cycles, pause/resume, uncheck and confirm advancement. Select new mastery during repetition and verify a single saved change. Check Stop/Restart clearing Repeat, final-step KNOWN confirmation, and keyboard or touch help. Audible cancellation/resumption, physical touch behavior and assistive-technology announcements remain owner checks; simulated speech does not certify these. Earlier acceptance gates retain their separately recorded status.
 
