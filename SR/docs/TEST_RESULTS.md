@@ -43,7 +43,11 @@ Chrome DOM/IndexedDB/Web Locks and desktop temporary-file writes/readbacks were 
 
 ### Publication
 
-Pending the implementation push and existing signed GitHub Actions workflow; release evidence will be recorded after completion.
+Implementation **`2b5b51ced22ef1edb5da9796a12bf48c8e0b0f31`** is on `origin/main`. [Android workflow 38657733045](https://github.com/twpaige/CCTTRPG/actions/runs/38657733045) **PASS**: full regressions, release build/lint, original-identity signing, increasing-version upgrade guards, publication and download verification. [Pages deployment 38657732182](https://github.com/twpaige/CCTTRPG/actions/runs/38657732182) succeeded. All **35/35 Data scenarios additionally passed against the deployed HTTPS site** in a disposable Chrome profile; this rerun is not added again to the 282 distinct-scenario total. An isolated 390px confirmation screenshot was inspected: counts, filename and Cancel/Confirm Import fit without horizontal overflow.
+
+Signed **[SR.apk 0.2.100901](https://github.com/twpaige/CCTTRPG/releases/download/sr-android-100901/SR.apk)** is available in [release sr-android-100901](https://github.com/twpaige/CCTTRPG/releases/tag/sr-android-100901). Public metadata matches the implementation SHA, application ID **com.crownandcall.srproof**, versionCode **100901** (greater than 100801), and original certificate SHA-256 **ee98699416f616b1707fee62d4311a9de26c30c848b6abd6206112db01f0f0cb**. Independent public download hash matched **4fedfef6e301aa5b3cda75494c8f99f241216555565e589029883eae8b1d3287**. Local `apksigner verify` passed; certificate inspection matched the original identity. APK package metadata reports versionName **0.2.100901** and the unchanged application ID. Packaged Data HTML/JS/file helper and shared backup/database modules exactly match committed Git blobs (Windows checkout line endings differ).
+
+No signing credentials or publishing configuration changed. The released APK's **physical in-place update/data retention and OneDrive/Downloads destination behavior remain OWNER VERIFICATION REQUIRED**. No later stage was begun.
 
 ## Stage 10 corrections — notification recovery and Android import, 2026-10-14
 
