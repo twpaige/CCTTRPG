@@ -18,7 +18,7 @@ Run the existing full-suite commands below. `node SR/tests/study.mjs` now runs 5
 
 ### Deployment and owner checks
 
-Deployment/live verification pending this implementation commit. No APK is authorized for this update.
+Implementation **`c10e81c931b7a2f8989b0320ff3946baed35f0be`** is pushed to `origin/main`. [Pages deployment 38668563638](https://github.com/twpaige/CCTTRPG/actions/runs/38668563638) **PASS**. The deployed player passed **58/58 domain + 18/18 UI scenarios** in Chrome with isolated data and simulated speech; this repeat verification is not counted again in the 321 total. [Android workflow 38668563641](https://github.com/twpaige/CCTTRPG/actions/runs/38668563641) confirms **build and publish SKIPPED**. No APK published. Final scope review and whitespace checks pass.
 
 Reload [the player](https://crownandcall.com/SR/) in Chrome. Confirm the collapsed default summary, then press Start. Listen while using Next/Previous Step and FC, Repeat FC through several passes, switching repeat modes, unchecking mid-card, Pause/Resume and Stop/Restart. Check that replay leaves saved dates intact and a fresh mastery choice applies once after its answer. Test final KNOWN/Reset confirmations only on material you intend to change. Audible cancellation, full narration, timing and actual assistive-technology announcements still require owner verification; automation does not certify sound. No new G6 or Android physical-device acceptance is claimed.
 
