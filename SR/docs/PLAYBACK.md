@@ -6,6 +6,10 @@ Open **[https://crownandcall.com/SR/](https://crownandcall.com/SR/)** in the **s
 
 The owner successfully played a newly authored Delaware flashcard on the home desktop using the live player, hearing all eligible steps in order with correct question/recall/answer timing and automatic progression. They then verified the expected next-review date changes on the Mastery page. **Core desktop audio REVIEW and scheduling are owner-verified; remaining detailed G6 checks are not yet all signed off.** The home library is separate from the earlier daytime-computer library. Back up each library before transferring JSON; importing is not automatic synchronization. Stage 10 now implements [authored Android listening](ANDROID_LISTENING.md); its new physical-device acceptance remains open.
 
+## Android PREPARE / PLAY
+
+Android now prepares a fixed native session before PLAY. Both REVIEW and AUDIT repeat until Stop; only the first successful completion of each prepared REVIEW step can schedule, including after skipping earlier passes. Android mastery buttons pause/save immediately and resume past the interrupted step; every 10 confirms scope. Explicit changes prune affected material using the original cutoff. This deliberately differs from desktop queued-after-answer choices and live repeat-boundary eligibility. Shared intervals, propagation, due/early rules, database and JSON safeguards remain unchanged. See [Android instructions and Samsung checklist](ANDROID_LISTENING.md).
+
 ## Hear Delaware
 
 1. Expand **Choose a Session**, choose **REVIEW**, then the **States** series. The page initially uses REVIEW, All series, a 7-day lookahead, and no shuffle.

@@ -10,10 +10,12 @@ final class Plan {
     final boolean authored;
     final String mode, libraryGeneration;
     final Map<String, JSONObject> descriptors = new HashMap<>();
+    SessionStore store;
     final float rate;
-    final List<PlaybackEngine.Unit> units = new ArrayList<>();
-    Plan(String json) throws JSONException {
-        if (json.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > MAX_BYTES) throw new JSONException("Session exceeds 16 MiB; select a smaller series. Nothing truncated.");
+    List<PlaybackEngine.Unit> units = new ArrayList<>();
+    Plan(String json) throws JSONException { this(json, false); }
+    Plan(String json, boolean streamed) throws JSONException {
+        if (!streamed && json.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > MAX_BYTES) throw new JSONException("Session exceeds 16 MiB; select a smaller series. Nothing truncated.");
         JSONObject root = new JSONObject(json);
         int version = root.getInt("version");
         if (version != 1 && version != 2) throw new JSONException("Unsupported plan version");
@@ -39,9 +41,7 @@ final class Plan {
                 if (mastery == 10) { if (!unit.isNull("nextDueAt")) throw new JSONException("KNOWN due must be null"); }
                 else number(unit, "nextDueAt", 0);
                 long recall = number(unit, "recallMs", 0);
-                segment(required(unit, "question"), "Question", actions);
-                actions.add(new PlaybackEngine.Action("wait", "", recall, "Recall"));
-                segment(required(unit, "answer"), "Answer", actions);
+                actions = new StepActions(required(unit, "question"), required(unit, "answer"), recall);
                 JSONObject descriptor = new JSONObject();
                 for (String key : new String[]{"cardId", "stepId", "cardRevision", "progressRevision", "mastery", "nextDueAt", "stepNumber"}) descriptor.put(key, unit.get(key));
                 descriptors.put(id, descriptor);
@@ -62,6 +62,14 @@ final class Plan {
             units.add(new PlaybackEngine.Unit(id, unit.getString("name"), actions));
         }
     }
+    Plan(SessionStore store) throws JSONException {
+        this.store = store; this.units = store;
+        JSONObject root = store.header;
+        sessionId = required(root, "sessionId"); voiceName = root.getString("voiceName");
+        mode = required(root, "mode"); libraryGeneration = required(root, "libraryGeneration");
+        rate = (float)root.getDouble("rate"); authored = true;
+    }
+    JSONObject descriptor(int position) { return store == null ? descriptors.get(units.get(position).id()) : store.descriptor(position); }
     private static String required(JSONObject row, String key) throws JSONException {
         String value = row.getString(key); if (value.trim().isEmpty()) throw new JSONException("Missing " + key); return value;
     }
@@ -69,6 +77,29 @@ final class Plan {
         double value = row.getDouble(key);
         if (!Double.isFinite(value) || value != Math.floor(value) || value < minimum || value > 9007199254740991L) throw new JSONException("Invalid " + key);
         return (long) value;
+    }
+    // Only the requested segment becomes a String/Action. No whole-session speech expansion.
+    static final class StepActions extends AbstractList<PlaybackEngine.Action> {
+        final String question, answer; final long recall;
+        final int[] q, a;
+        StepActions(String question, String answer, long recall) { this.question = question; this.answer = answer; this.recall = recall; q = boundaries(question); a = boundaries(answer); }
+        static int[] boundaries(String text) {
+            List<Integer> ends = new ArrayList<>(); ends.add(0);
+            for (int start = 0; start < text.length();) {
+                int end = start; for (int n = 0; n < 400 && end < text.length(); n++) end += Character.charCount(text.codePointAt(end));
+                if (end < text.length()) for (int i = end; i > start + (end - start) / 2; i--) if (Character.isWhitespace(text.charAt(i - 1))) { end = i; break; }
+                ends.add(end); start = end;
+            }
+            int[] values = new int[ends.size()]; for (int i = 0; i < values.length; i++) values[i] = ends.get(i); return values;
+        }
+        public int size() { return q.length + a.length - 1; }
+        public PlaybackEngine.Action get(int index) {
+            int questions = q.length - 1;
+            if (index == questions) return new PlaybackEngine.Action("wait", "", recall, "Recall");
+            boolean first = index < questions; int n = first ? index : index - questions - 1;
+            String text = first ? question : answer; int[] ends = first ? q : a;
+            return new PlaybackEngine.Action("speak", text.substring(ends[n], ends[n+1]), 0, first ? "Question" : "Answer");
+        }
     }
     // Exact substrings, never trim or rewrite authored text; small TTS requests at any supported rate.
     static void segment(String text, String label, List<PlaybackEngine.Action> actions) {

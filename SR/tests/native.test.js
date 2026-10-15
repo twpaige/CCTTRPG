@@ -2,7 +2,7 @@ import { openDatabase, request } from '../js/db.js';
 import { exportSnapshot, exportJSON, restoreJSON, contentKey } from '../js/backup.js';
 import { migrateSnapshot } from '../js/validation.js';
 import { legacyFixture, createLegacy } from './mastery.test.js';
-import { buildNativePlan, reconcileNative } from '../js/native-study.js';
+import { buildNativePlan, reconcileNative, prepareNativeSession, preparedPatches, updatePreparedSession } from '../js/native-study.js';
 import { selectReview, selectAudit, nextDue } from '../js/scheduler.js';
 import { changeMastery } from '../js/mastery.js';
 const tests = [], fixtures = [], time = 2000000000000;
@@ -80,6 +80,50 @@ test('Confirmed pending final mastery applies at completion with normal propagat
 });
 test('Backwards completion time remains queued without credit', async () => { const f = await fixture(); f.complete().completedAt = time - 1; await rejects(() => reconcileNative(f.db, f.native)); equal(contentKey(await exportSnapshot(f.db)), contentKey(f.snapshot)); });
 test('Schema-2 export and restore preserve reconciled progress and receipts', async () => { const f = await fixture(); f.complete(); await reconcileNative(f.db, f.native); const before = await exportSnapshot(f.db), json = await exportJSON(f.db); await restoreJSON(f.db, json, { confirmed: true, safetyJSON: json }); const after = await exportSnapshot(f.db); equal(after.stepProgress, before.stepProgress); equal(after.stepEvents, before.stepEvents); equal(after.flashcards, before.flashcards); });
+test('Streamed preparation preserves Unicode chunk boundaries and exact large answers', async () => {
+  const snapshot = migrateSnapshot(legacyFixture()); snapshot.flashcards[0].steps[0].answer = '🧠 日本語 '.repeat(80000);
+  let header, part = '', units = [], ready = false;
+  const native = { session(op, arg) { if (op === 'begin') header = JSON.parse(arg); if (op === 'part') { check(arg.length <= 65536); check(!(arg.charCodeAt(arg.length - 1) >= 0xD800 && arg.charCodeAt(arg.length - 1) <= 0xDBFF)); part += arg; } if (op === 'step') { units.push(JSON.parse(part)); part = ''; } if (op === 'finish') ready = true; return ''; } };
+  await prepareNativeSession(snapshot, { now: time, window: { type: 'days', days: 7 } }, native);
+  equal(units[0].answer, snapshot.flashcards[0].steps[0].answer); check(ready && header.cutoff === time + 7 * 86400000);
+});
+test('Preparation failure or Stop aborts before PLAY is ready', async () => {
+  const snapshot = migrateSnapshot(legacyFixture()), calls = [];
+  await rejects(() => prepareNativeSession(snapshot, { now: time }, { session(op) { calls.push(op); return op === 'step' ? 'ERROR: No space' : ''; } }));
+  check(calls.at(-1) === 'abort' && !calls.includes('finish'));
+  calls.length = 0; let continuing = true;
+  await rejects(() => prepareNativeSession(snapshot, { now: time }, { session(op) { calls.push(op); return ''; } }, async () => { continuing = false; }, () => continuing));
+  check(calls.at(-1) === 'abort' && !calls.includes('finish'));
+});
+test('Prepared pruning uses original cutoff, preserves unrelated rows and adds no new eligibility', () => {
+  const snapshot = migrateSnapshot(legacyFixture()), plan = buildNativePlan(snapshot, { now: time });
+  const manifest = { header: { mode: 'REVIEW', cutoff: time }, units: plan.units };
+  const changed = structuredClone(snapshot); const row = changed.stepProgress.find(row => row.flashcardId === 'card-0' && row.stepId === 'step-1'); row.nextDueAt = time + 1; row.revision++;
+  const patches = preparedPatches(changed, manifest, ['card-0']);
+  check(!patches[1].keep && patches[0].keep); equal(patches.map(row => row.id), plan.units.map(row => row.id));
+  equal(preparedPatches(changed, manifest, ['card-1']).map(row => row.progressRevision), plan.units.map(row => row.progressRevision));
+  manifest.header.cutoff = null; check(preparedPatches(changed, manifest, ['card-0']).every(row => row.keep));
+});
+test('Prepared final KNOWN prunes whole card and comprehensive KNOWN prunes BOUND series', async () => {
+  const f = await fixture(), manifest = { header: { mode: 'REVIEW', cutoff: null }, units: f.plan.units };
+  await changeMastery(f.db, { action: { type: 'step', cardId: 'card-0', stepId: 'step-4', level: 10 }, expectedKey: contentKey(f.snapshot), confirmed: true, now: time });
+  check(preparedPatches(await exportSnapshot(f.db), manifest, ['card-0']).every(row => !row.keep));
+  const snapshot = await exportSnapshot(f.db);
+  await changeMastery(f.db, { action: { type: 'step', cardId: 'card-1', stepId: 'step-4', level: 10 }, expectedKey: contentKey(snapshot), confirmed: true, now: time });
+  check(preparedPatches(await exportSnapshot(f.db), manifest, ['card-0', 'card-1']).every(row => !row.keep));
+});
+test('AUDIT reset removes its objective without introducing other cards', async () => {
+  const f = await fixture(), plan = buildNativePlan(f.snapshot, { mode: 'AUDIT' });
+  await changeMastery(f.db, { action: { type: 'resetObjective', cardId: 'card-1' }, expectedKey: contentKey(f.snapshot), confirmed: true, now: time });
+  const patches = preparedPatches(await exportSnapshot(f.db), { header: { mode: 'AUDIT', cutoff: null }, units: plan.units }, ['card-0', 'card-1']);
+  check(patches.length === plan.units.length && patches.every(row => !row.keep));
+});
+test('Prepared update streams every manifest batch in original order before activation', async () => {
+  const snapshot = migrateSnapshot(legacyFixture()), unit = buildNativePlan(snapshot, { now: time }).units[0];
+  const units = Array.from({ length: 100 }, (_, id) => ({ ...unit, id: String(id) })), written = []; let activated = false;
+  const native = { session(op, arg) { if (op === 'manifest') return JSON.stringify({ header: { mode: 'REVIEW', cutoff: time }, count: units.length, units: units.slice(Number(arg), Number(arg) + 32) }); if (op === 'updateStep') written.push(JSON.parse(arg)); if (op === 'updateFinish') { check(written.length === 100); activated = true; } return ''; } };
+  await updatePreparedSession(snapshot, [], native); check(activated); equal(written.map(row => row.id), units.map(row => row.id));
+});
 export async function run() {
   const results = [];
   try { for (const { name, fn } of tests) { try { await fn(); results.push({ name, pass: true }); } catch (error) { results.push({ name, pass: false, error: error.stack }); } } }

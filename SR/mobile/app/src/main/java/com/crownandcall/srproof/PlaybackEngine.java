@@ -27,8 +27,8 @@ public final class PlaybackEngine {
     private boolean began, repeat;
 
     public PlaybackEngine(Host host) { this.host = host; }
-    public Action action() { return unitIndex < units.size() ? units.get(unitIndex).actions().get(actionIndex) : null; }
-    public String unitName() { return unitIndex < units.size() ? units.get(unitIndex).name() : ""; }
+    public Action action() { return (status.equals("playing") || status.equals("paused")) && unitIndex < units.size() ? units.get(unitIndex).actions().get(actionIndex) : null; }
+    public String unitName() { try { return unitIndex < units.size() ? units.get(unitIndex).name() : ""; } catch (RuntimeException error) { return "Unavailable"; } }
     public int unitCount() { return units.size(); }
     public boolean stepStarted() { return began && unitIndex < units.size(); }
     public void start(List<Unit> plan) {
@@ -46,6 +46,9 @@ public final class PlaybackEngine {
     }
     private void invalidate() { token++; host.cancel(); }
     private void execute(boolean remainingWait) {
+        try { executeReady(remainingWait); } catch (RuntimeException error) { fail(error.getMessage()); }
+    }
+    private void executeReady(boolean remainingWait) {
         if (!status.equals("playing")) return;
         if (unitIndex >= units.size() && repeat && !units.isEmpty()) unitIndex = 0;
         if (unitIndex >= units.size()) { status = "finished"; invalidate(); host.changed(); host.ended(); return; }
@@ -100,4 +103,13 @@ public final class PlaybackEngine {
         else execute(false);
     }
     public void stop() { invalidate(); status = "stopped"; message = ""; host.changed(); host.ended(); }
+    public void revise(List<Unit> next, int afterId) {
+        if (!status.equals("paused")) throw new IllegalStateException("Pause before updating a session.");
+        invalidate(); units = next;
+        int low = 0, high = units.size();
+        while (low < high) { int middle = low + (high - low) / 2; if (Integer.parseInt(units.get(middle).id()) <= afterId) low = middle + 1; else high = middle; }
+        unitIndex = low;
+        if (unitIndex == units.size()) unitIndex = 0;
+        actionIndex = 0; began = false; remaining = 0; message = "Session updated. Ready to resume."; host.changed();
+    }
 }

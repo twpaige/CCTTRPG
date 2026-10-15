@@ -1,10 +1,10 @@
 // Android session preparation and reconciliation. No browser speech dependency.
-import { selectReview, selectAudit, recallSeconds, progressMap, progressKey, validTime } from './scheduler.js';
+import { selectReview, selectAudit, recallSeconds, progressMap, progressKey, validTime, cutoff } from './scheduler.js';
 import { completeStep } from './mastery.js';
 import { validateSnapshot, requireValue } from './validation.js';
 export const MAX_PLAN_BYTES = 16 * 1024 * 1024;
 export function buildNativePlan(snapshot, { mode = 'REVIEW', seriesId, window = { type: 'now' }, random = false,
-  now = Date.now(), rng = Math.random, recall = 4, rate = .9, voiceName = '', sessionId = crypto.randomUUID() } = {}) {
+  now = Date.now(), rng = Math.random, recall = 4, rate = .9, voiceName = '', sessionId = crypto.randomUUID(), streamed = false } = {}) {
   validateSnapshot(snapshot); validTime(now);
   requireValue(['REVIEW', 'AUDIT'].includes(mode), 'Choose REVIEW or AUDIT.');
   requireValue(Number.isFinite(rate) && rate >= .5 && rate <= 2, 'Rate must be 0.5–2.');
@@ -22,8 +22,59 @@ export function buildNativePlan(snapshot, { mode = 'REVIEW', seriesId, window = 
   }
   requireValue(units.length > 0, `No eligible ${mode} steps. Try another selection or review window.`);
   const plan = { version: 2, sessionId, libraryId: snapshot.libraryId, libraryGeneration: snapshot.libraryGeneration, mode, voiceName, rate, units };
-  requireValue(new TextEncoder().encode(JSON.stringify(plan)).length <= MAX_PLAN_BYTES, 'Selected session exceeds 16 MiB. Choose a smaller series; no content was truncated.');
+  if (!streamed) requireValue(new TextEncoder().encode(JSON.stringify(plan)).length <= MAX_PLAN_BYTES, 'Selected session exceeds 16 MiB. Choose a smaller series; no content was truncated.');
   return plan;
+}
+export function sessionCall(native, operation, argument = '') {
+  const result = native.session(operation, argument);
+  requireValue(typeof result === 'string' && !result.startsWith('ERROR:'), result || 'Native session operation failed.');
+  return result;
+}
+export async function prepareNativeSession(snapshot, options, native, yieldUI = () => new Promise(resolve => setTimeout(resolve, 0)), continuing = () => true) {
+  const now = options.now ?? Date.now(), plan = buildNativePlan(snapshot, { ...options, now, streamed: true });
+  const { units, ...header } = plan;
+  header.cutoff = plan.mode === 'REVIEW' ? (Number.isFinite(cutoff(now, options.window)) ? cutoff(now, options.window) : null) : null;
+  requireValue(continuing(), 'Preparation stopped.');
+  sessionCall(native, 'begin', JSON.stringify(header));
+  try {
+    for (let i = 0; i < units.length; i++) {
+      requireValue(continuing(), 'Preparation stopped.');
+      const json = JSON.stringify(units[i]);
+      for (let start = 0; start < json.length;) {
+        let end = Math.min(json.length, start + 65536);
+        if (end < json.length && json.charCodeAt(end - 1) >= 0xD800 && json.charCodeAt(end - 1) <= 0xDBFF) end--;
+        sessionCall(native, 'part', json.slice(start, end)); start = end;
+      }
+      sessionCall(native, 'step');
+      if (i % 16 === 0) await yieldUI();
+    }
+    requireValue(continuing(), 'Preparation stopped.');
+    sessionCall(native, 'finish');
+    return { header, count: units.length };
+  } catch (error) { try { sessionCall(native, 'abort'); } catch { /* Preserve original error. */ } throw error; }
+}
+export function preparedPatches(snapshot, manifest, affectedCards) {
+  const progress = progressMap(snapshot), affected = new Set(affectedCards);
+  const audit = manifest.header.mode === 'AUDIT' ? new Set(selectAudit(snapshot).flatMap(card => card.stepIds.map(step => progressKey(card.cardId, step)))) : null;
+  return manifest.units.map(unit => {
+    if (!affected.has(unit.cardId)) return { ...unit, keep: true };
+    const card = snapshot.flashcards.find(row => row.id === unit.cardId);
+    const row = progress.get(progressKey(unit.cardId, unit.stepId)), anchor = card && progress.get(progressKey(card.id, card.steps.at(-1).id));
+    const eligible = row => row && row.mastery < 10 && (manifest.header.cutoff === null || row.nextDueAt <= manifest.header.cutoff);
+    const keep = audit ? audit.has(progressKey(unit.cardId, unit.stepId)) : eligible(anchor) && eligible(row);
+    return { ...unit, keep: !!keep, ...(row ? { mastery: row.mastery, nextDueAt: row.nextDueAt, progressRevision: row.revision } : {}) };
+  });
+}
+export async function updatePreparedSession(snapshot, affectedCards, native) {
+  sessionCall(native, 'updateBegin');
+  let offset = 0, count;
+  do {
+    const manifest = JSON.parse(sessionCall(native, 'manifest', String(offset))); count = manifest.count;
+    for (const patch of preparedPatches(snapshot, manifest, affectedCards)) sessionCall(native, 'updateStep', JSON.stringify(patch));
+    offset += manifest.units.length;
+    await new Promise(resolve => setTimeout(resolve, 0));
+  } while (offset < count);
+  sessionCall(native, 'updateFinish');
 }
 export async function reconcileNative(db, native) {
   // A batch is copied by native code; only the exact successfully processed head is removed.

@@ -28,6 +28,7 @@ public final class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        try { PlaybackService.initializeStorage(getFilesDir()); } catch (IOException error) { bridgeError = error.getMessage(); }
         web = new WebView(this);
         web.setOnApplyWindowInsetsListener((view, insets) -> {
             if (Build.VERSION.SDK_INT >= 30) {
@@ -86,7 +87,7 @@ public final class MainActivity extends Activity {
         }));
     }
     private void startPlan(String json) {
-        if (!visible || filePending || PlaybackService.instance != null || PlaybackService.launching || PlaybackService.completions.size() != 0) { bridgeError = "Stop playback and save queued progress before starting a new session."; return; }
+        if (!visible || filePending || PlaybackService.prepared != null || PlaybackService.instance != null || PlaybackService.launching || PlaybackService.completions.size() != 0) { bridgeError = "Stop playback and save queued progress before starting a new session."; return; }
         try {
             PlaybackService.preparedPlan = new Plan(json);
             PlaybackService.launching = true;
@@ -98,9 +99,10 @@ public final class MainActivity extends Activity {
         @JavascriptInterface public String status() {
             try {
                 boolean running = PlaybackService.instance != null;
+                SessionStore prepared = PlaybackService.prepared;
                 JSONObject result = running ? new JSONObject(PlaybackService.snapshot) : new JSONObject().put("status", "stopped");
                 android.content.SharedPreferences prefs = getSharedPreferences(PlaybackService.PREFS, MODE_PRIVATE);
-                return result.put("serviceRunning", running || PlaybackService.launching).put("queuedCount", PlaybackService.completions.size()).put("queueLimit", CompletionQueue.LIMIT).put("voices", new JSONArray(voices)).put("voiceMessage", voiceMessage)
+                return result.put("prepared", prepared != null).put("preparedCount", prepared == null ? 0 : prepared.size()).put("serviceRunning", running || PlaybackService.launching).put("queuedCount", PlaybackService.completions.size()).put("queueLimit", CompletionQueue.LIMIT).put("voices", new JSONArray(voices)).put("voiceMessage", voiceMessage)
                     .put("bridgeError", bridgeError).put("android", Build.VERSION.RELEASE)
                     .put("webview", WebView.getCurrentWebViewPackage() == null ? "unknown" : WebView.getCurrentWebViewPackage().versionName)
                     .put("lastStatus", new JSONObject(prefs.getString("lastStatus", "{}")))
@@ -120,7 +122,24 @@ public final class MainActivity extends Activity {
             runOnUiThread(() -> {
                 if (!visible) return;
                 if (PlaybackService.instance != null) PlaybackService.instance.command(action);
+                else if ("STOP".equals(action)) { String error = PlaybackService.session("abort", ""); if (!error.isEmpty()) bridgeError = error; }
             });
+        }
+        @JavascriptInterface public String session(String operation, String argument) {
+            java.util.concurrent.FutureTask<String> task = new java.util.concurrent.FutureTask<>(() -> {
+                if (!visible && !operation.equals("abort")) return "ERROR: Return to SR to prepare or change the session.";
+                if (filePending) return "ERROR: Finish file transfer first.";
+                if (operation.equals("play")) {
+                    if (PlaybackService.instance != null || PlaybackService.launching || PlaybackService.prepared == null || PlaybackService.completions.size() != 0) return "ERROR: Prepare and save pending progress before PLAY.";
+                    if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) { requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1); return "ERROR: Enable notifications, then press PLAY."; }
+                    try { PlaybackService.preparedPlan = new Plan(PlaybackService.prepared); PlaybackService.launching = true; bridgeError = ""; startForegroundService(new Intent(MainActivity.this, PlaybackService.class).setAction("START")); return ""; }
+                    catch (Exception error) { PlaybackService.launching = false; return "ERROR: " + error.getMessage(); }
+                }
+                return PlaybackService.session(operation, argument);
+            });
+            runOnUiThread(task);
+            try { return task.get(30, java.util.concurrent.TimeUnit.SECONDS); }
+            catch (Exception error) { task.cancel(false); return "ERROR: Session operation did not finish. Stop and prepare again."; }
         }
         @JavascriptInterface public void refresh() { runOnUiThread(() -> { if (visible) refreshVoices(); }); }
         @JavascriptInterface public String completions() { return "[" + String.join(",", PlaybackService.completions.batch()) + "]"; }
@@ -145,7 +164,7 @@ public final class MainActivity extends Activity {
     }
     private void chooseBackup(String json) {
         if (!visible || filePending) return;
-        if (PlaybackService.instance != null || PlaybackService.launching || PlaybackService.completions.size() != 0) { fileError("Stop playback and return to Listening to save queued progress before transferring backups."); return; }
+        if (PlaybackService.instance != null || PlaybackService.launching || PlaybackService.prepared != null || PlaybackService.completions.size() != 0) { fileError("Stop playback and return to Listening to save queued progress before transferring backups."); return; }
         if (json != null && json.getBytes(StandardCharsets.UTF_8).length > MAX_BACKUP) { fileError("Backup exceeds 32 MiB."); return; }
         Intent intent = new Intent(json == null ? Intent.ACTION_OPEN_DOCUMENT : Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE).setType("application/json");
@@ -205,8 +224,8 @@ public final class MainActivity extends Activity {
     @Override public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(code, permissions, results);
         if (code == 1) {
-            if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) bridgeError = "Notification permission granted. Press Start to begin.";
-            else bridgeError = "Notification permission is needed for this proof's locked-screen controls. Enable it in app settings, then Start.";
+            if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) bridgeError = "Notification permission granted. Press PLAY to begin.";
+            else bridgeError = "Notification permission is needed for this proof's locked-screen controls. Enable it in app settings, then PLAY.";
         }
     }
     @Override protected void onResume() { super.onResume(); visible = true; if (web != null) web.onResume(); }
