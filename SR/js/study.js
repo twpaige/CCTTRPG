@@ -121,7 +121,9 @@ export class StudySession {
   skip() { this.controller?.skip(); }
   skipStep() { this.controller?.navigateStep(1); }
   previousStep() { this.controller?.navigateStep(-1); }
+  previousCard() { this.controller?.navigateCard(-1); }
   setRepeat(enabled) { this.controller?.setRepeat(enabled); }
+  setRepeatCard(enabled) { this.controller?.setRepeatCard(enabled); }
   async stop() {
     ++this.epoch; this.completion.interrupt(); this.controller?.stop();
     await this.release(); this.publish();

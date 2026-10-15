@@ -1,5 +1,27 @@
 # SR — Test results
 
+## Compact web player and flashcard navigation — 2026-10-14
+
+**Implementation and available automated checks PASS; new audible controls await owner listening verification.** Baseline `0a579565454624df0bac0b1157d1dbd2fb200223`. Web-only scope; Android application, schema, backup/import, editor and shared scheduling/mastery APIs unchanged. Historical reports below describe their tested versions, not current UI instructions.
+
+### Changes and evidence
+
+- `index.html`, `player.css`, `js/player.js`: collapsed settings with REVIEW / All series / 7-day lookahead / shuffle-off defaults and a window summary; visible Start; compact aligned settings. Retain saved desktop voice/rate/recall without writing settings. Late voice discovery honors the saved voice until the user manually selects another. Remove card/title/metadata/question/answer presentation and help UI/code. Keep mastery colors/keyboard support, screen-reader pending feedback, compact saved/status feedback, confirmations and errors. Audio still receives exact authored text.
+- `js/review.js`, `js/study.js`: Previous FC moves through the prepared order without reselection; Next Step/Next FC preserve prior forward behavior. Repeat FC loops eligible ordered steps and mutually excludes Repeat Step. Both reset on explicit navigation, Stop, Restart and special resets; Pause/Resume preserves them. Existing session practice tracking and completion APIs prevent duplicate review credit while allowing fresh mastery choices to commit once. Previous FC and step navigation are disabled during completion writes.
+- `tests/study.test.js`, `tests/study.mjs`: 8 added domain and 3 added UI scenarios; existing UI assertions adapted for intentionally removed presentation/help. PLAYBACK, SPECIFICATION and BUILD_PLAN updated. No framework or dependency added. Existing `[web-only]` workflow guard will prevent APK build/publication.
+
+**321/321 distinct automated scenarios PASS:** study 58 domain + 18 UI; original speech 33; persistence 38; editor 17; mastery 40 domain + 7 UI; Data 35; shared plan 6; release 6; native executor 16; authored native/focus/document 28; native integration 13 + mobile UI 6. Browser lifecycle, offline persistence and close-during-transaction checks also pass. Windows, Node 24.19.0, Chrome 155.0.0.0, JDK 17.0.20.1. Synthetic libraries, disposable profiles/databases and simulated speech only; no owner library accessed.
+
+New coverage includes Previous FC during question/recall/answer, pending cancellation and stale callbacks, first-card boundary, paused navigation, frozen shuffled UNBOUND order, multi-step FC repetition/ascending eligible steps, unchecking mid-pass, no duplicate credit on repeat/backward navigation, fresh mastery during practice, mutual exclusion and all repeat resets, recall Pause/Resume, AUDIT no-write repetition, collapsed defaults/summary/Start, removed clutter/help, saved preferences and manual voice selection, responsive layout and keyboard controls. Existing KNOWN/BOUND propagation, atomic rollback/retries, receipts and REVIEW/AUDIT regressions remain passing. Chrome screenshots inspected at desktop and 390px for collapsed and expanded settings; responsive checks also cover 900px.
+
+Run the existing full-suite commands below. `node SR/tests/study.mjs` now runs 58 domain + 18 UI cases; use the local server and SR_PLAYWRIGHT/SR_BROWSER as documented. Optional `SR_PLAYER_SCREENSHOTS` points to an existing output directory for layout screenshots. Use `SR_TEST_URL=https://crownandcall.com/SR` for isolated deployed verification.
+
+### Deployment and owner checks
+
+Deployment/live verification pending this implementation commit. No APK is authorized for this update.
+
+Reload [the player](https://crownandcall.com/SR/) in Chrome. Confirm the collapsed default summary, then press Start. Listen while using Next/Previous Step and FC, Repeat FC through several passes, switching repeat modes, unchecking mid-card, Pause/Resume and Stop/Restart. Check that replay leaves saved dates intact and a fresh mastery choice applies once after its answer. Test final KNOWN/Reset confirmations only on material you intend to change. Audible cancellation, full narration, timing and actual assistive-technology announcements still require owner verification; automation does not certify sound. No new G6 or Android physical-device acceptance is claimed.
+
 ## Desktop player layout and step navigation — 2026-10-14
 
 **Implementation and available automated checks PASS; audible interaction requires owner verification.** Based on main `bec67139d1ab259fed524cd5a1b8fb21aa9a653e`. Web player only; no Android application, schema, backup format, shared scheduler or editor changes.

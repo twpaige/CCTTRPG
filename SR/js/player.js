@@ -5,7 +5,7 @@ import { StudySession } from './study.js';
 import { englishVoices, selectVoice, voiceKey, watchVoices, PREFERRED_VOICE } from './voices.js';
 import { INTERVAL_LABELS, selectReview, selectAudit } from './scheduler.js';
 const $ = id => document.getElementById(id);
-let db, session, library, inventory = [], busy = false, watcher, countdown, displayedToken, displayedProgress;
+let db, session, library, inventory = [], busy = false, watcher, countdown, displayedToken, displayedProgress, voiceSelected = false;
 const option = (value, label) => { const node = document.createElement('option'); node.value = value; node.textContent = label; return node; };
 const error = reason => { $('error').textContent = reason.message || String(reason); };
 const shortIntervals = ['15m', '3h', '6h', '1d', '2d', '3d', '1w', '2w', '1mo', '3mo', 'KNOWN'];
@@ -24,13 +24,8 @@ function masteryDisplay(state, token) {
     button.classList.toggle('saved-level', level === current);
     button.classList.toggle('pending-level', state.pending !== undefined && level === selected);
   }
-  $('interval').textContent = current === undefined ? 'Choose mastery while a step is playing.' : `Saved mastery ${current}.`;
-  $('pending').textContent = state.pending === undefined ? 'No pending mastery change.'
-    : `Mastery ${state.pending} selected — ${state.pending === 10 ? 'KNOWN; excluded from normal REVIEW.' : `Next review in ${INTERVAL_LABELS[state.pending]}.`} Applies after the answer finishes.`;
-  if (saved) $('current-progress').textContent = token.masterySaved ? `Mastery ${current} saved after the successful answer.`
-    : `Saved mastery ${saved.mastery} · ${saved.nextDueAt === null ? 'KNOWN' : `Due ${new Date(saved.nextDueAt).toLocaleString()}`}. ${token.prepared.wasDue && token.prepared.mode === 'REVIEW' ? 'Successful answer restarts the interval.' : 'No automatic schedule change for this step.'}`;
-  else $('current-progress').textContent = '';
-  $('mastery-saved').textContent = state.masterySaved ? `Saved mastery ${state.masterySaved.level} — ${state.masterySaved.card}, step ${state.masterySaved.step}.` : '';
+  $('pending').textContent = state.pending === undefined ? '' : `Mastery ${state.pending} pending until answer completion.`;
+  $('mastery-saved').textContent = state.masterySaved ? `Saved mastery ${state.masterySaved.level}.` : '';
 }
 function options() {
   if ($('recall').value === '' || $('rate').value === '') throw new Error('Enter a recall duration and speech rate.');
@@ -46,8 +41,9 @@ function preview() {
   if (!library) return;
   try {
     const settings = options(), units = audit ? selectAudit(library, settings) : selectReview(library, settings);
-    $('session-summary').textContent = `${settings.mode} · ${$('series').selectedOptions[0]?.textContent || 'ALL series'}`;
-    $('selection').textContent = units.length ? `${settings.mode}: ${units.length} flashcards, ${units.reduce((sum, unit) => sum + unit.stepIds.length, 0)} steps. Selection refreshes at Start.`
+    const windowLabel = settings.window.type === 'days' ? `Next ${settings.window.days} days` : settings.window.type === 'now' ? 'Due now' : 'Max Deferred';
+    $('session-summary').textContent = `${settings.mode} · ${$('series').selectedOptions[0]?.textContent || 'All series'}${audit ? '' : ` · ${windowLabel}`}`;
+    $('selection').textContent = units.length ? `${settings.mode}: ${units.length} flashcards, ${units.reduce((sum, unit) => sum + unit.stepIds.length, 0)} steps.`
       : `${settings.mode}: no eligible cards. ${audit ? 'AUDIT requires KNOWN material.' : 'Try lookahead or Max Deferred to include future-due material; KNOWN is excluded.'}`;
   } catch (reason) { $('selection').textContent = reason.message; }
 }
@@ -63,8 +59,11 @@ function render(state = session?.snapshot || { status: 'idle' }) {
   const navigating = active && !!state.step && state.phase !== 'commit';
   $('skip-step').disabled = busy || !navigating;
   $('previous-step').disabled = busy || !navigating || state.stepIndex === 0;
+  $('previous-fc').disabled = busy || !navigating || state.cardIndex === 0 || state.phase === 'cycle';
   $('repeat-step').disabled = busy || !active || !state.step;
   $('repeat-step').checked = !!state.repeatCurrent;
+  $('repeat-fc').disabled = busy || !active || !state.step;
+  $('repeat-fc').checked = !!state.repeatCard;
   $('stop').disabled = busy || !active;
   $('restart').disabled = busy || !session?.options;
   const unfinished = active && ['playing', 'paused', 'error'].includes(state.status) && ['question', 'recall', 'answer'].includes(state.phase) && !!session?.completion.current;
@@ -72,13 +71,10 @@ function render(state = session?.snapshot || { status: 'idle' }) {
   $('special-controls').disabled = busy || !active || !state.card || state.phase === 'commit';
   $('audit-actions').hidden = state.mode !== 'AUDIT';
   if (state.starting) $('status').textContent = 'Preparing session…';
-  else if (state.status === 'idle') $('status').textContent = 'Library ready. Choose REVIEW or AUDIT, then Start.';
-  else if (state.status === 'finished') $('status').textContent = `${state.mode} complete — no more eligible cards in this pass. AUDIT ends when its selection is empty.`;
+  else if (state.status === 'idle') $('status').textContent = selectVoice(inventory, $('voice').value) ? 'Ready' : ($('voice-note').textContent || 'Waiting for English voices…');
+  else if (state.status === 'finished') $('status').textContent = `${state.mode} complete — no eligible cards remain.`;
   else $('status').textContent = `${state.mode} · ${state.status} · ${state.phase}${state.mode === 'AUDIT' ? ` · cycle ${state.cycle}` : ''}${state.phase === 'recall' ? ` · ${Math.ceil(state.remainingMs / 1000)} seconds remaining` : ''}`;
   if (state.error) error(`${state.error} Resume / retry retries this operation. Stop releases the library; make a backup before attempting recovery.`);
-  $('current-card').textContent = state.card ? `${state.card.name}` : 'Ready to listen';
-  $('current-step').textContent = state.step ? `Authored step ${state.step.position + 1} · eligible step ${state.stepIndex + 1} of ${state.card.steps.length} · voice: ${state.voiceName}` : '';
-  $('question').textContent = state.step?.question || ''; $('answer').textContent = state.step?.answer || '';
   masteryDisplay(state, session?.completion.current);
 }
 async function run(action) {
@@ -90,7 +86,7 @@ async function run(action) {
 async function load() {
   library = await exportSnapshot(db);
   const selected = $('series').value;
-  $('series').replaceChildren(option('', 'ALL series'), ...library.series.map(row => option(row.id, `${row.name} · ${row.bound ? 'BOUND' : 'UNBOUND'}`)));
+  $('series').replaceChildren(option('', 'All series'), ...library.series.map(row => option(row.id, `${row.name} · ${row.bound ? 'BOUND' : 'UNBOUND'}`)));
   if (library.series.some(row => row.id === selected)) $('series').value = selected;
   preview();
 }
@@ -120,38 +116,21 @@ $('levels').onkeydown = event => {
   event.preventDefault(); const target = $(`level-${level}`); target.focus(); target.click();
 };
 for (const id of ['mode', 'series', 'window', 'days', 'random', 'recall', 'rate']) $(id).onchange = preview;
-$('voice').onchange = () => render();
+$('voice').onchange = () => { voiceSelected = true; render(); };
 $('start').onclick = () => run(async () => { await session.start(options()); if (session.options) $('session-panel').open = false; });
 $('pause').onclick = () => session.pause();
 $('resume').onclick = () => { $('error').textContent = ''; session.resume(); };
 $('skip').onclick = () => { $('error').textContent = ''; session.skip(); };
 $('skip-step').onclick = () => { $('error').textContent = ''; session.skipStep(); };
 $('previous-step').onclick = () => { $('error').textContent = ''; session.previousStep(); };
+$('previous-fc').onclick = () => { $('error').textContent = ''; session.previousCard(); };
 $('repeat-step').onchange = () => session.setRepeat($('repeat-step').checked);
+$('repeat-fc').onchange = () => session.setRepeatCard($('repeat-fc').checked);
 $('stop').onclick = () => run(async () => { await session.stop(); await load(); });
 $('restart').onclick = () => run(async () => { await session.restart(); $('session-panel').open = false; });
 $('reload').onclick = () => run(load);
 for (const [id, type] of [['reset', 'resetCard'], ['reset-final', 'resetFinal'], ['reset-objective', 'resetObjective']])
   $(id).onclick = () => run(() => session.special(type, message => confirm(message)));
-for (const [index, button] of [...document.querySelectorAll('.help-toggle')].entries()) {
-  const fieldset = button.closest('fieldset');
-  if (fieldset) { const legend = fieldset.querySelector('legend'); legend.classList.remove('sr-only'); legend.append(' ', button); }
-  const tip = document.createElement('span'); tip.className = 'help-tip'; tip.id = `help-${index}`; tip.role = 'tooltip'; tip.hidden = true; tip.textContent = button.dataset.help;
-  document.body.append(tip); button.setAttribute('aria-describedby', tip.id); button.setAttribute('aria-expanded', 'false');
-  let pinned = false;
-  const show = () => {
-    tip.hidden = false; button.setAttribute('aria-expanded', 'true');
-    const rect = button.getBoundingClientRect();
-    tip.style.left = Math.max(8, Math.min(rect.left, innerWidth - tip.offsetWidth - 8)) + 'px';
-    tip.style.top = Math.max(8, Math.min(rect.bottom + 6, innerHeight - tip.offsetHeight - 8)) + 'px';
-  };
-  const hide = () => { pinned = false; tip.hidden = true; button.setAttribute('aria-expanded', 'false'); };
-  button.addEventListener('mouseenter', show); button.addEventListener('mouseleave', () => { if (!pinned) hide(); });
-  button.addEventListener('focus', show); button.addEventListener('blur', hide);
-  button.addEventListener('click', () => { pinned = !pinned; if (pinned) show(); else hide(); });
-  button.addEventListener('keydown', event => { if (event.key === 'Escape') { event.preventDefault(); hide(); } });
-  window.addEventListener('scroll', () => { if (!tip.hidden) show(); }, { passive: true });
-}
 $('refresh-voices').onclick = () => watcher?.refresh();
 window.addEventListener('pagehide', () => { clearTimeout(countdown); watcher?.dispose(); void session?.stop().finally(() => db?.close()); });
 window.addEventListener('pageshow', event => { if (event.persisted) location.reload(); });
@@ -166,10 +145,12 @@ await run(async () => {
   if (!globalThis.speechSynthesis) throw new Error('Native browser speech is unavailable. Use desktop Chrome.');
   watcher = watchVoices(speechSynthesis, ({ voices, waiting }) => {
     inventory = voices;
-    const chosen = selectVoice(voices, $('voice').value);
+    const savedVoice = library.settings.desktopVoice;
+    const saved = !voiceSelected && englishVoices(voices).find(voice => savedVoice && voice.name === savedVoice.name && voice.lang === savedVoice.language && (!savedVoice.voiceURI || voice.voiceURI === savedVoice.voiceURI));
+    const chosen = selectVoice(voices, saved ? voiceKey(saved) : $('voice').value);
     $('voice').replaceChildren(...englishVoices(voices).map(voice => option(voiceKey(voice), `${voice.name} (${voice.lang}${voice.localService ? ', local service' : ''})`)));
     if (chosen) $('voice').value = voiceKey(chosen);
-    $('voice-note').textContent = chosen ? `${chosen.name === PREFERRED_VOICE ? 'Preferred voice available.' : 'English fallback available; choose any listed voice.'} Local/offline audio still requires a listening check.`
+    $('voice-note').textContent = chosen ? `${chosen.name === PREFERRED_VOICE ? 'Preferred voice available.' : 'English voice available.'}`
       : waiting ? 'Waiting for English voices…' : 'No English voice found. Install an English system voice, then Refresh voices.';
     render();
   });

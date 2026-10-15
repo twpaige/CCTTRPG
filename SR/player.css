@@ -16,9 +16,22 @@
 #session-panel summary { cursor: pointer; font-weight: 700; font-size: 1.1rem; }
 #session-summary { font-weight: 400; font-size: .85rem; margin-left: 1rem; }
 #session-panel[open] summary { margin-bottom: 1rem; }
-.session-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
-#playback-controls { margin: 1rem 0; padding-top: 1rem; border-top: 1px solid #d5ddd1; }
+.session-grid { display: grid; grid-template-columns: minmax(130px, .6fr) minmax(180px, 1fr) minmax(300px, 1.4fr); gap: .8rem; }
+.review-grid { display: grid; grid-template-columns: minmax(150px, 1fr) 140px; gap: .5rem .8rem; }
+.review-grid[hidden] { display: none; }
+.random-option { grid-column: 1 / -1; }
+.voice-grid { display: grid; grid-template-columns: minmax(180px, 1fr) 130px 190px; gap: .8rem; max-width: 800px; margin-top: .8rem; }
+#settings label { margin-bottom: 0; }
+#settings input:not([type=checkbox]), #settings select { padding: .35rem .5rem; }
+.settings-actions { margin: .8rem 0 .4rem; }
+#selection { margin-bottom: 0; }
+#special-controls { margin-top: .6rem; }
+#playback-controls .toolbar, #special-controls .toolbar { margin-bottom: .6rem; }
+.repeat-options label { margin: 0; font-weight: 400; }
+.player-status { display: flex; flex-wrap: wrap; gap: .4rem 1rem; font-size: .85rem; color: #4f6057; }
+#flashcard-panel #status { background: none; padding: 0; margin: 0; }
+#mastery-saved { margin: 0; font-weight: 400; }
+#error:not(:empty) { margin-top: .6rem; }
 #flashcard-panel #levels { max-width: 900px; }
-.help-toggle { display: inline-grid; place-items: center; width: 1.6rem; height: 1.6rem; padding: 0; border-radius: 50%; font-size: .85rem; }
-.help-tip { position: fixed; z-index: 20; width: min(300px, calc(100vw - 16px)); background: #23352f; color: white; padding: .7rem; border-radius: .4rem; box-shadow: 0 3px 12px #0003; font-size: .9rem; }
-@media (max-width: 700px) { .session-grid { grid-template-columns: 1fr; } #session-summary { display: block; margin-left: 1rem; } }
+@media (max-width: 1000px) { .session-grid { grid-template-columns: 1fr 1fr; } #review-options { grid-column: 1 / -1; max-width: 500px; } }
+@media (max-width: 700px) { .session-grid, .voice-grid { grid-template-columns: 1fr; } #session-summary { display: block; margin-left: 1rem; } }

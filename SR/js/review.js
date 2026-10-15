@@ -25,6 +25,7 @@ export class ReviewController {
     this.settings = null;
     this.remainingMs = 0;
     this.repeatCurrent = false;
+    this.repeatCard = false;
     this.error = '';
   }
 
@@ -32,7 +33,7 @@ export class ReviewController {
     const card = this.cards[this.cardIndex];
     return {
       status: this.status, phase: this.phase, cardIndex: this.cardIndex,
-      stepIndex: this.stepIndex, repeatCurrent: this.repeatCurrent, card, step: card?.steps[this.stepIndex],
+      stepIndex: this.stepIndex, repeatCurrent: this.repeatCurrent, repeatCard: this.repeatCard, card, step: card?.steps[this.stepIndex],
       error: this.error, voiceName: this.settings?.voice.name || '',
       remainingMs: this.status === 'playing' && this.phase === 'recall'
         ? Math.max(0, this.deadline - this.clock.now()) : this.remainingMs,
@@ -63,7 +64,7 @@ export class ReviewController {
     this.settings = { ...settings };
     this.cardIndex = 0;
     this.stepIndex = 0;
-    this.repeatCurrent = false;
+    this.repeatCurrent = this.repeatCard = false;
     this._newStep();
     this.error = '';
     this.status = 'playing';
@@ -77,7 +78,7 @@ export class ReviewController {
   }
 
   stop() {
-    this.repeatCurrent = false;
+    this.repeatCurrent = this.repeatCard = false;
     this._cancelAction();
     this.hooks.discardStep();
     this.status = 'stopped';
@@ -101,23 +102,33 @@ export class ReviewController {
     this._execute();
   }
 
-  skip() {
+  skip() { this.navigateCard(1); }
+
+  navigateCard(direction) {
     if (!['playing', 'paused', 'error'].includes(this.status)) return;
+    if (direction === -1 && (this.cardIndex === 0 || this.phase === 'commit' || this.phase === 'cycle')) return;
     const paused = this.status === 'paused';
     this._cancelAction();
-    this.repeatCurrent = false;
-    ++this.cardIndex;
+    this.repeatCurrent = this.repeatCard = false;
+    this.cardIndex += direction;
     this.stepIndex = 0;
     this._newStep();
     this.error = '';
     this.status = paused ? 'paused' : 'playing';
-    this._publish('skip-card');
+    this._publish(direction === -1 ? 'previous-card' : 'skip-card');
     if (this.cardIndex >= this.cards.length && !this.hooks.nextCycle) this._finish();
     else if (!paused) this._execute();
   }
 
   setRepeat(enabled) {
     this.repeatCurrent = !!enabled && ['playing', 'paused', 'error'].includes(this.status) && !!this.snapshot.step;
+    if (this.repeatCurrent) this.repeatCard = false;
+    this._publish('repeat-setting');
+  }
+
+  setRepeatCard(enabled) {
+    this.repeatCard = !!enabled && ['playing', 'paused', 'error'].includes(this.status) && !!this.snapshot.step;
+    if (this.repeatCard) this.repeatCurrent = false;
     this._publish('repeat-setting');
   }
 
@@ -125,7 +136,7 @@ export class ReviewController {
     if (!['playing', 'paused', 'error'].includes(this.status) || !this.snapshot.step || this.phase === 'commit') return;
     if (direction === -1 && this.stepIndex === 0) return;
     const paused = this.status === 'paused';
-    this._cancelAction(); this.repeatCurrent = false;
+    this._cancelAction(); this.repeatCurrent = this.repeatCard = false;
     if (direction === -1) { --this.stepIndex; this._newStep(); }
     else this._advance();
     this.error = ''; this.status = paused ? 'paused' : 'playing';
@@ -135,7 +146,7 @@ export class ReviewController {
   }
 
   _finish() {
-    this.repeatCurrent = false;
+    this.repeatCurrent = this.repeatCard = false;
     this._cancelAction();
     this.status = 'finished';
     this._publish('session-finished');
@@ -151,11 +162,14 @@ export class ReviewController {
   }
 
   // A special mastery action cancels the unfinished attempt, even if its dialog is dismissed.
-  resetCurrentStep() { this.repeatCurrent = false; this.pause(); this._newStep(); this._publish('step-reset'); }
+  resetCurrentStep() { this.repeatCurrent = this.repeatCard = false; this.pause(); this._newStep(); this._publish('step-reset'); }
 
   _advance() {
     if (this.repeatCurrent) { this._newStep(); return; }
-    if (++this.stepIndex >= this.cards[this.cardIndex].steps.length) { this.stepIndex = 0; ++this.cardIndex; }
+    if (++this.stepIndex >= this.cards[this.cardIndex].steps.length) {
+      this.stepIndex = 0;
+      if (!this.repeatCard) ++this.cardIndex;
+    }
     this._newStep();
   }
 
