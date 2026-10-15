@@ -12,7 +12,7 @@
 
 Reproduce with the full-suite commands below; `node SR/tests/study.mjs` now runs 62 domain + 20 UI scenarios. The same runner supports `SR_TEST_URL=https://crownandcall.com/SR` for deployed verification. Optional `SR_PLAYER_SCREENSHOTS` captures the status at 1440px and 390px in an existing output directory.
 
-Deployment/live checks pending this implementation commit. The existing `[web-only]` commit guard will skip Android build and publication.
+Implementation **`040482ac7341e78378d0aea8f5b95d18f242a37b`** pushed to `origin/main`. [Pages deployment 38670351859](https://github.com/twpaige/CCTTRPG/actions/runs/38670351859) **PASS**. Deployed Chrome tests: **62/62 domain + 20/20 UI PASS** with isolated data and simulated speech (not counted again in 327). [Android workflow 38670352025](https://github.com/twpaige/CCTTRPG/actions/runs/38670352025): **build and publish SKIPPED**. No APK published. Final scope and whitespace review pass.
 
 Owner check: reload [the player](https://crownandcall.com/SR/), listen while navigating/repeating, and compare the displayed series/card/step positions with authored order. Confirm recall and paused countdown agree with audible playback. Browser tests verify display and simulated timing, not actual audio or screen-reader announcements. Existing acceptance-gate status remains unchanged.
 
