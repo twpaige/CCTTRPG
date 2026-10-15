@@ -32,7 +32,7 @@ Reproduce with the existing full-suite commands below. In particular, `node SR/t
 
 Reload [the desktop player](https://crownandcall.com/SR/) in your usual Chrome profile. During actual audio, click several ordinary levels and confirm narration continues without replay/pause, the last level saves after the answer, and the next step shows its own mastery. Check Stop/Skip cancellation and final-step KNOWN cancel/confirm on material you intend to change. The actual audible experience and assistive-technology announcement quality are not certified by silent automation. Earlier owner audio evidence and open G6 checks remain separate.
 
-Commit/push and deployed-site verification are pending below; results will be recorded after publication.
+Implementation `fe917a56977e3dd477a81781ca28ef3dba95b5a7` plus line-ending cleanup **`f5fb8865a4e3042134d902a26f8eb6025423c66c`** are pushed to `origin/main`. [Pages deployment 38664372233](https://github.com/twpaige/CCTTRPG/actions/runs/38664372233) **PASS**. The deployed [desktop player](https://crownandcall.com/SR/) passed **37/37 domain + 11/11 UI scenarios** using the same Chrome runner, isolated database and simulated speech. This repeat verification is not added again to the 293 distinct-scenario total. The final combined diff passes whitespace checks and touches only desktop implementation/tests and directly affected documentation. No Android installation is required for this change.
 
 ## Data & Recovery simplification — 2026-10-14
 
