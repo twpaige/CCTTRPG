@@ -3,32 +3,28 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; base-uri 'none'">
 <title>SR — REVIEW / AUDIT</title><link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="player.css"></head>
 <body><header><p class="eyebrow">SR · LISTEN TO YOUR LIBRARY</p><h1>REVIEW / AUDIT</h1>
-<nav aria-label="Main"><a id="library-link" href="library.html">Library editor</a><a id="mastery-link" href="mastery.html">Knowledge Mastery</a><a id="data-link" href="data/index.html">Data &amp; recovery</a><a href="docs/PLAYBACK.md">Playback guide</a></nav>
-<p>REVIEW practices material you are learning. AUDIT tests material you have marked KNOWN.</p>
-<p class="note">Uses your saved library in this browser. No import or reset is needed after this update. Keep dated JSON backups.</p></header>
-<main><p id="status" role="status">Opening local library…</p><p id="error" role="alert"></p>
-<div class="mastery-layout"><section><h2>Choose a session</h2><fieldset id="settings" disabled><legend class="sr-only">Session settings</legend>
-<label>Activity<select id="mode"><option>REVIEW</option><option>AUDIT</option></select></label>
+<nav aria-label="Main"><a id="library-link" href="library.html">Library editor</a><a id="mastery-link" href="mastery.html">Knowledge Mastery</a><a id="data-link" href="data/index.html">Data &amp; recovery</a><a href="docs/PLAYBACK.md">Playback guide</a></nav></header>
+<main class="player-layout">
+<details id="session-panel" open><summary>Choose a Session <span id="session-summary"></span></summary>
+<fieldset id="settings" disabled><legend class="sr-only">Session settings</legend><div class="session-grid">
+<div><label>Activity<select id="mode"><option>REVIEW</option><option>AUDIT</option></select></label><button class="help-toggle" aria-label="Help: REVIEW and AUDIT" data-help="REVIEW practices eligible learning steps. AUDIT repeats KNOWN final steps without automatic schedule changes.">?</button></div>
 <label>Series<select id="series"><option value="">ALL series</option></select></label>
-<div id="review-options"><label>Review window<select id="window"><option value="now">Due now</option><option value="days">Due within days</option><option value="max">Max Deferred</option></select></label>
-<label>Days of lookahead<input id="days" type="number" min="1" step="1" value="7" disabled></label>
-<label><input id="random" type="checkbox"> Randomize UNBOUND flashcards</label></div>
-<p id="audit-note" hidden>AUDIT repeats KNOWN final steps until you Stop. A wholly KNOWN BOUND series contributes its final comprehensive card. Successful AUDIT does not change scheduling.</p>
-<label>English voice<select id="voice"></select></label><p id="voice-note"></p><button id="refresh-voices">Refresh voices</button>
+<div id="review-options"><label>Review window<select id="window"><option value="now">Due now</option><option value="days">Due within days</option><option value="max">Max Deferred</option></select></label><button class="help-toggle" aria-label="Help: review windows" data-help="A card qualifies through its final step. Lookahead includes future steps within the same cutoff; early practice keeps dates unless mastery is explicitly changed.">?</button>
+<label>Days of lookahead<input id="days" type="number" min="1" step="1" value="7" disabled></label><label><input id="random" type="checkbox"> Randomize UNBOUND flashcards</label></div>
+<p id="audit-note" hidden>KNOWN final steps · continuous AUDIT</p>
+<div><label>English voice<select id="voice"></select></label><p id="voice-note"></p><button id="refresh-voices">Refresh voices</button><button class="help-toggle" aria-label="Help: voice and recall" data-help="Google UK English Male is preferred when available. Saved per-step recall overrides the default, including zero. Stop before changing settings.">?</button></div>
 <label>Speech rate<input id="rate" type="number" min="0.5" max="2" step="0.1" value="0.9"></label>
-<label>Default recall pause (seconds)<input id="recall" type="number" min="0" step="any" value="4"></label>
-<p class="note">A step's saved recall override takes precedence. Stop before changing session settings.</p>
-<button id="reload">Reload library list</button></fieldset>
-<p id="selection"></p><div class="toolbar"><button id="start" class="primary" disabled>Start</button><button id="pause" disabled>Pause</button><button id="resume" disabled>Resume / retry</button><button id="skip" disabled>Skip flashcard</button><button id="stop" disabled>Stop</button><button id="restart" disabled>Restart session</button></div>
-<p class="note">Resume repeats only the interrupted speech segment, or the remaining recall pause. A scheduling retry saves the same completed step without repeating its answer. Restart reloads currently eligible cards; already credited steps keep their updates.</p>
-</section><section><h2 id="current-card">Ready to listen</h2><p id="current-step"></p><p id="current-progress"></p>
-<h3>Question</h3><p id="question" class="verbatim"></p><h3>Answer</h3><p id="answer" class="verbatim"></p>
+<label>Default recall pause (seconds)<input id="recall" type="number" min="0" step="any" value="4"></label></div>
+<button id="reload">Reload library list</button></fieldset><p id="selection"></p></details>
+<section id="flashcard-panel" aria-labelledby="current-card"><p id="status" role="status">Opening local library…</p><p id="error" role="alert"></p>
+<h2 id="current-card">Ready to listen</h2><p id="current-step"></p><p id="current-progress"></p>
+<div class="card-text"><div><h3>Question</h3><p id="question" class="verbatim"></p></div><div><h3>Answer</h3><p id="answer" class="verbatim"></p></div></div>
 <fieldset id="mastery-controls" disabled><legend id="mastery-label">Current step mastery</legend>
-<div id="levels" role="radiogroup" aria-labelledby="mastery-label" aria-describedby="mastery-help"></div>
-<p id="interval"></p><p id="pending" role="status"></p>
-<p id="mastery-help" class="note">Click a level to apply it after the full answer, without interrupting audio. The outlined level is saved; the filled level is selected. Stop or Skip discards an unfinished choice. Final-step KNOWN asks for confirmation. Use arrow keys to select a level.</p></fieldset>
-<p id="mastery-saved" role="status"></p>
-<fieldset id="special-controls" disabled><legend>Explicit mastery actions</legend><div class="toolbar"><button id="reset">Reset FC</button><button id="known">I know this for sure</button></div>
-<div id="audit-actions" hidden><p>If this AUDIT failed, choose a reset:</p><div class="toolbar"><button id="reset-final">Reset final step only</button><button id="reset-objective">Reset entire flashcard / objective</button></div></div>
-<p class="note">These actions pause and ask for confirmation. A confirmed action moves past this card. Cancelling leaves it paused and restarts that step on Resume. Neither action claims completed speech.</p></fieldset>
-</section></div></main><script type="module" src="js/player.js"></script></body></html>
+<div class="toolbar"><button class="help-toggle" aria-label="Help: mastery selection" data-help="Click once; audio continues. Outline means saved, fill means selected. The last choice saves after the complete answer. Stop or navigation discards unfinished choices.">?</button><button class="help-toggle" aria-label="Help: KNOWN propagation" data-help="Intermediate KNOWN changes one step. Final-step KNOWN confirms the whole card, or the entire BOUND series for its final card.">?</button></div>
+<div id="levels" role="radiogroup" aria-labelledby="mastery-label"></div><p id="interval"></p><p id="pending" role="status"></p></fieldset><p id="mastery-saved" role="status"></p>
+<div id="playback-controls" role="group" aria-labelledby="playback-title"><h3 id="playback-title">Playback <button class="help-toggle" aria-label="Help: playback controls" data-help="Pause/Resume repeats interrupted speech or the remaining recall. Retry saves a completed answer without replaying it. Skip Flashcard moves past the card. Restart reloads eligible cards.">?</button></h3>
+<div class="toolbar"><button id="start" class="primary" disabled>Start</button><button id="pause" disabled>Pause</button><button id="resume" disabled>Resume / retry</button><button id="previous-step" disabled>Previous Step</button><button id="skip-step" disabled>Skip Step</button><button class="help-toggle" aria-label="Help: step navigation" data-help="Skip Step interrupts without credit. Previous Step replays an earlier eligible step in this card only. Saved credit stays; replay is practice. Navigation clears pending mastery and repeat.">?</button><button id="skip" disabled>Skip Flashcard</button><button id="stop" disabled>Stop</button><button id="restart" disabled>Restart Session</button></div>
+<div class="toolbar"><label><input id="repeat-step" type="checkbox" disabled> Repeat Current Step</label><button class="help-toggle" aria-label="Help: repeat current step" data-help="Repeat the full question, recall and answer. After the first success, repeats are practice with no extra review credit. A new mastery choice saves once. Uncheck to advance after this answer.">?</button></div></div>
+<fieldset id="special-controls" disabled><legend>Reset actions</legend><div class="toolbar"><button id="reset">Reset FC</button><button class="help-toggle" aria-label="Help: Reset FC" data-help="Confirm resetting this card to mastery 0. This pauses playback and moves past the card. Cancel leaves it paused; Resume restarts its question.">?</button></div>
+<div id="audit-actions" hidden><div class="toolbar"><button id="reset-final">Reset final step only</button><button id="reset-objective">Reset entire flashcard / objective</button></div></div></fieldset>
+</section></main><script type="module" src="js/player.js"></script></body></html>

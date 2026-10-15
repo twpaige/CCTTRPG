@@ -26,7 +26,8 @@ concurrency:
 
 jobs:
   build:
-    if: github.ref == 'refs/heads/main'
+    # Explicit web-only tasks must not publish an APK; Pages remains independent.
+    if: github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[web-only]')
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     outputs:

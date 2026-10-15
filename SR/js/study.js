@@ -57,7 +57,7 @@ export class StudySession {
       if (epoch !== this.epoch) { release(); return; }
       this.lease = release;
       this.options = { ...options, window: { ...options.window } };
-      this.masterySaved = undefined;
+      this.masterySaved = undefined; this.practiced = new Set();
       this.sessionId = crypto.randomUUID(); this.occurrence = 0; this.cycle = 1;
       const snapshot = await exportSnapshot(this.db);
       if (epoch !== this.epoch) return;
@@ -79,9 +79,11 @@ export class StudySession {
           const prior = [...this.operations], generation = this.completion.generation;
           return this.track((async () => {
             await Promise.allSettled(prior);
-            await guard();
+            const current = await guard();
             if (generation !== this.completion.generation) throw new Error('Step interrupted before speech.');
-            const token = await this.completion.begin({ cardId: state.card.id, stepId: state.step.id, mode: options.mode,
+            const practice = options.mode === 'REVIEW' && (this.practiced.has(JSON.stringify([state.card.id, state.step.id]))
+              || current.stepProgress.some(row => row.flashcardId === state.card.id && row.stepId === state.step.id && row.mastery === 10));
+            const token = await this.completion.begin({ cardId: state.card.id, stepId: state.step.id, mode: practice ? 'FOCUSED' : options.mode,
               sessionId: this.sessionId, occurrenceId: String(++this.occurrence), startedAt: this.now(), window: options.window });
             if (identity(JSON.parse(token.prepared.expectedKey)) !== expected)
               throw new Error('Library content changed while preparing. Stop, then Start to reload.');
@@ -91,6 +93,7 @@ export class StudySession {
         completeStep: token => {
           token.completedAt ??= this.now();
           return this.track(this.completion.finish(token, token.completedAt).then(result => {
+            this.practiced.add(JSON.stringify([token.prepared.cardId, token.prepared.stepId]));
             if (token.pending) {
               token.masterySaved = true;
               const card = JSON.parse(token.prepared.expectedKey).flashcards.find(row => row.id === token.prepared.cardId);
@@ -116,6 +119,9 @@ export class StudySession {
   pause() { this.controller?.pause(); }
   resume() { this.controller?.resume(); }
   skip() { this.controller?.skip(); }
+  skipStep() { this.controller?.navigateStep(1); }
+  previousStep() { this.controller?.navigateStep(-1); }
+  setRepeat(enabled) { this.controller?.setRepeat(enabled); }
   async stop() {
     ++this.epoch; this.completion.interrupt(); this.controller?.stop();
     await this.release(); this.publish();

@@ -57,6 +57,8 @@ Desktop playback is at /SR/; authoring is at /SR/library.html within the same or
 
 ## Stage 6 — implemented desktop player and G6
 
+Owner-authorized web-only redesign: vertically stacked, collapsible session settings; playback controls beside mastery; Skip Step, Previous Step and per-step Repeat; contextual help; redundant KNOWN action removed. Replays of completed steps use the existing practice completion path, with new explicit mastery choices still applied once. No Android change or APK publication. The existing APK workflow skips commits explicitly marked `[web-only]`, while Pages deploys normally.
+
 1. `index.html`/`js/player.js` load the actual IndexedDB library. Link the preserved editor, mastery and Data screens; never seed/reset personal content. Choose REVIEW/AUDIT, ALL/one series, due-now/N-day/Max Deferred, unbound shuffle, voice, rate and default recall. Show authored card/step/text/state and empty/error outcomes.
 2. `js/study.js` adapts Stage 5 selection/completion to the original `ReviewController`. A REVIEW pass keeps ordered units; AUDIT repeats refreshed eligible cycles. Questions, full recall waits and complete answers progress without extra gestures. Native `BrowserSpeech` remains the only desktop speech adapter.
 3. Extend that controller with asynchronous prepare/commit/cycle hooks, retained in-flight work across pauses, exact Unicode text segments and long timer chaining. Preserve all original controls/cancellation tests. Commit only after the entire answer; retry the identical receipt/time without replaying an already finished answer.

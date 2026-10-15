@@ -17,6 +17,12 @@ The owner successfully played a newly authored Delaware flashcard on the home de
 
 If the series is missing, check the Chrome profile and exact website address first. Another computer, profile, localhost, or Android has a separate library. This release does not copy data between them.
 
+## Compact player layout
+
+**Choose a Session** sits above the full-width flashcard panel. It opens expanded, collapses on Start/Restart, and stays collapsed after Stop or completion. Click its heading to inspect it at any time; opening/closing it never interrupts audio. Active session settings remain locked until Stop. Playback controls are grouped beneath the mastery buttons in the flashcard panel.
+
+Small **?** buttons provide short contextual help. Hover or focus to read; move away or leave focus to dismiss. Click/tap toggles help, and Escape closes it. Errors, confirmation prompts, pending choices and saved results remain visible outside help.
+
 ## Activities and controls
 
 **REVIEW:** Due now, whole-number N-day lookahead, or Max Deferred. A card qualifies only through its final step; each retained step must qualify within the same cutoff. BOUND cards stay ordered. Randomization affects only UNBOUND cards, never steps. A finished due step restarts its current interval. An early step keeps its original dates even if its due time passes during that step. Playing never raises mastery automatically.
@@ -26,12 +32,23 @@ If the series is missing, check the Chrome profile and exact website address fir
 | Control | Behavior |
 |---|---|
 | Pause / Resume | Pause cancels speech. Resume repeats just the interrupted segment; completed earlier segments remain complete. Recall resumes its remaining time. |
+| Skip Step | Interrupts the current eligible step without credit, discards its pending mastery, and starts the next eligible step or card. Paused navigation stays paused. |
+| Previous Step | Restarts the previous eligible step in this card from its question. Disabled on the first eligible step; never crosses backward into another card. Earlier saved progress stays intact. |
+| Repeat Current Step | Loops the full question, recall and answer. Uncheck to finish this repetition and then advance. Pause/Resume keeps its usual meaning. |
 | Skip flashcard | Cancels the unfinished step and skips all remaining steps in that card; already completed steps retain credit. Paused Skip stays paused. |
 | Stop | Cancels the unfinished attempt, drops its pending mastery and releases the library after any already-started valid save finishes. |
 | Restart session | Stops and reloads currently eligible cards using the previous settings. Prior completion credit remains; newly scheduled steps may no longer be due. |
 | Resume / retry after an error | Speech errors repeat the failed segment. Scheduling errors retry the same completed step without replaying its answer or double-counting it. |
 
 Long text is split into small utterances without rewriting or dropping characters; slight pauses between segments are possible. There is no 120-second recall limit on desktop. Chrome can still delay speech/timers when hidden or suspended; keep the computer awake. A segment missing its completion callback for 120 seconds causes a visible error, never guessed credit. Offline use of a voice and background reliability require listening tests; offline cold launch is not implemented.
+
+### Repetition and replay safety
+
+After the first successful completion of a selected step in a session, further repetitions and Previous Step replays use the existing practice completion mode, without automatic review credit or repeated due-date changes. The current session remembers successfully completed card/step identities; the normal REVIEW selection and order are unchanged. A selected step made KNOWN during this pass may also be revisited as practice. This does not add KNOWN material to a new REVIEW selection.
+
+A new explicit mastery choice during practice applies once after the next complete answer, using the existing scheduling API and receipt rules. It does not reapply an earlier choice or move the original last-reviewed timestamp. AUDIT continues to make no automatic changes. Navigation during an already-started completion write waits for that write (step buttons are disabled); it cannot undo legitimately committed work.
+
+Repeat resets on Skip Step, Previous Step, Skip Flashcard, Stop, Restart and special resets. It never follows you to another card. Navigation discards unfinished pending choices and late speech callbacks. Restart creates a new eligible session, keeping saved progress.
 
 ## Change mastery while listening
 
@@ -43,7 +60,7 @@ Tab into the radio group; arrow keys select adjacent levels, Home selects 0 and 
 
 Final-step KNOWN asks for confirmation of the whole card, or the entire BOUND series for its final card. Audio pauses for that dialog and continues afterward if it had been playing; an already paused session stays paused. Cancel keeps the prior saved/pending choice. A stopped or skipped step cannot receive a late confirmation. Ordinary AUDIT still makes no automatic mastery or scheduling changes.
 
-**Reset FC** confirms resetting every step of this card to 0, due in 15 minutes. **I know this for sure** confirms making the card KNOWN and available through AUDIT; the final BOUND card propagates this to its entire series. These actions are immediate explicit changes after confirmation, not speech-completion credit. Playback remains paused and moves past that card. Cancelling instead restarts the interrupted step on Resume, with its pending adjustment discarded.
+**Reset FC** confirms resetting every step of this card to 0, due in 15 minutes. It is an immediate explicit change after confirmation, not speech-completion credit. Playback remains paused and moves past that card. Cancel restarts the interrupted step on Resume, with its pending adjustment discarded. The redundant “I know this for sure” button is removed; use mastery 10 with its existing card/series confirmation rules.
 
 During AUDIT, **Reset final step only** preserves earlier KNOWN steps; **Reset entire flashcard / objective** resets the whole card, or the entire series when auditing its final BOUND card. Confirmations identify the scope. Reset targets disappear from later AUDIT cycles.
 
@@ -58,7 +75,7 @@ Close/reload SR tabs that were open before this update; old pages lack the new c
 Report the date, Chrome version, voice, recall settings, and observations:
 
 - Hear your actual Delaware wording and eligible steps in order on the live site, with correct pauses and automatic progression. Confirm its text is unchanged in the editor.
-- Exercise Pause/Resume during question, recall and answer; Stop, paused Skip and Restart. Confirm silence after Stop and no overlapping/stale narration.
+- Exercise Pause/Resume during question, recall and answer; Skip Step, Previous Step, Repeat, Stop, paused Skip Flashcard and Restart. Check that repeats do not keep moving due dates and that a new mastery choice saves only once. Confirm silence after Stop and no overlapping/stale narration.
 - Check due REVIEW advances dates only after an answer; lookahead early REVIEW preserves dates; AUDIT repeats final steps without automatic changes. Test mastery/reset confirmations on content you intend to change, or a separately created disposable test library.
 - Try a long answer and a saved recall override above 120 seconds. Confirm full duration/wording and controls; automatic synthetic timing tests do not prove sound.
 - Record preferred/fallback availability and any stalls in a background tab. Earlier G1/G2 long-run/device checks remain separate.

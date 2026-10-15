@@ -167,6 +167,59 @@ test('Stop during an outstanding KNOWN confirmation cannot queue or resume anoth
   const pending = f.session.pendingMastery(10, () => new Promise(resolve => { approve = resolve; }));
   await f.session.stop(); approve(true); await pending; equal(f.session.snapshot.status, 'stopped'); equal(f.synth.current, null); equal(row(await f.read(), 'a1').mastery, 0);
 });
+for (const phase of ['question', 'recall', 'answer']) {
+  test(`Skip Step during ${phase} discards pending work without credit and ignores late speech`, async () => {
+    const f = await fixture(); await start(f); if (phase === 'recall') await question(f); if (phase === 'answer') await answer(f);
+    await f.session.pendingMastery(8); const late = f.synth.current?.onend; f.session.setRepeat(true); f.session.skipStep(); late?.(); await until(() => f.synth.current && f.session.snapshot.step.id === 'a1');
+    equal((await f.read()).stepEvents.length, 0); equal(row(await f.read()).mastery, 0); equal(f.session.snapshot.pending, undefined); equal(f.session.snapshot.repeatCurrent, false);
+    f.session.skipStep(); await until(() => f.synth.current && f.session.snapshot.card.id === 'b'); equal(f.session.snapshot.step.id, 'b0'); equal(f.synth.overlaps, 0);
+  });
+  test(`Previous Step during ${phase} restarts previous question, preserves credit and discards interrupted choice`, async () => {
+    const f = await fixture(); await start(f); await step(f); const before = await f.read();
+    if (phase === 'recall') await question(f); if (phase === 'answer') await answer(f);
+    await f.session.pendingMastery(9); const late = f.synth.current?.onend; f.session.previousStep(); late?.(); await until(() => f.synth.current && f.session.snapshot.step.id === 'a0');
+    equal(f.session.snapshot.phase, 'question'); equal(f.session.snapshot.pending, undefined); await step(f);
+    equal(contentKey(await f.read()), contentKey(before)); equal(f.session.snapshot.step.id, 'a1'); equal(f.synth.overlaps, 0);
+  });
+}
+test('Previous never crosses cards and paused navigation stays paused', async () => {
+  const f = await fixture(); await start(f); const utterance = f.synth.current; f.session.previousStep(); equal(f.synth.current, utterance);
+  f.session.pause(); f.session.skipStep(); equal(f.session.snapshot.status, 'paused'); equal(f.session.snapshot.step.id, 'a1'); f.session.previousStep(); equal(f.session.snapshot.step.id, 'a0'); equal(f.synth.current, null);
+  f.session.skip(); equal(f.session.snapshot.card.id, 'b'); f.session.previousStep(); equal(f.session.snapshot.card.id, 'b'); equal(f.session.snapshot.step.id, 'b0');
+});
+test('Repeat is full practice after first success, uncheck advances only after current answer', async () => {
+  const f = await fixture(); await start(f); f.session.setRepeat(true); await step(f); const first = await f.read();
+  for (let i = 0; i < 3; i++) { equal(f.session.snapshot.step.id, 'a0'); await step(f); equal(contentKey(await f.read()), contentKey(first)); }
+  equal(f.synth.spoken.filter(text => text.includes('a question 0')).length, 5);
+  await answer(f); f.session.setRepeat(false); equal(f.session.snapshot.step.id, 'a0'); f.synth.end(); await until(() => f.synth.current && f.session.snapshot.step.id === 'a1'); equal(contentKey(await f.read()), contentKey(first));
+});
+test('A fresh mastery choice during repeat commits once without duplicate automatic credit', async () => {
+  const f = await fixture(); await start(f); f.session.setRepeat(true); await step(f); const first = await f.read();
+  await f.session.pendingMastery(7); await step(f); const changed = await f.read(); equal(row(changed).mastery, 7); equal(row(changed).lastReviewedAt, row(first).lastReviewedAt); equal(changed.stepEvents.length, 2);
+  await step(f); equal(contentKey(await f.read()), contentKey(changed)); await f.session.pendingMastery(10); await step(f); equal(row(await f.read()).mastery, 10); equal(f.session.snapshot.step.id, 'a0');
+});
+test('Repeat preserves recall Pause/Resume and clears on navigation, Stop and Restart', async () => {
+  const f = await fixture(); await start(f); f.session.setRepeat(true); await question(f); f.clock.tick(300); f.session.pause(); f.clock.tick(9999); f.session.resume(); f.clock.tick(699); equal(f.synth.current, null); f.clock.tick(1); await until(() => f.synth.current); f.synth.end(); await until(() => f.synth.current); equal(f.session.snapshot.step.id, 'a0');
+  f.session.skipStep(); await until(() => f.synth.current); equal(f.session.snapshot.repeatCurrent, false); f.session.setRepeat(true); f.session.previousStep(); await until(() => f.synth.current); equal(f.session.snapshot.repeatCurrent, false);
+  f.session.setRepeat(true); f.session.skip(); await until(() => f.synth.current); equal(f.session.snapshot.repeatCurrent, false);
+  f.session.setRepeat(true); await f.session.stop(); equal(f.session.snapshot.repeatCurrent, false); await start(f); f.session.setRepeat(true); await f.session.restart(); await until(() => f.synth.current); equal(f.session.snapshot.repeatCurrent, false);
+});
+test('AUDIT repeat never schedules; repeated final KNOWN still requires confirmation', async () => {
+  const f = await fixture(); await alter(f, s => s.stepProgress.forEach(p => { p.mastery = 10; p.nextDueAt = null; })); const before = await f.read();
+  await start(f, { mode: 'AUDIT' }); f.session.setRepeat(true); for (let i = 0; i < 3; i++) await step(f); equal(contentKey(await f.read()), contentKey(before));
+  let message; await f.session.pendingMastery(10, text => { message = text; return false; }); check(message.includes('entire BOUND series')); await step(f); equal(contentKey(await f.read()), contentKey(before));
+});
+test('Previous can practice a selected step made KNOWN by final-step propagation without credit', async () => {
+  const f = await fixture(); await start(f); f.session.skipStep(); await until(() => f.synth.current && f.session.snapshot.step.id === 'a1');
+  f.session.setRepeat(true); await f.session.pendingMastery(10, () => true); await step(f); const before = await f.read();
+  f.session.previousStep(); await until(() => f.synth.current && f.session.snapshot.step.id === 'a0'); await step(f); equal(contentKey(await f.read()), contentKey(before));
+});
+test('Navigation cannot abandon an in-flight successful completion write', async () => {
+  const f = await fixture(); await start(f); const finish = f.session.completion.finish.bind(f.session.completion); let release;
+  f.session.completion.finish = async (...args) => { await new Promise(resolve => { release = resolve; }); return finish(...args); };
+  await answer(f); f.synth.end(); await until(() => f.session.snapshot.phase === 'commit'); f.session.skipStep(); f.session.previousStep(); equal(f.session.snapshot.phase, 'commit');
+  release(); await until(() => f.synth.current); equal((await f.read()).stepEvents.length, 1); equal(f.session.snapshot.step.id, 'a1');
+});
 test('Receipt write failure rolls back; Resume retries without replaying answer or duplicating a committed receipt', async () => {
   const f = await fixture(); await start(f); await answer(f); const before = await f.read(), original = IDBObjectStore.prototype.add;
   IDBObjectStore.prototype.add = function (...args) { if (this.name === 'stepEvents') throw new DOMException('Test quota', 'QuotaExceededError'); return original.apply(this, args); };

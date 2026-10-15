@@ -1,5 +1,39 @@
 # SR — Test results
 
+## Desktop player layout and step navigation — 2026-10-14
+
+**Implementation and available automated checks PASS; audible interaction requires owner verification.** Based on main `bec67139d1ab259fed524cd5a1b8fb21aa9a653e`. Web player only; no Android application, schema, backup format, shared scheduler or editor changes.
+
+### Changes
+
+`index.html`, `player.css` and `js/player.js` provide vertical panels, initially expanded settings that collapse on Start, full-width flashcard/mastery/playback controls, Previous Step, Skip Step, Repeat Current Step and hover/focus/click help. The redundant KNOWN action is removed; mastery 10 and Reset FC retain their safeguards. Settings remain locked during playback and can be inspected without interrupting speech.
+
+`js/review.js` cancels interrupted speech/timers and discards pending choices on navigation. Previous stays within the current card and navigation preserves a manual pause. Repeat resets on navigation, Stop and Restart. Step navigation is unavailable during an atomic completion write. `js/study.js` uses the existing FOCUSED completion path for replayed REVIEW steps, preserving saved credit without automatically rescheduling practice; new explicit mastery choices still save once after a completed answer. AUDIT remains unchanged.
+
+`tests/study.test.js` and `tests/study.mjs` extend the existing harness. PLAYBACK, SPECIFICATION and BUILD_PLAN document these behaviors. The only non-SR change is a minimal `.github/workflows/sr-android.yml` guard: commits containing `[web-only]` skip Android build/publication, allowing this web deployment without an APK. Pages remains independent.
+
+### Executed tests
+
+**310/310 distinct scenarios PASS**, including 13 new domain and 4 new UI scenarios. Windows, Node 24.19.0, Chrome 155.0.0.0, JDK 17.0.20.1. Tests use synthetic libraries and disposable databases/profiles; speech is simulated and no owner library is accessed.
+
+| Coverage | Pass |
+|---|---:|
+| Desktop study domain / UI | 50 + 15 |
+| Original speech / shared plan / release / native engine | 33 + 6 + 6 + 16 |
+| Persistence / editor / mastery domain / mastery UI | 38 + 17 + 40 + 7 |
+| Authored native/focus/document / native integration / mobile UI | 28 + 13 + 6 |
+| Desktop/Android Data workflow | 35 |
+
+New checks cover Skip/Previous during question, recall and answer; stale callbacks; pending-choice cancellation; no cross-card Previous; full repeat cycles and unchecking; pause/resume; Stop/Skip/Restart reset; fresh mastery during practice; no duplicate scheduling; KNOWN propagation and replay of a selected step made KNOWN by propagation; commit-phase navigation protection; panel collapse and control placement; tooltip hover/focus/Escape/click/keyboard; responsive layout and keyboard controls. Existing regressions pass. Workflow `actionlint` passes. Chrome screenshots were inspected for expanded settings and collapsed playback at desktop and narrow widths; layout tests cover 1440, 900 and 390 pixels.
+
+Reproduce using the full-suite commands below. The study runner now executes 50 domain and 15 UI scenarios: start `node SR/tests/serve.mjs`, then `node SR/tests/study.mjs` with SR_PLAYWRIGHT/SR_BROWSER configured as below. Set `SR_TEST_URL=https://crownandcall.com/SR` to verify deployment with isolated data.
+
+### Owner verification and deployment
+
+Publication and live-site verification are pending at this implementation commit; results will be recorded after deployment. No APK should be published for this task.
+
+Open [the desktop player](https://crownandcall.com/SR/) in Chrome and reload after deployment. With material you intend to review, start and confirm settings collapse. Expand them during audio, then try Skip Step and Previous during question, recall and answer. Repeat through several full cycles, pause/resume, uncheck and confirm advancement. Select new mastery during repetition and verify a single saved change. Check Stop/Restart clearing Repeat, final-step KNOWN confirmation, and keyboard or touch help. Audible cancellation/resumption, physical touch behavior and assistive-technology announcements remain owner checks; simulated speech does not certify these. Earlier acceptance gates retain their separately recorded status.
+
 ## Desktop one-click mastery — 2026-10-14
 
 **Implementation and automated checks PASS; updated audible interaction still needs owner verification.** Authorized desktop Stage 6 usability correction only, based on main `0462891`. No shared scheduling/storage code, Android controls/native playback/Data, editor, standalone mastery page, schema, backup format or signing configuration changed.

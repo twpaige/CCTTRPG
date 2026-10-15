@@ -28,7 +28,7 @@ function masteryDisplay(state, token) {
   $('pending').textContent = state.pending === undefined ? 'No pending mastery change.'
     : `Mastery ${state.pending} selected — ${state.pending === 10 ? 'KNOWN; excluded from normal REVIEW.' : `Next review in ${INTERVAL_LABELS[state.pending]}.`} Applies after the answer finishes.`;
   if (saved) $('current-progress').textContent = token.masterySaved ? `Mastery ${current} saved after the successful answer.`
-    : `Saved mastery ${saved.mastery} · ${saved.nextDueAt === null ? 'KNOWN' : `Due ${new Date(saved.nextDueAt).toLocaleString()}`}. ${token.prepared.wasDue && state.mode === 'REVIEW' ? 'Successful answer restarts the interval.' : 'No automatic schedule change for this step.'}`;
+    : `Saved mastery ${saved.mastery} · ${saved.nextDueAt === null ? 'KNOWN' : `Due ${new Date(saved.nextDueAt).toLocaleString()}`}. ${token.prepared.wasDue && token.prepared.mode === 'REVIEW' ? 'Successful answer restarts the interval.' : 'No automatic schedule change for this step.'}`;
   else $('current-progress').textContent = '';
   $('mastery-saved').textContent = state.masterySaved ? `Saved mastery ${state.masterySaved.level} — ${state.masterySaved.card}, step ${state.masterySaved.step}.` : '';
 }
@@ -46,6 +46,7 @@ function preview() {
   if (!library) return;
   try {
     const settings = options(), units = audit ? selectAudit(library, settings) : selectReview(library, settings);
+    $('session-summary').textContent = `${settings.mode} · ${$('series').selectedOptions[0]?.textContent || 'ALL series'}`;
     $('selection').textContent = units.length ? `${settings.mode}: ${units.length} flashcards, ${units.reduce((sum, unit) => sum + unit.stepIds.length, 0)} steps. Selection refreshes at Start.`
       : `${settings.mode}: no eligible cards. ${audit ? 'AUDIT requires KNOWN material.' : 'Try lookahead or Max Deferred to include future-due material; KNOWN is excluded.'}`;
   } catch (reason) { $('selection').textContent = reason.message; }
@@ -59,6 +60,11 @@ function render(state = session?.snapshot || { status: 'idle' }) {
   $('pause').disabled = busy || state.status !== 'playing';
   $('resume').disabled = busy || !['paused', 'error'].includes(state.status) || !active;
   $('skip').disabled = busy || !active || !state.card;
+  const navigating = active && !!state.step && state.phase !== 'commit';
+  $('skip-step').disabled = busy || !navigating;
+  $('previous-step').disabled = busy || !navigating || state.stepIndex === 0;
+  $('repeat-step').disabled = busy || !active || !state.step;
+  $('repeat-step').checked = !!state.repeatCurrent;
   $('stop').disabled = busy || !active;
   $('restart').disabled = busy || !session?.options;
   const unfinished = active && ['playing', 'paused', 'error'].includes(state.status) && ['question', 'recall', 'answer'].includes(state.phase) && !!session?.completion.current;
@@ -115,15 +121,37 @@ $('levels').onkeydown = event => {
 };
 for (const id of ['mode', 'series', 'window', 'days', 'random', 'recall', 'rate']) $(id).onchange = preview;
 $('voice').onchange = () => render();
-$('start').onclick = () => run(() => session.start(options()));
+$('start').onclick = () => run(async () => { await session.start(options()); if (session.options) $('session-panel').open = false; });
 $('pause').onclick = () => session.pause();
 $('resume').onclick = () => { $('error').textContent = ''; session.resume(); };
 $('skip').onclick = () => { $('error').textContent = ''; session.skip(); };
+$('skip-step').onclick = () => { $('error').textContent = ''; session.skipStep(); };
+$('previous-step').onclick = () => { $('error').textContent = ''; session.previousStep(); };
+$('repeat-step').onchange = () => session.setRepeat($('repeat-step').checked);
 $('stop').onclick = () => run(async () => { await session.stop(); await load(); });
-$('restart').onclick = () => run(() => session.restart());
+$('restart').onclick = () => run(async () => { await session.restart(); $('session-panel').open = false; });
 $('reload').onclick = () => run(load);
-for (const [id, type] of [['reset', 'resetCard'], ['known', 'known'], ['reset-final', 'resetFinal'], ['reset-objective', 'resetObjective']])
+for (const [id, type] of [['reset', 'resetCard'], ['reset-final', 'resetFinal'], ['reset-objective', 'resetObjective']])
   $(id).onclick = () => run(() => session.special(type, message => confirm(message)));
+for (const [index, button] of [...document.querySelectorAll('.help-toggle')].entries()) {
+  const fieldset = button.closest('fieldset');
+  if (fieldset) { const legend = fieldset.querySelector('legend'); legend.classList.remove('sr-only'); legend.append(' ', button); }
+  const tip = document.createElement('span'); tip.className = 'help-tip'; tip.id = `help-${index}`; tip.role = 'tooltip'; tip.hidden = true; tip.textContent = button.dataset.help;
+  document.body.append(tip); button.setAttribute('aria-describedby', tip.id); button.setAttribute('aria-expanded', 'false');
+  let pinned = false;
+  const show = () => {
+    tip.hidden = false; button.setAttribute('aria-expanded', 'true');
+    const rect = button.getBoundingClientRect();
+    tip.style.left = Math.max(8, Math.min(rect.left, innerWidth - tip.offsetWidth - 8)) + 'px';
+    tip.style.top = Math.max(8, Math.min(rect.bottom + 6, innerHeight - tip.offsetHeight - 8)) + 'px';
+  };
+  const hide = () => { pinned = false; tip.hidden = true; button.setAttribute('aria-expanded', 'false'); };
+  button.addEventListener('mouseenter', show); button.addEventListener('mouseleave', () => { if (!pinned) hide(); });
+  button.addEventListener('focus', show); button.addEventListener('blur', hide);
+  button.addEventListener('click', () => { pinned = !pinned; if (pinned) show(); else hide(); });
+  button.addEventListener('keydown', event => { if (event.key === 'Escape') { event.preventDefault(); hide(); } });
+  window.addEventListener('scroll', () => { if (!tip.hidden) show(); }, { passive: true });
+}
 $('refresh-voices').onclick = () => watcher?.refresh();
 window.addEventListener('pagehide', () => { clearTimeout(countdown); watcher?.dispose(); void session?.stop().finally(() => db?.close()); });
 window.addEventListener('pageshow', event => { if (event.persisted) location.reload(); });
