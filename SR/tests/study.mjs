@@ -10,7 +10,7 @@ const profile = await mkdtemp(join(tmpdir(), 'sr-study-test-'));
 let context, page, count = 0;
 const pass = text => { console.log(`PASS UI ${text}`); count++; };
 const ready = async () => { await page.waitForFunction(() => !document.getElementById('settings').disabled); if (!await page.locator('#session-panel').evaluate(el => el.open)) await page.locator('#session-panel summary').click(); };
-const phase = value => page.waitForFunction(value => document.getElementById('status').textContent.includes(`· ${value}`), value);
+const phase = value => page.waitForFunction(value => document.getElementById('status').textContent.includes(`· ${value[0].toUpperCase()}${value.slice(1)}`), value);
 const spoken = () => page.waitForFunction(() => !!globalThis.testSynth.current);
 const end = () => page.evaluate(() => testSynth.end());
 const press = id => page.locator(`#${id}`).click();
@@ -69,7 +69,7 @@ try {
   after = await read(); assert(after.stepProgress.filter(r => ['a', 'b'].includes(r.flashcardId)).every(r => r.mastery === 10)); assert.equal(after.stepEvents.length, 2);
   pass('paused Skip preserves prior credit and confirmed final-step KNOWN propagates BOUND series');
   await page.locator('#mode').selectOption('AUDIT'); await press('start'); await spoken(); assert.match(await page.evaluate(()=>testSynth.spoken.at(-1)), /b question/);
-  const audit = await read(); await end(); await phase('answer'); await end(); await spoken(); await page.waitForFunction(() => document.getElementById('status').textContent.includes('cycle 2'));
+  const audit = await read(); await end(); await phase('answer'); await end(); await spoken(); assert.match(await page.locator('#status').textContent(), /AUDIT · States \(synthetic\) · Card 2\/2 · Step 3\/3 · Question/);
   assert.deepEqual((await read()).stepProgress, audit.stepProgress); assert.deepEqual((await read()).stepEvents, audit.stepEvents);
   await confirm('reset-final', true, /change 1 steps/); await phase('paused'); await press('resume'); await spoken(); assert.match(await page.evaluate(()=>testSynth.spoken.at(-1)), /a question/); await press('stop'); await ready();
   pass('continuous AUDIT makes no automatic writes and refreshes reset-final eligibility');
@@ -106,7 +106,7 @@ try {
   await press('level-9'); await press('stop'); await ready(); assert.equal((await read()).stepProgress.find(r=>r.stepId==='b0').mastery,0);
   pass('Stop and playing Skip discard selection without leaking into the next step');
   await fresh(); await end(); await phase('answer'); await end(); await spoken(); await page.waitForFunction(() => testSynth.current?.text.includes('question 1'));
-  await confirm('level-10', false, /2 steps across 1 flashcards/); await spoken(); assert.match(await page.locator('#status').textContent(), /playing/); assert.equal(await page.locator('#level-0').getAttribute('aria-checked'),'true');
+  await confirm('level-10', false, /2 steps across 1 flashcards/); await spoken(); assert.match(await page.locator('#status').textContent(), /Question/); assert.equal(await page.locator('#level-0').getAttribute('aria-checked'),'true');
   await confirm('level-10', true, /2 steps across 1 flashcards/); await spoken(); await end(); await phase('answer'); await end(); await spoken(); await page.waitForFunction(() => testSynth.current?.text.includes('b question'));
   after=await read(); assert(after.stepProgress.filter(r=>r.flashcardId==='a').every(r=>r.mastery===10)); assert(after.stepProgress.filter(r=>r.flashcardId==='b').every(r=>r.mastery===0));
   for(let i=0;i<2;i++){ await end(); await phase('answer'); await end(); await spoken(); await page.waitForFunction(n=>testSynth.current?.text.includes('question '+(n-1)),i+2); }
@@ -175,5 +175,32 @@ try {
     for(const width of [1440,900,390]) { await page.setViewportSize({width,height:1000}); await page.screenshot({path:join(process.env.SR_PLAYER_SCREENSHOTS,`compact-expanded-${width}.png`),fullPage:true}); await page.locator('#session-panel summary').click(); await page.screenshot({path:join(process.env.SR_PLAYER_SCREENSHOTS,`compact-collapsed-${width}.png`),fullPage:true}); await page.locator('#session-panel summary').click(); }
   }
   assert.deepEqual(errors, []); pass('saved voice/rate/recall retained without overwriting preferences; summary follows window/activity changes');
+  await fresh(); await press('stop'); await ready();
+  await page.evaluate(async ({name,original})=>{
+    const {openDatabase}=await import('./js/db.js'); const {restoreJSON,exportJSON}=await import('./js/backup.js'); const db=await openDatabase({name});
+    try { for(const id of ['a1','b0']) { const row=original.stepProgress.find(p=>p.stepId===id); row.mastery=10; row.nextDueAt=null; }
+      original.flashcards.find(c=>c.id==='b').steps[1].recallSeconds=2.2;
+      await restoreJSON(db,JSON.stringify(original),{confirmed:true,safetyJSON:await exportJSON(db)});
+    } finally { db.close(); }
+  },{name,original:before});
+  await page.reload(); await ready(); await page.evaluate(()=>testVoices()); await page.locator('#series').selectOption('bound'); await page.locator('#recall').fill('0');
+  await press('start'); await spoken();
+  const prefix='REVIEW · States (synthetic) · Card 2/2 · Step 2/3 · ';
+  assert.equal(await page.locator('#status').textContent(),prefix+'Question'); await end(); await phase('recall');
+  assert.equal(await page.locator('#status').textContent(),prefix+'Recall: 3 seconds remaining');
+  await page.waitForFunction(()=>document.getElementById('status').textContent.endsWith('Recall: 2 seconds remaining'));
+  await press('pause'); const frozen=await page.locator('#status').textContent(); assert.match(frozen,/Paused \(Recall: [12] seconds remaining\)$/);
+  await new Promise(resolve=>setTimeout(resolve,1100)); assert.equal(await page.locator('#status').textContent(),frozen);
+  for(const width of [1440,390]) { await page.setViewportSize({width,height:1000}); assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)); if(process.env.SR_PLAYER_SCREENSHOTS) await page.screenshot({path:join(process.env.SR_PLAYER_SCREENSHOTS,`status-${width}.png`),fullPage:true}); }
+  await press('resume'); await phase('recall'); await phase('answer'); assert.equal(await page.locator('#status').textContent(),prefix+'Answer');
+  await press('skip-step'); await spoken(); assert.match(await page.locator('#status').textContent(),/Card 2\/2 · Step 3\/3 · Question$/);
+  await press('previous-step'); await spoken(); assert.equal(await page.locator('#status').textContent(),prefix+'Question');
+  pass('authored positions in filtered UI, custom live countdown freezes/resumes, navigation and responsive status');
+  await page.evaluate(()=>testSynth.current.onerror({error:'test failure'})); await phase('error'); assert.equal(await page.locator('#status').textContent(),prefix+'Error'); assert(await page.locator('#error').isVisible());
+  await press('stop'); await ready(); assert.equal(await page.locator('#status').textContent(),prefix+'Stopped');
+  await press('restart'); await spoken(); assert.equal(await page.locator('#status').textContent(),prefix+'Question');
+  await end(); await phase('answer'); await end(); await spoken(); assert.match(await page.locator('#status').textContent(),/Step 3\/3 · Question$/);
+  await end(); await phase('answer'); await end(); await ready(); assert.equal(await page.locator('#status').textContent(),'REVIEW · Completed');
+  assert.deepEqual(errors,[]); pass('Error, Stopped, Restart and Completed status preserve error details and actual playback');
   console.log(`${results.length}/${results.length} Stage 6 domain scenarios + ${count}/${count} UI scenarios. ${await page.evaluate(() => navigator.userAgent)}. Simulated speech; no audible claim.`);
 } finally { await context?.close(); assert.equal(dirname(profile), tmpdir()); assert(profile.includes('sr-study-test-')); await rm(profile, { recursive: true, force: true }); }

@@ -2,6 +2,7 @@ import { openDatabase } from './db.js';
 import { exportSnapshot } from './backup.js';
 import { BrowserSpeech } from './speech.js';
 import { StudySession } from './study.js';
+import { playbackStatus } from './player-status.js';
 import { englishVoices, selectVoice, voiceKey, watchVoices, PREFERRED_VOICE } from './voices.js';
 import { INTERVAL_LABELS, selectReview, selectAudit } from './scheduler.js';
 const $ = id => document.getElementById(id);
@@ -72,8 +73,7 @@ function render(state = session?.snapshot || { status: 'idle' }) {
   $('audit-actions').hidden = state.mode !== 'AUDIT';
   if (state.starting) $('status').textContent = 'Preparing session…';
   else if (state.status === 'idle') $('status').textContent = selectVoice(inventory, $('voice').value) ? 'Ready' : ($('voice-note').textContent || 'Waiting for English voices…');
-  else if (state.status === 'finished') $('status').textContent = `${state.mode} complete — no eligible cards remain.`;
-  else $('status').textContent = `${state.mode} · ${state.status} · ${state.phase}${state.mode === 'AUDIT' ? ` · cycle ${state.cycle}` : ''}${state.phase === 'recall' ? ` · ${Math.ceil(state.remainingMs / 1000)} seconds remaining` : ''}`;
+  else $('status').textContent = playbackStatus(state, library);
   if (state.error) error(`${state.error} Resume / retry retries this operation. Stop releases the library; make a backup before attempting recovery.`);
   masteryDisplay(state, session?.completion.current);
 }

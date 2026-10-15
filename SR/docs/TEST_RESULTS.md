@@ -1,5 +1,21 @@
 # SR — Test results
 
+## Detailed web playback status — 2026-10-14
+
+**Implementation and automated checks PASS; owner listening comparison remains optional verification.** Baseline `0c09ac5498f109f289ac3a85a74ed2c41cf2a5b3`. Presentation only: no audio controller, scheduling, selection, navigation, repetition, database, JSON, voice or Android changes.
+
+`js/player-status.js` formats Activity / actual series name / authored card position and series total / authored step position and full card total / phase from the existing library snapshot and controller state. `js/player.js` renders it in the existing bottom status element. The existing once-per-second display refresh observes `remainingMs`; no playback timers were added. Recall rounds up, clamps negative values, freezes on Pause and follows Resume. Preparation/save/error/end states remain explicit. No question/answer text or help UI restored; no layout or framework changes needed. PLAYBACK documents these semantics.
+
+**327/327 distinct automated scenarios PASS:** study 62 domain + 20 UI; original speech 33; persistence 38; editor 17; mastery 40 + 7 UI; Data 35; shared plan 6; release 6; native executor 16; authored native/focus/document 28; native integration 13 + mobile UI 6. Lifecycle, offline persistence and transaction-close regressions also pass. Windows, Node 24.19.0, Chrome 155.0.0.0, JDK 17.0.20.1. Synthetic libraries and disposable profiles only; no owner data accessed and speech simulated.
+
+`tests/study.test.js` adds four grouped cases covering authored positions through filtered REVIEW, AUDIT, shuffled UNBOUND and multiple series; Previous/Next navigation and both repeats; custom 4.2-second recall with exact injected-clock pause/resume; nonnegative rounded countdown; Stop/Restart/Completed/Error. `tests/study.mjs` adds two Chrome cases for filtered card/step totals, real display countdown using a 2.2-second custom recall, paused freeze, resume, navigation, error details, Stop/Restart/completion and responsive wrapping. Existing status assertions were updated for the requested labels. A new test initially expected due-only Restart to retain already-reviewed cards; corrected its setup to Max Deferred, preserving the existing eligibility behavior. Final run passes. Desktop and 390px paused-status screenshots inspected in Chrome.
+
+Reproduce with the full-suite commands below; `node SR/tests/study.mjs` now runs 62 domain + 20 UI scenarios. The same runner supports `SR_TEST_URL=https://crownandcall.com/SR` for deployed verification. Optional `SR_PLAYER_SCREENSHOTS` captures the status at 1440px and 390px in an existing output directory.
+
+Deployment/live checks pending this implementation commit. The existing `[web-only]` commit guard will skip Android build and publication.
+
+Owner check: reload [the player](https://crownandcall.com/SR/), listen while navigating/repeating, and compare the displayed series/card/step positions with authored order. Confirm recall and paused countdown agree with audible playback. Browser tests verify display and simulated timing, not actual audio or screen-reader announcements. Existing acceptance-gate status remains unchanged.
+
 ## Compact web player and flashcard navigation — 2026-10-14
 
 **Implementation and available automated checks PASS; new audible controls await owner listening verification.** Baseline `0a579565454624df0bac0b1157d1dbd2fb200223`. Web-only scope; Android application, schema, backup/import, editor and shared scheduling/mastery APIs unchanged. Historical reports below describe their tested versions, not current UI instructions.

@@ -3,6 +3,7 @@ import { Repository } from '../js/repository.js';
 import { exportSnapshot, exportJSON, restoreJSON, contentKey } from '../js/backup.js';
 import { StudySession, speechParts } from '../js/study.js';
 import { BrowserSpeech } from '../js/speech.js';
+import { playbackStatus } from '../js/player-status.js';
 import { nextDue } from '../js/scheduler.js';
 const check = (ok, message = 'Assertion failed') => { if (!ok) throw new Error(message); };
 const equal = (a, b) => check(JSON.stringify(a) === JSON.stringify(b), `Different values: ${JSON.stringify(a)} / ${JSON.stringify(b)}`);
@@ -352,6 +353,38 @@ test('AUDIT Repeat FC and Previous FC preserve no-automatic-write behavior', asy
   f.session.setRepeatCard(true); const before=await f.read(); for(let i=0;i<3;i++) await step(f);
   equal(f.session.snapshot.card.id,'b'); equal(f.session.cycle,1); equal(contentKey(await f.read()),contentKey(before));
   f.session.setRepeatCard(false); await step(f); equal(f.session.snapshot.card.id,'c'); f.session.previousCard(); await until(()=>f.synth.current); equal(f.session.snapshot.card.id,'b'); equal(contentKey(await f.read()),contentKey(before));
+});
+
+test('Status uses full authored series/card/step positions for filtered REVIEW and AUDIT', async () => {
+  const f = await fixture(); await alter(f, s => { row(s,'a1').mastery=10; row(s,'a1').nextDueAt=null; row(s,'b0').nextDueAt=time+86400000; });
+  const library=await f.read(); await start(f,{seriesId:'bound'});
+  equal(playbackStatus(f.session.snapshot,library),'REVIEW · States (synthetic) · Card 2/2 · Step 2/3 · Question');
+  f.session.skipStep(); await until(()=>f.synth.current); equal(playbackStatus(f.session.snapshot,library),'REVIEW · States (synthetic) · Card 2/2 · Step 3/3 · Question');
+  await f.session.stop(); await alter(f,s=>s.stepProgress.forEach(p=>{p.mastery=10;p.nextDueAt=null;})); await start(f,{mode:'AUDIT'});
+  equal(playbackStatus(f.session.snapshot,await f.read()),'AUDIT · States (synthetic) · Card 2/2 · Step 3/3 · Question');
+});
+test('Status follows authored positions across shuffled cards, series and backward navigation', async () => {
+  const f=await fixture(); await start(f,{random:true}); const library=await f.read();
+  f.session.skip(); await until(()=>f.synth.current); f.session.skip(); await until(()=>f.synth.current);
+  equal(playbackStatus(f.session.snapshot,library),'REVIEW · Unbound (synthetic) · Card 2/2 · Step 1/2 · Question');
+  f.session.skip(); await until(()=>f.synth.current); equal(playbackStatus(f.session.snapshot,library),'REVIEW · Unbound (synthetic) · Card 1/2 · Step 1/1 · Question');
+  f.session.previousCard(); await until(()=>f.synth.current); equal(playbackStatus(f.session.snapshot,library),'REVIEW · Unbound (synthetic) · Card 2/2 · Step 1/2 · Question');
+});
+test('Status observes custom recall, rounded countdown and pause/resume without changing timing', async () => {
+  const f=await fixture(); await alter(f,s=>{s.flashcards[0].steps[0].recallSeconds=4.2;}); await start(f); const library=await f.read(), status=()=>playbackStatus(f.session.snapshot,library);
+  await question(f); check(status().endsWith('Recall: 5 seconds remaining')); f.clock.tick(1000); check(status().endsWith('Recall: 4 seconds remaining'));
+  f.session.pause(); const frozen=status(); check(frozen.endsWith('Paused (Recall: 4 seconds remaining)')); f.clock.tick(9000); equal(status(),frozen);
+  f.session.resume(); f.clock.tick(3199); check(status().endsWith('Recall: 1 seconds remaining')); f.clock.tick(1); await until(()=>f.synth.current); check(status().endsWith('Answer'));
+  check(playbackStatus({...f.session.snapshot,phase:'recall',remainingMs:-1},library).endsWith('Recall: 0 seconds remaining'));
+});
+test('Status follows both repeats, step navigation, Stop, Restart, completion and error', async () => {
+  const f=await fixture(); await start(f,{seriesId:'bound',window:{type:'max'}}); const library=await f.read(), status=()=>playbackStatus(f.session.snapshot,library);
+  f.session.setRepeat(true); await step(f); check(status().includes('Card 1/2 · Step 1/2'));
+  f.session.setRepeatCard(true); await step(f); check(status().includes('Step 2/2')); await step(f); check(status().includes('Step 1/2'));
+  f.session.skipStep(); await until(()=>f.synth.current); check(status().includes('Step 2/2')); f.session.previousStep(); await until(()=>f.synth.current); check(status().includes('Step 1/2'));
+  f.synth.fail(); await until(()=>f.session.snapshot.status==='error'); check(status().endsWith('Error'));
+  await f.session.stop(); check(status().endsWith('Stopped')); await f.session.restart(); await until(()=>f.synth.current); check(status().endsWith('Question'));
+  f.session.skip(); await until(()=>f.synth.current); f.session.skip(); equal(status(),'REVIEW · Completed');
 });
 
 export async function runStudyTests(report = () => {}) {
