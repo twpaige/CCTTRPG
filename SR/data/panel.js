@@ -39,8 +39,13 @@ async function reconcile() {
   if (JSON.parse(native.status()).queuedCount) throw new Error('Completed steps could not be saved. Return to Listening and retry saving queued progress. No import occurred.');
   activeGuard();
 }
-function nativeFile(method, json) {
-  return new Promise((resolve, reject) => { pendingFile = { resolve, reject }; native[method](json); });
+function nativeFile(method, ...args) {
+  return new Promise((resolve, reject) => {
+    pendingFile = { resolve, reject };
+    // WebView resolves Java methods by arity: openBackup() must receive no argument.
+    try { native[method](...args); }
+    catch (error) { pendingFile = undefined; reject(error); }
+  });
 }
 window.addEventListener('sr-file-result', ({ detail }) => {
   if (!pendingFile) return;

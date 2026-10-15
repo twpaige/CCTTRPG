@@ -9,18 +9,31 @@ const { chromium } = createRequire(import.meta.url)(process.env.SR_PLAYWRIGHT ||
 const base = process.env.SR_TEST_URL || 'http://127.0.0.1:8765', profile = await mkdtemp(join(tmpdir(), 'sr-data-test-'));
 let context, count = 0;
 const pass = name => { count++; console.log('PASS ' + name); };
+const activity = await readFile(new URL('../mobile/app/src/main/java/com/crownandcall/srproof/MainActivity.java', import.meta.url), 'utf8');
+const signatures = Object.fromEntries([...activity.matchAll(/@JavascriptInterface public \w+ (\w+)\(([^)]*)\)/g)]
+  .map(([, name, parameters]) => [name, parameters.trim() ? parameters.split(',').map(p => p.trim().split(/\s+/)[0]) : []]));
+assert.deepEqual(signatures.openBackup, []); assert.deepEqual(signatures.saveBackup, ['String']);
+pass('File bridge signatures match annotated Java methods: openBackup(), saveBackup(String)');
 try {
   context = await chromium.launchPersistentContext(profile, { headless: true, executablePath: process.env.SR_BROWSER || undefined });
   for (const android of [false, true]) {
     const page = await context.newPage(), errors = [], name = 'SRLearning-test-data-' + (android ? 'android' : 'desktop');
     page.on('pageerror', e => errors.push(e.message));
     if (!android) await installPickers(page, profile);
-    else await page.addInitScript(() => {
+    else await page.addInitScript(signatures => {
       window.picker = { saved: [], opens: 0, rows: [], state: { serviceRunning: false }, ackFails: false };
       window.SRNative = { status: () => JSON.stringify({ ...picker.state, queuedCount: picker.rows.length }),
         openBackup: () => picker.opens++, saveBackup: json => picker.saved.push(json),
         completions: () => JSON.stringify(picker.rows.slice(0, 32)), acknowledge: id => { if (picker.ackFails || picker.rows[0]?.queueId !== id) return false; picker.rows.shift(); return true; } };
-    });
+      // Android resolves methods by name AND argument count; plain JS mocks accept extra arguments.
+      for (const [name, method] of Object.entries(SRNative)) SRNative[name] = (...args) => {
+        const types = signatures[name];
+        if (!types || args.length !== types.length) throw new Error('Error invoking ' + name + ': Method not found');
+        if (types.some((type, i) => type === 'String' && typeof args[i] !== 'string')) throw new Error('Invalid native String argument');
+        if (picker.throwNext === name) { picker.throwNext = ''; throw new Error('Injected bridge invocation failure'); }
+        return method(...args);
+      };
+    }, signatures);
     await page.goto(base + '/data/index.html?test=' + name);
     const idle = () => page.waitForFunction(() => !document.getElementById('choose-import').disabled);
     await idle();
@@ -44,6 +57,17 @@ try {
       const tx = db.transaction('settings', 'readwrite'); const done = new Promise((resolve, reject) => { tx.oncomplete = resolve; tx.onabort = reject; }); await request(tx.objectStore('settings').put({ key: 'rate', value })); await done;
     } finally { db.close(); } }, { name, value });
     let original = key(await read());
+    if (android) {
+      await page.locator('#choose-import').click();
+      await page.waitForFunction(() => picker.opens === 1 || document.getElementById('error').textContent);
+      assert.equal(await page.locator('#error').textContent(), '');
+      assert.equal(await page.evaluate(() => picker.opens), 1); await emit({ cancelled: true }); await idle();
+      pass('Android import invokes the zero-argument native picker signature');
+      await page.evaluate(() => picker.throwNext = 'openBackup'); await page.locator('#choose-import').click(); await idle();
+      assert.match(await page.locator('#error').textContent(), /Injected bridge invocation failure/);
+      await emit({ json: 'Late result after failed invocation' }); assert.equal(key(await read()), original);
+      pass('Synchronous bridge failure preserves the library and permits retry');
+    }
     assert.equal(await page.locator('#recovery, #migration-backup, #choose-safety, #confirm, #replace, input[type=checkbox]').count(), 0);
     assert.deepEqual(await page.locator('section[aria-label="Backup and import"] button').allTextContents(), ['Save Complete JSON Backup', 'Import JSON Library']);
     await page.setViewportSize({ width: 390, height: 844 }); assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
@@ -94,6 +118,18 @@ try {
     await choose(JSON.stringify(state)); await verified(); assert.deepEqual((await backup()).stepProgress, state.stepProgress); await page.locator('#confirm-import').click(); await idle();
     assert.deepEqual((await read()).stepProgress, state.stepProgress);
     pass(`${name}: version-2 progress round trip with complete outgoing backup`);
+    const beforeExport = key(await read());
+    if (android) {
+      const saved = await page.evaluate(() => picker.saved.length); await page.locator('#export').click();
+      await page.waitForFunction(n => picker.saved.length === n + 1, saved);
+      await emit({ saved: true, verified: true, filename: 'SR-Backup-2026-10-15-1435-1.json' });
+    } else {
+      await writeFile(join(profile, 'backup.json'), ''); await page.locator('#export').click();
+    }
+    await idle(); assert.equal(key(await backup()), beforeExport); assert.equal(key(await read()), beforeExport);
+    assert.match(await page.locator('#preview').textContent(), /Complete Backup Saved Successfully/);
+    assert.match(await page.locator('#backup-status').textContent(), /SR-Backup-.*written and read back/);
+    pass(`${name}: standalone export preserves complete content/progress and reports verified timestamped filename`);
     if (android) {
       await page.evaluate(() => { picker.state.serviceRunning = true; }); const before = key(await read()); await page.locator('#choose-import').click(); await idle(); assert.match(await page.locator('#error').textContent(), /Stop playback/); assert.equal(key(await read()), before); await page.evaluate(() => { picker.state.serviceRunning = false; });
       pass('Android: active native service refused without dropping progress');

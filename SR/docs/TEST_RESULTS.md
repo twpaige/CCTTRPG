@@ -1,5 +1,15 @@
 # SR — Test results
 
+## Android JSON picker bridge correction — 2026-10-15
+
+Owner reported **Error invoking openBackup: Method not found** on Samsung. The native annotated method is present as `openBackup()`; export is `saveBackup(String)`. Shared recovery simplification commit `2b5b51c` replaced the earlier direct zero-argument call with `nativeFile(method, json)`, which always invoked `native[method](json)`. Import therefore supplied one undefined argument to the zero-argument Java method. Method names match; argument count did not. The previous plain JavaScript mock silently accepted extra arguments.
+
+Small shared-helper correction forwards the actual argument list: zero for open, one JSON string for save. Synchronous bridge failure clears the pending callback and follows existing error handling. No native method, picker implementation, library schema/origin, signing identity, scheduling/mastery or playback behavior changes.
+
+Regression evidence: the Data harness now derives method names and parameter types from the annotated Java source and enforces arity/string arguments on every mocked bridge call. Before the fix, this harness failed with the exact reported error; after the fix, **40/40 Data scenarios PASS** (previous 35 plus five checks). Added coverage includes the native file contract, zero-argument import dispatch, invocation failure/retry, and complete standalone desktop/Android export with verified timestamped filename. Existing tests retain automatic outgoing backups, exact snapshot checks, read-back verification failures, cancellation, replacement locks, rollback, v1/v2 JSON conversion/round trips, progress reconciliation and late-completion rejection. Native BackupDocument tests cover timestamp/collision naming, exact UTF-8 write/read-back and refusal to overwrite nonempty files. Browser bridge/pickers/providers are simulated; this is not a physical Samsung import claim.
+
+Full regression and release results will be recorded after verification. Remaining owner check: update the signed APK in place; export a dated backup, import via the Samsung picker, verify the automatic outgoing backup and confirmation, then export/reopen and compare library contents. Check cancellation as well. No uninstall or data clearing is required.
+
 ## Desktop Library Editor cloning — 2026-10-15
 
 Website-only Clone FC (1–10) and Clone Series (exactly one), using saved content and one atomic repository transaction. Copies insert immediately after the original with contiguous integer positions, new identifiers/timestamps, remapped recitation references and mastery-0 progress due in 15 minutes. No existing progress/history is copied or modified. Dirty drafts block cloning. Existing action-row styling and dialogs are reused; the first copy is selected for editing.
