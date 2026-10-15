@@ -33,7 +33,7 @@ export class StudySession {
   async settled() { while (this.operations.size) await Promise.allSettled([...this.operations]); }
   async release() { await this.settled(); const release = this.lease; this.lease = undefined; release?.(); }
   get snapshot() { return { ...(this.controller?.snapshot || { status: 'idle' }), mode: this.options?.mode, cycle: this.cycle,
-    pending: this.completion.current?.pending?.action.level, starting: this.starting }; }
+    pending: this.completion.current?.masterySaved ? undefined : this.completion.current?.pending?.action.level, masterySaved: this.masterySaved, starting: this.starting }; }
   publish() { this.onChange(this.snapshot); }
   select(snapshot) {
     const units = this.options.mode === 'AUDIT' ? selectAudit(snapshot, this.options)
@@ -57,6 +57,7 @@ export class StudySession {
       if (epoch !== this.epoch) { release(); return; }
       this.lease = release;
       this.options = { ...options, window: { ...options.window } };
+      this.masterySaved = undefined;
       this.sessionId = crypto.randomUUID(); this.occurrence = 0; this.cycle = 1;
       const snapshot = await exportSnapshot(this.db);
       if (epoch !== this.epoch) return;
@@ -89,7 +90,16 @@ export class StudySession {
         },
         completeStep: token => {
           token.completedAt ??= this.now();
-          return this.track(this.completion.finish(token, token.completedAt));
+          return this.track(this.completion.finish(token, token.completedAt).then(result => {
+            if (token.pending) {
+              token.masterySaved = true;
+              const card = JSON.parse(token.prepared.expectedKey).flashcards.find(row => row.id === token.prepared.cardId);
+              this.masterySaved = { level: token.pending.action.level, card: card.name,
+                step: card.steps.find(row => row.id === token.prepared.stepId).position + 1 };
+              this.publish();
+            }
+            return result;
+          }));
         },
         nextCycle: options.mode === 'AUDIT' ? () => this.track((async () => {
           const current = await guard(); ++this.cycle; return this.select(current);
@@ -114,15 +124,25 @@ export class StudySession {
   async pendingMastery(level, confirm) {
     const token = this.completion.current;
     if (!token || token.promise || !['question', 'recall', 'answer'].includes(this.controller.phase)) throw new Error('Wait for an unfinished step before choosing mastery.');
-    // Pause before awaiting a confirmation/reading state so audio cannot overtake the choice.
-    this.pause();
-    const snapshot = await exportSnapshot(this.db), { cardId, stepId } = token.prepared;
+    // Use the captured, validated step snapshot: ordinary selection has no async gap
+    // in which an answer callback could advance to a different step.
+    const snapshot = JSON.parse(token.prepared.expectedKey), { cardId, stepId } = token.prepared;
     const plan = planMastery(snapshot, { type: 'step', cardId, stepId, level });
-    const confirmed = plan.confirmation && await confirm(plan.message + ' This pending choice applies only after the entire answer finishes.');
-    if (plan.confirmation && !confirmed) return;
-    if (this.completion.current !== token) throw new Error('Step changed; mastery was not queued.');
-    this.completion.pendingMastery(level, { confirmed }); this.publish();
+    if (!plan.confirmation) {
+      this.completion.pendingMastery(level); this.publish(); return;
+    }
+    const wasPlaying = this.controller.status === 'playing';
+    this.pause();
+    try {
+      const confirmed = await confirm(plan.message + ' This pending choice applies only after the entire answer finishes.');
+      if (this.completion.current !== token) return;
+      if (confirmed) this.completion.pendingMastery(level, { confirmed: true });
+      this.publish();
+    } finally {
+      if (wasPlaying && this.completion.current === token && this.controller.status === 'paused') this.resume();
+    }
   }
+
   async special(type, confirm) {
     const cardId = this.controller?.snapshot.card?.id;
     if (!cardId || !this.lease || this.controller.phase === 'commit') throw new Error('Wait for the current scheduling write, or select an active flashcard.');

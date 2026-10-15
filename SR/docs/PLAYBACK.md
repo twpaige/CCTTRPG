@@ -35,7 +35,13 @@ Long text is split into small utterances without rewriting or dropping character
 
 ## Change mastery while listening
 
-Select level 0–10 and read the displayed interval, then **Queue mastery after answer**. Playback pauses so you can check the choice; choose **Resume** to continue. It is saved only after the full answer succeeds. Stop/Skip before then discards it. Final-step 10 requires explicit confirmation of all affected steps/cards, including the entire series for its final BOUND card.
+Click one of the **0–10 mastery buttons**. Each shows its interval beneath the number: 15m, 3h, 6h, 1d, 2d, 3d, 1w, 2w, 1mo, 3mo, KNOWN. Levels 0–9 and intermediate-step KNOWN queue immediately while audio continues. No separate Queue, Save or Resume action is needed. Several choices during one step keep only the last choice.
+
+The outlined button marks the saved level; the filled button marks the selected level (brown while pending). Text identifies both states. Pending feedback says it applies after the answer; the saved message identifies the completed card and step. The next step displays its own mastery. Stop/Skip before the answer finishes discards the pending choice. Scheduling uses the existing API: the explicit change takes effect at successful answer completion, and the next due date uses that completion timestamp.
+
+Tab into the radio group; arrow keys select adjacent levels, Home selects 0 and End selects 10. Space/Enter activates a focused button. The row wraps on narrower windows.
+
+Final-step KNOWN asks for confirmation of the whole card, or the entire BOUND series for its final card. Audio pauses for that dialog and continues afterward if it had been playing; an already paused session stays paused. Cancel keeps the prior saved/pending choice. A stopped or skipped step cannot receive a late confirmation. Ordinary AUDIT still makes no automatic mastery or scheduling changes.
 
 **Reset FC** confirms resetting every step of this card to 0, due in 15 minutes. **I know this for sure** confirms making the card KNOWN and available through AUDIT; the final BOUND card propagates this to its entire series. These actions are immediate explicit changes after confirmation, not speech-completion credit. Playback remains paused and moves past that card. Cancelling instead restarts the interrupted step on Resume, with its pending adjustment discarded.
 

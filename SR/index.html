@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; base-uri 'none'">
-<title>SR — REVIEW / AUDIT</title><link rel="stylesheet" href="styles.css"></head>
+<title>SR — REVIEW / AUDIT</title><link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="player.css"></head>
 <body><header><p class="eyebrow">SR · LISTEN TO YOUR LIBRARY</p><h1>REVIEW / AUDIT</h1>
 <nav aria-label="Main"><a id="library-link" href="library.html">Library editor</a><a id="mastery-link" href="mastery.html">Knowledge Mastery</a><a id="data-link" href="data/index.html">Data &amp; recovery</a><a href="docs/PLAYBACK.md">Playback guide</a></nav>
 <p>REVIEW practices material you are learning. AUDIT tests material you have marked KNOWN.</p>
@@ -23,9 +23,11 @@
 <p class="note">Resume repeats only the interrupted speech segment, or the remaining recall pause. A scheduling retry saves the same completed step without repeating its answer. Restart reloads currently eligible cards; already credited steps keep their updates.</p>
 </section><section><h2 id="current-card">Ready to listen</h2><p id="current-step"></p><p id="current-progress"></p>
 <h3>Question</h3><p id="question" class="verbatim"></p><h3>Answer</h3><p id="answer" class="verbatim"></p>
-<fieldset id="mastery-controls" disabled><legend>Current step mastery</legend><label>Pending mastery<select id="level"></select></label><p id="interval"></p>
-<button id="queue">Queue mastery after answer</button><p id="pending" role="status"></p>
-<p class="note">Queue pauses playback so you can check the choice. Press Resume to continue. Stop or Skip discards an unfinished step's pending change.</p></fieldset>
+<fieldset id="mastery-controls" disabled><legend id="mastery-label">Current step mastery</legend>
+<div id="levels" role="radiogroup" aria-labelledby="mastery-label" aria-describedby="mastery-help"></div>
+<p id="interval"></p><p id="pending" role="status"></p>
+<p id="mastery-help" class="note">Click a level to apply it after the full answer, without interrupting audio. The outlined level is saved; the filled level is selected. Stop or Skip discards an unfinished choice. Final-step KNOWN asks for confirmation. Use arrow keys to select a level.</p></fieldset>
+<p id="mastery-saved" role="status"></p>
 <fieldset id="special-controls" disabled><legend>Explicit mastery actions</legend><div class="toolbar"><button id="reset">Reset FC</button><button id="known">I know this for sure</button></div>
 <div id="audit-actions" hidden><p>If this AUDIT failed, choose a reset:</p><div class="toolbar"><button id="reset-final">Reset final step only</button><button id="reset-objective">Reset entire flashcard / objective</button></div></div>
 <p class="note">These actions pause and ask for confirmation. A confirmed action moves past this card. Cancelling leaves it paused and restarts that step on Resume. Neither action claims completed speech.</p></fieldset>

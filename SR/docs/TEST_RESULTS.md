@@ -1,5 +1,39 @@
 # SR — Test results
 
+## Desktop one-click mastery — 2026-10-14
+
+**Implementation and automated checks PASS; updated audible interaction still needs owner verification.** Authorized desktop Stage 6 usability correction only, based on main `0462891`. No shared scheduling/storage code, Android controls/native playback/Data, editor, standalone mastery page, schema, backup format or signing configuration changed.
+
+### Implementation
+
+`index.html`, desktop-only `js/player.js` / `js/study.js`, and new desktop-only `player.css` replace the dropdown/Queue button with eleven radio-style buttons. Numbers 0–10 sit above exact interval labels. One selected level, an outlined saved level and a distinct pending fill/text are shown. Arrow/Home/End navigation uses roving focus; native button Space/Enter works. Narrow layouts wrap the row without splitting KNOWN.
+
+Ordinary choices and intermediate-step KNOWN use the captured step snapshot and existing `planMastery` / `StepCompletionController` APIs synchronously: no speech cancellation or asynchronous gap before queuing, and the final choice wins. Completion still uses the existing atomic scheduling/receipt API and successful-answer timestamp. Saved feedback appears only after the write succeeds and identifies the card/step. Stop/Skip discards unfinished choices. Final-step KNOWN pauses for its existing card/BOUND confirmation, then resumes only a previously playing, still-current step. Cancel retains its previous choice. Special Reset/KNOWN and AUDIT safeguards remain intact.
+
+Updated PLAYBACK, SPECIFICATION and BUILD_PLAN remove obsolete desktop queue/pause instructions. `study.test.js` / `study.mjs` extend the existing harness; no new framework. Neither desktop module nor the new stylesheet is included in Android's asset allowlist/build inputs. No Android update is needed for this feature; the unchanged repository workflow may automatically rebuild on its existing broad desktop/test path triggers.
+
+### Executed tests
+
+**293/293 scenarios PASS**: all previous 282 scenarios, adapted for the intentionally changed desktop control, plus 7 domain and 4 UI scenarios. Windows, Node 24.19.0, Chrome **155.0.0.0** headless, JDK 17.0.20.1. Disposable browser profiles, synthetic libraries and simulated speech only; no owner data accessed.
+
+| Coverage | Pass |
+|---|---:|
+| Desktop study domain / UI | 37 + 11 |
+| Original speech / shared plan / release / native engine | 33 + 6 + 6 + 16 |
+| Persistence / editor / mastery domain / mastery UI | 38 + 17 + 40 + 7 |
+| Authored native/focus/document tests / native integration / mobile UI | 28 + 13 + 6 |
+| Desktop/Android Data workflow | 35 |
+
+New checks exercise uninterrupted question/recall/answer selection, synchronous last-choice wins, commit-only-after-answer, no leakage to the next step, intermediate KNOWN, card/final BOUND confirmation and propagation, cancellation with prior pending choice, preservation of manual pause, Stop during outstanding confirmation, all eleven labels, current/pending/saved display, removal of Queue, rapid clicks, playing Skip/Stop, keyboard navigation and 390px layout. Existing due/early/AUDIT scheduling, resets, retries, duplicate receipts, stale writes and all Android regressions pass. UI testing exposed focus loss when temporarily disabling controls; focus restoration was fixed and the suite rerun. UTF-8 validation and screenshot inspection also checked visible feedback text and compact layouts at 1440/900/390px.
+
+Reproduce with the existing full-suite commands below. In particular, `node SR/tests/serve.mjs` then `node SR/tests/study.mjs` runs the 37 domain and 11 UI scenarios (set SR_PLAYWRIGHT/SR_BROWSER as documented). Same runner supports `SR_TEST_URL=https://crownandcall.com/SR` for isolated deployed verification. Native regression commands are unchanged; no Android build change is necessary.
+
+### Owner verification and deployment
+
+Reload [the desktop player](https://crownandcall.com/SR/) in your usual Chrome profile. During actual audio, click several ordinary levels and confirm narration continues without replay/pause, the last level saves after the answer, and the next step shows its own mastery. Check Stop/Skip cancellation and final-step KNOWN cancel/confirm on material you intend to change. The actual audible experience and assistive-technology announcement quality are not certified by silent automation. Earlier owner audio evidence and open G6 checks remain separate.
+
+Commit/push and deployed-site verification are pending below; results will be recorded after publication.
+
 ## Data & Recovery simplification — 2026-10-14
 
 **Implementation and available automation PASS; Samsung update retention and real OneDrive/Downloads picker behavior require owner verification.** This is the authorized shared Data correction, not Stage 8, 9 or 11. Baseline: current main `b6614e4`. Historical evidence below is retained as originally tested; its old recovery controls are no longer current instructions.

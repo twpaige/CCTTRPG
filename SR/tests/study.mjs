@@ -43,10 +43,15 @@ try {
   await page.locator('#series').selectOption('bound'); await page.locator('#recall').fill('0'); await press('start'); await spoken();
   assert.match(await page.locator('#current-card').textContent(), /Delaware/); assert.equal(await page.locator('#question').textContent(), '  a question 0? 🧠\n');
   const before = await read(); await end(); await phase('answer'); assert.equal((await read()).stepEvents.length, 0);
-  await page.locator('#level').selectOption('7'); assert.match(await page.locator('#interval').textContent(), /2 weeks/); await press('queue'); await phase('paused');
-  assert.equal((await read()).stepProgress.find(r => r.stepId === 'a0').mastery, 0); await press('resume'); await end(); await spoken(); await page.waitForFunction(() => document.getElementById('current-step').textContent.includes('Authored step 2'));
+  const spokenBefore = await page.evaluate(() => testSynth.spoken.length);
+  await press('level-7'); assert.match(await page.locator('#pending').textContent(), /2 weeks.*after the answer/); await phase('answer');
+  assert.equal(await page.evaluate(() => testSynth.spoken.length), spokenBefore);
+  assert.equal(await page.locator('#level-7').getAttribute('aria-checked'), 'true'); assert.match(await page.locator('#level-0').getAttribute('class'), /saved-level/);
+  assert.match(await page.locator('#level-7').getAttribute('class'), /pending-level/);
+  assert.equal((await read()).stepProgress.find(r => r.stepId === 'a0').mastery, 0); await end(); await spoken(); await page.waitForFunction(() => document.getElementById('current-step').textContent.includes('Authored step 2'));
   let after = await read(); assert.equal(after.stepEvents.length, 1); assert.equal(after.stepProgress.find(r => r.stepId === 'a0').mastery, 7); assert.deepEqual(after.flashcards, before.flashcards);
-  pass('authored Q/A, answer-only completion and queued mastery use real IndexedDB');
+  assert.match(await page.locator('#mastery-saved').textContent(), /Saved mastery 7/); assert.equal(await page.locator('#level-0').getAttribute('aria-checked'), 'true');
+  pass('one-click queues without interrupting speech, current/pending differ, answer saves and next step resets selection');
   const second = await context.newPage(); await second.goto(url); await second.waitForFunction(() => !document.getElementById('settings').disabled); await second.evaluate(() => testVoices()); await second.locator('#start').click();
   await second.waitForFunction(() => document.getElementById('error').textContent.includes('busy in another tab')); assert.equal(await second.evaluate(() => testSynth.spoken.length), 0);
   await second.goto(`${base}/library.html?test=${name}`); await second.waitForFunction(() => !document.getElementById('workspace').disabled); await second.getByRole('button', { name: 'New series', exact: true }).click(); await second.locator('#series-name').fill('Unsaved test draft'); await second.locator('#save').click();
@@ -68,5 +73,39 @@ try {
   await page.setViewportSize({ width: 390, height: 844 }); assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)); await page.locator('#start').focus(); await page.keyboard.press('Enter'); await spoken(); await press('stop'); await ready();
   if (process.env.SR_STUDY_SCREENSHOT) await page.screenshot({ path: process.env.SR_STUDY_SCREENSHOT, fullPage: true });
   assert.deepEqual(errors, []); pass('narrow-screen layout, keyboard Start and no uncaught page errors');
+  async function fresh() {
+    await page.evaluate(async ({ name, original }) => { const { openDatabase } = await import('./js/db.js'); const { exportJSON, restoreJSON } = await import('./js/backup.js'); const db = await openDatabase({ name }); try { await restoreJSON(db, JSON.stringify(original), { confirmed: true, safetyJSON: await exportJSON(db) }); } finally { db.close(); } }, { name, original: before });
+    await page.reload(); await ready(); await page.evaluate(() => testVoices()); await page.locator('#series').selectOption('bound'); await page.locator('#recall').fill('0'); await press('start'); await spoken();
+  }
+  await fresh();
+  assert.equal(await page.locator('#queue, #level').count(), 0);
+  assert.deepEqual(await page.locator('#levels button span').allTextContents(), ['15m','3h','6h','1d','2d','3d','1w','2w','1mo','3mo','KNOWN']);
+  assert.deepEqual(await page.locator('#levels button strong').allTextContents(), Array.from({length:11}, (_,i)=>String(i)));
+  assert.equal(await page.getByRole('radio').count(), 11); assert.equal(await page.locator('[role=radio][aria-checked=true]').count(), 1);
+  await press('level-2'); await press('level-8'); await press('level-4');
+  assert.equal(await page.evaluate(() => testSynth.spoken.length), 1); assert.equal(await page.locator('#level-4').getAttribute('aria-checked'), 'true');
+  await end(); await phase('answer'); await end(); await spoken(); await page.waitForFunction(() => document.getElementById('current-step').textContent.includes('Authored step 2'));
+  assert.equal((await read()).stepProgress.find(r=>r.stepId==='a0').mastery,4); await press('stop'); await ready();
+  pass('all eleven labelled radio buttons; rapid selections commit only the last level');
+  await fresh(); await page.locator('#level-0').focus(); await page.keyboard.press('ArrowRight'); assert.equal(await page.locator('#level-1').getAttribute('aria-checked'),'true');
+  await page.keyboard.press('End'); assert.equal(await page.locator('#level-10').getAttribute('aria-checked'),'true');
+  await page.keyboard.press('Home'); await page.keyboard.press('ArrowLeft'); assert.equal(await page.locator('#level-10').getAttribute('aria-checked'),'true');
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await end(); await phase('answer'); await end(); await spoken(); await page.waitForFunction(() => document.getElementById('current-step').textContent.includes('Authored step 2'));
+  after=await read(); assert.equal(after.stepProgress.find(r=>r.stepId==='a0').mastery,10); assert.equal(after.stepProgress.find(r=>r.stepId==='a1').mastery,0); await press('stop'); await ready();
+  pass('keyboard arrows/Home/End, intermediate KNOWN without confirmation and responsive selector');
+  await fresh(); await press('level-6'); await press('skip'); await spoken(); await page.waitForFunction(() => document.getElementById('current-card').textContent.includes('Card b'));
+  assert.equal(await page.locator('#level-0').getAttribute('aria-checked'),'true'); assert.equal((await read()).stepProgress.find(r=>r.stepId==='a0').mastery,0);
+  await press('level-9'); await press('stop'); await ready(); assert.equal((await read()).stepProgress.find(r=>r.stepId==='b0').mastery,0);
+  pass('Stop and playing Skip discard selection without leaking into the next step');
+  await fresh(); await end(); await phase('answer'); await end(); await spoken(); await page.waitForFunction(() => document.getElementById('current-step').textContent.includes('Authored step 2'));
+  await confirm('level-10', false, /2 steps across 1 flashcards/); await spoken(); assert.match(await page.locator('#status').textContent(), /playing/); assert.equal(await page.locator('#level-0').getAttribute('aria-checked'),'true');
+  await confirm('level-10', true, /2 steps across 1 flashcards/); await spoken(); await end(); await phase('answer'); await end(); await spoken(); await page.waitForFunction(() => document.getElementById('current-card').textContent.includes('Card b'));
+  after=await read(); assert(after.stepProgress.filter(r=>r.flashcardId==='a').every(r=>r.mastery===10)); assert(after.stepProgress.filter(r=>r.flashcardId==='b').every(r=>r.mastery===0));
+  for(let i=0;i<2;i++){ await end(); await phase('answer'); await end(); await spoken(); await page.waitForFunction(n=>document.getElementById('current-step').textContent.includes('Authored step '+n),i+2); }
+  await confirm('level-10', true, /entire BOUND series/); await spoken(); await end(); await phase('answer'); await end(); await ready();
+  assert((await read()).stepProgress.filter(r=>['a','b'].includes(r.flashcardId)).every(r=>r.mastery===10));
+  pass('final-step KNOWN cancel safely continues; confirmed card and final BOUND-series propagation');
+  assert.deepEqual(errors, []);
   console.log(`${results.length}/${results.length} Stage 6 domain scenarios + ${count}/${count} UI scenarios. ${await page.evaluate(() => navigator.userAgent)}. Simulated speech; no audible claim.`);
 } finally { await context?.close(); assert.equal(dirname(profile), tmpdir()); assert(profile.includes('sr-study-test-')); await rm(profile, { recursive: true, force: true }); }

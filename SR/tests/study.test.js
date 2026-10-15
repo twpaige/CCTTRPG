@@ -96,7 +96,7 @@ test('Pause/Resume repeats the interrupted speech segment and preserves recall r
   await question(f); f.clock.tick(350); f.session.pause(); f.clock.tick(9000); f.session.resume(); f.clock.tick(649); equal(f.synth.current, null); f.clock.tick(1); check(f.synth.current); equal(f.synth.overlaps, 0);
 });
 test('Skip discards unfinished change; earlier completed steps keep credit; paused Skip stays paused', async () => {
-  const f = await fixture(); await start(f); await step(f); await f.session.pendingMastery(8, () => true); f.session.skip();
+  const f = await fixture(); await start(f); await step(f); await f.session.pendingMastery(8, () => true); f.session.pause(); f.session.skip();
   equal(f.session.snapshot.status, 'paused'); equal(f.session.snapshot.card.id, 'b'); f.session.resume(); await until(() => f.synth.current);
   const after = await f.read(); equal(after.stepEvents.length, 1); equal(row(after, 'a1').mastery, 0); equal(row(after, 'a1').lastReviewedAt, null);
 });
@@ -126,11 +126,46 @@ test('Speech error and watchdog never award credit; retry same answer then write
   f.session.resume(); f.clock.tick(120000); await until(() => f.session.snapshot.status === 'error'); equal((await f.read()).stepEvents.length, 0);
   f.session.resume(); const end = f.synth.current.onend; f.synth.end(); end(); await until(() => f.synth.current); equal((await f.read()).stepEvents.length, 1);
 });
-test('Pending mastery previews/pauses, commits at answer success; KNOWN final requires propagation confirmation', async () => {
+test('Pending mastery continues playback, commits at answer success; KNOWN final requires propagation confirmation', async () => {
   const f = await fixture(); await start(f); await f.session.pendingMastery(7, () => true); equal(row(await f.read()).mastery, 0); f.session.resume(); await step(f);
   let after = await f.read(); equal(row(after).mastery, 7); equal(row(after).nextDueAt, nextDue(7, time + 1000));
   let message; await f.session.pendingMastery(10, text => { message = text; return false; }); check(message.includes('2 steps across 1 flashcards')); equal(f.session.snapshot.pending, undefined);
   await f.session.pendingMastery(10, () => true); f.session.resume(); await step(f); after = await f.read(); check(after.stepProgress.filter(r => r.flashcardId === 'a').every(r => r.mastery === 10));
+});
+for (const phase of ['question', 'recall', 'answer']) test(`One-click mastery during ${phase} is synchronous, last-choice wins and audio is uninterrupted`, async () => {
+  const f = await fixture(); await start(f);
+  if (phase === 'recall') await question(f); if (phase === 'answer') await answer(f);
+  const utterance = f.synth.current, remaining = f.session.snapshot.remainingMs;
+  const promises = [2, 7, 9].map(level => f.session.pendingMastery(level, () => { throw new Error('Ordinary choice must not confirm'); }));
+  equal(f.session.snapshot.pending, 9); equal(f.session.snapshot.status, 'playing'); equal(f.synth.current, utterance); equal(f.session.snapshot.remainingMs, remaining);
+  await Promise.all(promises); equal(row(await f.read()).mastery, 0);
+  if (phase === 'question') await answer(f);
+  else if (phase === 'recall') { f.clock.tick(1000); await until(() => f.synth.current); }
+  f.synth.end(); await until(() => f.session.snapshot.step?.id === 'a1' && f.synth.current);
+  equal(row(await f.read()).mastery, 9); equal(f.session.snapshot.pending, undefined); equal(f.session.snapshot.masterySaved.level, 9);
+  await step(f); equal(row(await f.read(), 'a1').mastery, 0); equal(f.synth.overlaps, 0);
+});
+test('Intermediate KNOWN queues without confirmation or pause and changes only that step', async () => {
+  const f = await fixture(); await start(f); const utterance = f.synth.current;
+  await f.session.pendingMastery(10, () => { throw new Error('Unexpected propagation'); }); equal(f.synth.current, utterance); await step(f);
+  const after = await f.read(); equal(row(after).mastery, 10); equal(row(after).nextDueAt, null); equal(row(after, 'a1').mastery, 0);
+});
+test('Final KNOWN cancel resumes only previously playing audio and preserves earlier pending choice', async () => {
+  const f = await fixture(); await start(f); await step(f); await f.session.pendingMastery(3);
+  await f.session.pendingMastery(10, message => { check(message.includes('2 steps across 1 flashcards')); equal(f.session.snapshot.status, 'paused'); return false; });
+  equal(f.session.snapshot.status, 'playing'); equal(f.session.snapshot.pending, 3); equal(row(await f.read(), 'a1').mastery, 0);
+  f.session.pause(); await f.session.pendingMastery(10, () => false); equal(f.session.snapshot.status, 'paused');
+});
+test('Final BOUND KNOWN confirms series scope then propagates only after the answer', async () => {
+  const f = await fixture(); await start(f); f.session.skip(); await until(() => f.synth.current); await step(f); await step(f);
+  let confirmed = false; await f.session.pendingMastery(10, message => { check(message.includes('entire BOUND series')); check(message.includes('5 steps across 2 flashcards')); confirmed = true; return true; });
+  check(confirmed); equal(f.session.snapshot.status, 'playing'); check((await f.read()).stepProgress.every(p => p.mastery === 0));
+  await step(f); const after = await f.read(); check(after.stepProgress.filter(p => ['a', 'b'].includes(p.flashcardId)).every(p => p.mastery === 10)); equal(row(after, 'c0').mastery, 0);
+});
+test('Stop during an outstanding KNOWN confirmation cannot queue or resume another step', async () => {
+  const f = await fixture(); await start(f); await step(f); let approve;
+  const pending = f.session.pendingMastery(10, () => new Promise(resolve => { approve = resolve; }));
+  await f.session.stop(); approve(true); await pending; equal(f.session.snapshot.status, 'stopped'); equal(f.synth.current, null); equal(row(await f.read(), 'a1').mastery, 0);
 });
 test('Receipt write failure rolls back; Resume retries without replaying answer or duplicating a committed receipt', async () => {
   const f = await fixture(); await start(f); await answer(f); const before = await f.read(), original = IDBObjectStore.prototype.add;
