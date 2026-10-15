@@ -2,7 +2,7 @@
 
 ## Android listening interface and one-touch PLAY — 2026-10-15
 
-**Implementation and 386 local automated scenarios PASS. Android build/lint/signing and release evidence will be recorded below after publication. Samsung acceptance remains OPEN.** Current origin/main was fetched before changes and remained `28ed1bc47987d18198782b854ea819b19a531d77`; prior APK `0.2.101601`. This is Stage 10 only. Historical evidence below is preserved and describes its tested interfaces.
+**Implementation, 386 automated scenarios, Android build/lint, signing and published-download verification PASS. Samsung acceptance remains OPEN.** Current origin/main was fetched before changes and remained `28ed1bc47987d18198782b854ea819b19a531d77`; prior APK `0.2.101601`. This is Stage 10 only. Historical evidence below is preserved and describes its tested interfaces.
 
 ### Changes
 
@@ -19,6 +19,12 @@
 Focused coverage: native announcement order, no announcement credit, pause/retry/stale callbacks/Stop, duckable focus versus calls, navigation boundaries/cross-card/backward/paused behavior, unchanged once-per-step credit after backward playback, content-free status, collapsed panels and keyboard toggle, sticky layout at 390px, one-touch preparation/failure/retry, exact recall overrides, all mastery levels/KNOWN/reset/cancel/save failure, safe ready reuse, settings/mastery/import invalidation, due-boundary invalidation, corrupt preferences/write failure, all choices after page and real browser-process restart, Stop during preparation, no automatic speech on reopen, and empty REVIEW status. Existing 5,000-step fixture, larger 12,000-step batching and 12,001 completion overflow tests pass. Collapsed mobile layout visually inspected.
 
 Use the existing complete-suite commands below. `node SR/mobile/tests/authored.test.mjs` now includes authored 28, prepared 11 and listening-interface 11. `node SR/tests/native.mjs` runs 22 domain and 23 UI scenarios. New tests run through the unchanged GitHub Actions build pipeline. Automated audio does not certify audible timing, Bluetooth routing or locked Samsung behavior.
+
+### Published APK and release verification
+
+Implementation **`07585958f8d0e079fc5ac8087f017592e578e89a`** is pushed to origin/main. [Android workflow 38746173925](https://github.com/twpaige/CCTTRPG/actions/runs/38746173925) completed **build and publish PASS**, including the complete regression suites, assembleRelease/lintRelease, signing, application ID, version progression, original certificate comparison and byte-identical release-download verification. [Pages deployment 38746171017](https://github.com/twpaige/CCTTRPG/actions/runs/38746171017) also passed.
+
+Signed APK **0.2.101701**, version code 101701 (greater than prior 101601): [download SR.apk](https://github.com/twpaige/CCTTRPG/releases/download/sr-android-101701/SR.apk), [release and build metadata](https://github.com/twpaige/CCTTRPG/releases/tag/sr-android-101701). Independently downloaded APK SHA-256 matches metadata: `2cac5fdf4cc773b6401618e719e76bb5385a36d8cfdd2e57a7beec00a8ee9740`. Commit and unchanged app ID `com.crownandcall.srproof` match. Signing SHA-256 remains `ee98699416f616b1707fee62d4311a9de26c30c848b6abd6206112db01f0f0cb`. Packaged index/mobile JavaScript/CSS, preferences module, shared desktop styling and native-study module were verified present in the downloaded APK. These checks establish build/identity compatibility, not observed Samsung update/data preservation or audible acceptance.
 
 ### Remaining owner verification
 
