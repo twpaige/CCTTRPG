@@ -215,7 +215,11 @@ public final class PlaybackService extends Service implements PlaybackEngine.Hos
         // Earcons share the existing TTS queue, media routing, focus and cancellation.
         // The WAV includes the approved leading/trailing silence; onDone gates speech.
         actions.postDelayed(() -> engine.failed(token, "Transition sound timed out. Resume retries."), 15000);
-        if (tts.playEarcon("sr-" + kind, TextToSpeech.QUEUE_FLUSH, null, Long.toString(token)) == TextToSpeech.ERROR)
+        // AudioSpeechItem reads this Bundle key for callbacks, even with the explicit ID.
+        String utteranceId = Long.toString(token);
+        Bundle params = new Bundle();
+        params.putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId);
+        if (tts.playEarcon("sr-" + kind, TextToSpeech.QUEUE_FLUSH, params, utteranceId) == TextToSpeech.ERROR)
             engine.failed(token, "Transition sound could not play. Resume retries.");
     }
     @Override public void speak(String text, long token) {

@@ -1,4 +1,5 @@
 // Development-only JSON implementation for host JVM tests; never packaged in the APK.
+import './earcon.test.mjs';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';

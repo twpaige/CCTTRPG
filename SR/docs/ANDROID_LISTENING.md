@@ -28,6 +28,12 @@ Stage 10 remains ACTIVE; Stage 7 SUPERSEDED; Stages 8, 9 and 11 ON HOLD. No new 
 
 ## Approved transition chimes
 
+### Samsung timeout correction
+
+APK 0.2.102401 can play a chime but then hang with “Transition sound timed out. Resume retries.” Its earcon call supplied a separate utterance ID but no parameter Bundle. Android's audio-item callback lookup reads `TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID` from that Bundle, so the callback can be suppressed even after audio finishes. The corrected call supplies the same native token in both locations. The approved PCM files and 15-second watchdog are unchanged; progression still requires an actual completion callback, never an elapsed-duration guess.
+
+Install the corrected signed release linked in [TEST_RESULTS.md](TEST_RESULTS.md) over the existing app. Retest the reported Psalm 23 series: PLAY, listen past the first chime through consecutive steps and another flashcard, then repeat with Bluetooth earbuds and the phone locked. Check Pause/Resume and Stop during a chime, plus navigation while a cue is pending. There should be no overlap, timeout, unfinished-answer credit or changed sound. These physical-device checks remain owner verification.
+
 The native executor plays warm wood within a flashcard and the two-note cue across flashcards, including automatic replay and manual Next/Previous. These replace one another at a boundary; no spoken next-step/card phrase is added. Existing playlist announcements are preserved. Chimes run entirely in the native TTS audio queue, using two bundled mono 48 kHz PCM WAV resources rendered from the approved laboratory synthesis. Each includes 270 ms silence + 720 ms tone + 180 ms silence, with pitch 330 Hz, volume 32% and decay 69%. They do not depend on the WebView, consume completion-queue entries, change batching, or create learning events.
 
 The existing TTS progress listener gates the next question on earcon completion; the same stop, audio-focus, media routing, watchdog and notification paths apply. Pause during a chime cancels it; Resume retries the cue before speaking the target question. Resume during ordinary speech has no new chime. Rapid navigation cancels stale cues. Initial Start and Stop are silent except for the existing playlist announcements. Settings are fixed for this release; there are no chime controls or new database/backup fields.
