@@ -12,7 +12,11 @@ export async function readSnapshot(tx) {
     progress, presets, settings: Object.fromEntries(settings.map(row => [row.key, row.value])), reviewEvents, stepProgress, stepEvents });
 }
 export const exportSnapshot = db => transaction(db, DATA_STORES, 'readonly', readSnapshot);
-export async function exportJSON(db) { return JSON.stringify(await exportSnapshot(db), null, 2); }
+const deviceSettings = new Set(['desktopVoice', 'androidVoice', 'rate', 'recallSeconds']);
+export function portableSnapshot(snapshot) {
+  return { ...snapshot, settings: Object.fromEntries(Object.entries(snapshot.settings).filter(([key]) => !deviceSettings.has(key))) };
+}
+export async function exportJSON(db) { return JSON.stringify(portableSnapshot(await exportSnapshot(db)), null, 2); }
 function canonical(value) {
   if (Array.isArray(value)) return value.map(canonical);
   if (value && typeof value === 'object') return Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])]));
@@ -36,15 +40,17 @@ export async function restoreJSON(db, json, { confirmed = false, safetyJSON } = 
   const incoming = migrateSnapshot(parseSnapshot(json));
   requireValue(confirmed === true, 'Explicit Replace confirmation is required.');
   const safety = migrateSnapshot(parseSnapshot(safetyJSON));
-  const expected = contentKey(safety);
+  const expected = contentKey(portableSnapshot(safety));
   return transaction(db, DATA_STORES, 'readwrite', async tx => {
     const current = await readSnapshot(tx);
-    requireValue(contentKey(current) === expected, 'Library changed after the safety export. Export and verify a new safety backup.');
+    requireValue(contentKey(portableSnapshot(current)) === expected, 'Library changed after the safety export. Export and verify a new safety backup.');
     // Replacement is atomic; historical recovery records remain untouched.
     for (const name of DATA_STORES) tx.objectStore(name).clear();
     for (const name of ['series', 'flashcards', 'progress', 'presets', 'reviewEvents', 'stepProgress', 'stepEvents'])
       for (const row of incoming[name]) tx.objectStore(name).add(row);
-    for (const [key, value] of Object.entries(incoming.settings)) tx.objectStore('settings').add({ key, value });
+    // Legacy device settings remain inert/local; incoming backups never replace them.
+    const settings = { ...portableSnapshot(incoming).settings, ...Object.fromEntries(Object.entries(current.settings).filter(([key]) => deviceSettings.has(key))) };
+    for (const [key, value] of Object.entries(settings)) tx.objectStore('settings').add({ key, value });
     const libraryGeneration = crypto.randomUUID();
     tx.objectStore('meta').add({ key: 'library', libraryId: incoming.libraryId, libraryGeneration });
     return { libraryGeneration, cards: incoming.flashcards.length };

@@ -4,6 +4,10 @@ The same storage ES modules run on the website and in the existing Android WebVi
 
 ## Locations and identity
 
+Desktop speech preferences use browser-local `sr.desktop.speech.v1` (voice descriptor, rate and default recall), shared by REVIEW and editor Preview. If absent, initialize once from existing local legacy settings or defaults. Incoming JSON never initializes or replaces those choices. Missing voices fall back without changing the saved descriptor; asynchronous discovery restores a matching voice. Android's `sr.android.listening.v1` and native voice handling are untouched.
+
+`exportSnapshot/readSnapshot` remain full internal snapshots for editor/mastery guards. Portable `exportJSON` omits legacy settings keys `desktopVoice`, `androidVoice`, `rate`, and `recallSeconds`. Restore still validates old keys for compatibility, then ignores incoming device values and retains existing inert local legacy records. The safety comparison uses that same portable projection; all content, progress, history, generation and remaining settings still participate. Per-step `recallSeconds` is authored content and remains unchanged in every export. No schema/version change or migration is needed. Already installed Android APKs keep their current exporter; any older device fields they send are ignored on website import.
+
 - Data panel: `https://crownandcall.com/SR/data/index.html`
 - Isolated real-IndexedDB tests: `https://crownandcall.com/SR/tests/persistence.html`
 - Desktop database: `SRLearning`, internal version 2, scoped to the website origin/browser profile.
@@ -136,7 +140,7 @@ The Data page has two primary actions: **Save Complete JSON Backup** and **Impor
 
 **Playback and concurrency:** import holds the existing exclusive library Web Lock from validated preview through backup and confirmation. Other cooperating tabs cannot start playback or mutate the library. Old noncooperating writes are caught by the backup match and final transaction check. Android refuses a prepared session or active/launching service, saves queued completions before the outgoing snapshot, and refuses replacement if new completions appear. Failed reconciliation retains the queue. Cancellation does not undo legitimate completed-step credit saved before backup. The Data workflow does not alter playback or crash recovery. Reload old tabs after updating.
 
-No merge or Drive service is involved. Returning a whole phone snapshot to desktop also replaces content/mastery/preferences: preserve both copies if desktop content changed. Desktop is the intended content authority. Do not use a whole phone restore to merge later review results into newer desktop edits.
+No merge or Drive service is involved. Returning a whole phone snapshot to desktop also replaces content/mastery/portable settings (not local speech preferences): preserve both copies if desktop content changed. Desktop is the intended content authority. Do not use a whole phone restore to merge later review results into newer desktop edits.
 
 Both file UIs cap input at 32 MiB before any modification. The Android picker uses the Storage Access Framework with bounded reads and no broad storage permission, file/content URL access, external navigation or INTERNET permission. Cancel/error does not import. Android export reports success only after writing/closing and reopening the selected document for exact byte verification. This does not certify OneDrive cloud sync.
 

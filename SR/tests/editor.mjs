@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { testCloning } from './cloning.mjs';
 import { testPasting } from './pasting.mjs';
+import { testSpeechPreview } from './speech-preview.mjs';
 const { chromium } = createRequire(import.meta.url)(process.env.SR_PLAYWRIGHT || 'playwright');
 const base = process.env.SR_TEST_URL || 'http://127.0.0.1:8765';
 const profile = await mkdtemp(join(tmpdir(), 'sr-editor-test-'));
@@ -166,6 +167,7 @@ try {
   assert(await page.locator('#workspace').evaluate(element => element.disabled)); passed('Invalid test database name fails closed');
   checks += await testCloning(context, base);
   checks += await testPasting(context, base);
+  checks += await testSpeechPreview(base);
   console.log(`${checks}/${checks} editor acceptance scenarios passed. Browser UI automation, not owner manual verification.`);
 } finally {
   await context?.close();

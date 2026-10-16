@@ -227,9 +227,9 @@ test('Version 1/2 JSON recovery, original snapshots and step-completion receipts
   const after = await exportSnapshot(target.db); after.libraryGeneration = before.libraryGeneration; equal(contentKey(after), contentKey(before));
 });
 test('Corrupt step snapshots fail without mutation (missing/duplicate/dangling/KNOWN due/receipt)', async () => {
-  const f = await fixture(); const json = await exportJSON(f.db);
+  const f = await fixture(); const json = await exportJSON(f.db), before = contentKey(await exportSnapshot(f.db));
   for (const mutate of [s => s.stepProgress.pop(), s => s.stepProgress.push(s.stepProgress[0]), s => s.stepProgress[0].stepId = 'absent', s => s.stepProgress[0].mastery = 10, s => s.stepEvents.push({ id: 'bad' })]) {
-    const bad = JSON.parse(json); mutate(bad); await rejects(() => restoreJSON(f.db, JSON.stringify(bad), { confirmed: true, safetyJSON: json })); equal(contentKey(await exportSnapshot(f.db)), contentKey(JSON.parse(json)));
+    const bad = JSON.parse(json); mutate(bad); await rejects(() => restoreJSON(f.db, JSON.stringify(bad), { confirmed: true, safetyJSON: json })); equal(contentKey(await exportSnapshot(f.db)), before);
   }
 });
 test('1,000-card / 10,000-step migration, filtering and independent write preserve exact content', async () => {

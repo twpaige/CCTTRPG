@@ -1,5 +1,13 @@
 # SR — Test results
 
+## Website speech Preview and device-local preferences — 2026-10-16
+
+Per-question/answer Preview speaks current unsaved text with the desktop speech adapter, short utterance segmentation and shared voice/rate. Same-button Stop and switching cancel unfinished speech; switching retains the existing library Web Lock to avoid a release/reacquire race. REVIEW/Preview exclude one another without cancelling the active owner. No recall, save, mastery or scheduling action occurs. Navigation and editor actions stop Preview.
+
+Desktop voice/rate/default recall now persist in `sr.desktop.speech.v1`, initialized once from local legacy settings/defaults. Late voice discovery restores the preferred voice; fallback never overwrites that descriptor. Portable JSON excludes the four legacy device settings keys, while authored step recall remains. Old imports retain local preferences and existing inert legacy values. Internal snapshot guards remain complete; restore compares portable snapshots. Android preference keys/native behavior and schema 2 are unchanged; no APK release is needed.
+
+Focused browser tests cover unsaved exact text/no writes, Stop/switch, long text, both directions of REVIEW exclusion, shared preferences, older backup import/export separation, authored recall preservation, native preference isolation, narrow controls, editor exit, real browser-process restart, delayed voice discovery/fallback, and corrupt local storage. Existing recovery tests now use a portable volume setting for concurrent-change checks; malformed backup rollback compares the full unchanged internal snapshot. **445/445 automated scenarios PASS**: the prior 434 plus 11 focused speech/preference scenarios (editor now 68). Existing storage, mastery, desktop/shared/native playback, Android UI, Data/recovery and release-safety suites passed. Preview layout visually checked at desktop and narrow widths. Live verification follows publication. All sound is simulated; owner should verify actual Chrome voice/audio and the feel of Preview on their device.
+
 ## Website Paste Flashcards — 2026-10-15
 
 Additive authoring dialog accepts one strict JSON format, previews counts/destination without writes, and confirms an atomic append to an existing or newly created BOUND/UNBOUND series. Existing rows/history are preserved; new cards/steps have ordinary identities, timestamps and mastery-0 progress due in 15 minutes. Unsupported fields and full-library backups are rejected. Dirty drafts block opening, input changes invalidate preview, and stale confirmation requires fresh validation while retaining the text. No database/backup format, restore behavior, playback/mastery policy or Android UI change.

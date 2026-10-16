@@ -111,12 +111,13 @@ test('Complete JSON round-trip preserves Unicode, whitespace, references, settin
   await restoreJSON(target.db, JSON.stringify(original), { confirmed: true, safetyJSON: await exportJSON(target.db) });
   const restored = await exportSnapshot(target.db); check(restored.libraryGeneration !== original.libraryGeneration);
   restored.libraryGeneration = original.libraryGeneration;
+  delete original.settings.recallSeconds; delete original.settings.androidVoice;
   equal(contentKey(restored), contentKey(original));
 });
 test('Confirmation and matching safety backup are both required', async () => {
   const f = await fixture(); await seed(f); const json = await exportJSON(f.db);
   await rejects(() => restoreJSON(f.db, json, { safetyJSON: json })); await rejects(() => restoreJSON(f.db, json, { confirmed: true }));
-  await f.repo.setSetting('rate', 1.1); const before = contentKey(await exportSnapshot(f.db));
+  await f.repo.setSetting('volume', .7); const before = contentKey(await exportSnapshot(f.db));
   await rejects(() => restoreJSON(f.db, json, { confirmed: true, safetyJSON: json })); equal(contentKey(await exportSnapshot(f.db)), before);
 });
 test('External outgoing backup restores previous library without creating an internal recovery copy', async () => {

@@ -54,7 +54,7 @@ try {
     }
     const backup = async () => android ? JSON.parse(await page.evaluate(() => picker.saved.at(-1))) : JSON.parse(await readFile(join(profile, 'backup.json'), 'utf8'));
     const mutate = value => page.evaluate(async ({ name, value }) => { const { openDatabase, request } = await import('../js/db.js'); const db = await openDatabase({ name }); try { // Simulate an old tab that does not cooperate with Web Locks.
-      const tx = db.transaction('settings', 'readwrite'); const done = new Promise((resolve, reject) => { tx.oncomplete = resolve; tx.onabort = reject; }); await request(tx.objectStore('settings').put({ key: 'rate', value })); await done;
+      const tx = db.transaction('settings', 'readwrite'); const done = new Promise((resolve, reject) => { tx.oncomplete = resolve; tx.onabort = reject; }); await request(tx.objectStore('settings').put({ key: 'volume', value })); await done;
     } finally { db.close(); } }, { name, value });
     let original = key(await read());
     if (android) {
@@ -93,17 +93,17 @@ try {
     if (!android) assert(await page.evaluate(() => picker.sameFolder));
     await page.locator('#cancel-import').click(); await idle(); assert.equal(key(await read()), original);
     pass(`${name}: complete external empty backup, location hint and confirmation cancellation`);
-    await choose(); await mutate(1.2); original = key(await read());
+    await choose(); await mutate(.2); original = key(await read());
     if (android) await emit({ saved: true, verified: true, filename: 'verified.json' });
     else { await writeFile(join(profile, 'backup.json'), ''); await page.locator('#destination').click(); }
     await idle(); assert.match(await page.locator('#error').textContent(), /changed during backup/); assert.equal(key(await read()), original);
     pass(`${name}: old-tab mutation during backup fails closed`);
-    await choose(); await verified(); await mutate(1.3); original = key(await read()); await page.locator('#confirm-import').click(); await idle();
+    await choose(); await verified(); await mutate(.3); original = key(await read()); await page.locator('#confirm-import').click(); await idle();
     assert.match(await page.locator('#error').textContent(), /changed after the safety export/); assert.equal(key(await read()), original);
     pass(`${name}: transaction rechecks concurrent change after verification`);
     await choose(); await verified();
     const locked = await page.evaluate(async name => { const { openDatabase, acquirePlayback, transaction, request } = await import('../js/db.js'); const db = await openDatabase({ name }); let blocked = 0;
-      try { try { (await acquirePlayback(db))(); } catch { blocked++; } try { await transaction(db, ['settings'], 'readwrite', tx => request(tx.objectStore('settings').put({ key: 'rate', value: 1.4 }))); } catch { blocked++; } return blocked; } finally { db.close(); }
+      try { try { (await acquirePlayback(db))(); } catch { blocked++; } try { await transaction(db, ['settings'], 'readwrite', tx => request(tx.objectStore('settings').put({ key: 'volume', value: .4 }))); } catch { blocked++; } return blocked; } finally { db.close(); }
     }, name); assert.equal(locked, 2);
     await page.locator('#cancel-import').click(); await idle(); pass(`${name}: backup/confirmation lease prevents new playback and cooperating writes`);
     await choose(); await verified();

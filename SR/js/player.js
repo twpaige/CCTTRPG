@@ -5,9 +5,11 @@ import { StudySession } from './study.js';
 import { playbackStatus } from './player-status.js';
 import { englishVoices, selectVoice, voiceKey, watchVoices, PREFERRED_VOICE } from './voices.js';
 import { INTERVAL_LABELS, selectReview, selectAudit } from './scheduler.js';
+import { readSpeechPreferences, saveSpeechPreferences, preferredVoice } from './speech-preferences.js';
 const $ = id => document.getElementById(id);
-let db, session, library, inventory = [], busy = false, watcher, countdown, displayedToken, displayedProgress, voiceSelected = false;
+let db, session, library, inventory = [], busy = false, watcher, countdown, displayedToken, displayedProgress;
 let savedNotice, noticeTimer;
+let speechPreferences;
 const option = (value, label) => { const node = document.createElement('option'); node.value = value; node.textContent = label; return node; };
 const error = reason => { $('error').textContent = reason.message || String(reason); };
 const shortIntervals = ['15m', '3h', '6h', '1d', '2d', '3d', '1w', '2w', '1mo', '3mo', 'KNOWN'];
@@ -127,8 +129,21 @@ $('levels').onkeydown = event => {
   else return;
   event.preventDefault(); const target = $(`level-${level}`); target.focus(); target.click();
 };
-for (const id of ['mode', 'series', 'window', 'days', 'random', 'recall', 'rate']) $(id).onchange = preview;
-$('voice').onchange = () => { voiceSelected = true; render(); };
+for (const id of ['mode', 'series', 'window', 'days', 'random']) $(id).onchange = preview;
+function rememberSpeech() {
+  try {
+    const settings = options();
+    speechPreferences.rate = settings.rate; speechPreferences.recall = settings.recallMs / 1000;
+    saveSpeechPreferences(speechPreferences);
+  } catch (reason) { error(reason); }
+  preview(); render();
+}
+for (const id of ['recall', 'rate']) $(id).onchange = rememberSpeech;
+$('voice').onchange = () => {
+  const voice = selectVoice(inventory, $('voice').value);
+  if (voice) speechPreferences.voice = { name: voice.name, language: voice.lang, voiceURI: voice.voiceURI };
+  rememberSpeech();
+};
 $('start').onclick = () => run(async () => { await session.start(options()); if (session.options) $('session-panel').open = false; });
 $('pause').onclick = () => session.pause();
 $('resume').onclick = () => { $('error').textContent = ''; session.resume(); };
@@ -153,13 +168,12 @@ await run(async () => {
   db = await openDatabase({ name: name || undefined, onBlocked: error, onVersionChange: reason => { void session?.stop(); db = undefined; error(reason); render(); } });
   session = new StudySession(db, new BrowserSpeech(globalThis.speechSynthesis, globalThis.SpeechSynthesisUtterance), { onChange: render });
   await load();
-  $('recall').value = library.settings.recallSeconds ?? 4; $('rate').value = library.settings.rate ?? 0.9;
+  speechPreferences = readSpeechPreferences(library.settings);
+  $('recall').value = speechPreferences.recall; $('rate').value = speechPreferences.rate;
   if (!globalThis.speechSynthesis) throw new Error('Native browser speech is unavailable. Use desktop Chrome.');
   watcher = watchVoices(speechSynthesis, ({ voices, waiting }) => {
     inventory = voices;
-    const savedVoice = library.settings.desktopVoice;
-    const saved = !voiceSelected && englishVoices(voices).find(voice => savedVoice && voice.name === savedVoice.name && voice.lang === savedVoice.language && (!savedVoice.voiceURI || voice.voiceURI === savedVoice.voiceURI));
-    const chosen = selectVoice(voices, saved ? voiceKey(saved) : $('voice').value);
+    const chosen = preferredVoice(voices, speechPreferences);
     $('voice').replaceChildren(...englishVoices(voices).map(voice => option(voiceKey(voice), `${voice.name} (${voice.lang}${voice.localService ? ', local service' : ''})`)));
     if (chosen) $('voice').value = voiceKey(chosen);
     $('voice-note').textContent = chosen ? `${chosen.name === PREFERRED_VOICE ? 'Preferred voice available.' : 'English voice available.'}`

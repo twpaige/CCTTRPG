@@ -1,6 +1,8 @@
 import { openDatabase, DATA_STORES } from './db.js';
 import { Repository } from './repository.js';
 import { validateFlashcardInput, text } from './validation.js';
+import { EditorSpeech } from './editor-speech.js';
+import { readSpeechPreferences } from './speech-preferences.js';
 import { exportSnapshot, exportJSON, contentKey, readSnapshot } from './backup.js';
 
 const $ = id => document.getElementById(id);
@@ -8,6 +10,21 @@ const copy = value => structuredClone(value);
 let db, repo, snapshot, selected, draft, dirty = false, busy = false, pendingDelete, databaseOptions;
 let seriesPage = 0, cardPage = 0, pendingClone, pastePreview;
 const pageSize = 50;
+const speechPreview = new EditorSpeech(() => db, () => {
+  for (const button of document.querySelectorAll('[data-preview]')) {
+    const active = button.dataset.preview === speechPreview.id;
+    button.textContent = active ? 'Stop' : 'Preview'; button.setAttribute('aria-pressed', String(active));
+  }
+}, error);
+function speechField(label, id, value, update) {
+  const wrapper = node('div', undefined, 'speech-field'), bar = node('div', undefined, 'toolbar');
+  const caption = node('label', label); caption.htmlFor = id;
+  const play = button('Preview', () => { $('error').textContent = ''; void speechPreview.toggle(id, $(id).value); }, { label: `Preview ${label.toLowerCase()} for step ${Number(id.split('-')[1]) + 1}` });
+  play.dataset.preview = id; play.setAttribute('aria-pressed', 'false'); bar.append(caption, play);
+  const input = node('textarea'); input.id = id; input.value = value;
+  input.oninput = () => { update(input.value); markDirty(); };
+  wrapper.append(bar, input); return wrapper;
+}
 function node(tag, text, className) {
   const element = document.createElement(tag);
   if (text !== undefined) element.textContent = text;
@@ -38,6 +55,7 @@ function controls() {
 }
 async function run(action) {
   if (busy) return;
+  speechPreview.stop();
   busy = true; controls(); $('error').textContent = '';
   try { await action(); } catch (reason) { error(reason); }
   finally { busy = false; controls(); }
@@ -123,6 +141,7 @@ function positionField(max) {
   label.append(bar); return label;
 }
 function renderEditor() {
+  speechPreview.stop();
   const editor = $('editor'); editor.replaceChildren(); draftState();
   if (!draft) { editor.append(node('h2', 'Choose a flashcard to edit'), node('p', 'Or create a new flashcard in the selected series. Changes are saved only when you choose Save.')); return; }
   const { kind, original, value } = draft;
@@ -149,8 +168,8 @@ function renderEditor() {
     value.steps.forEach((step, index) => {
       const section = node('fieldset', undefined, 'step'); section.dataset.stepId = step.id;
       section.append(node('legend', `Step ${index + 1}`),
-        field('Question', `question-${index}`, step.question, text => { step.question = text; }, { tag: 'textarea' }),
-        field('Answer', `answer-${index}`, step.answer, text => { step.answer = text; }, { tag: 'textarea' }));
+        speechField('Question', `question-${index}`, step.question, text => { step.question = text; }),
+        speechField('Answer', `answer-${index}`, step.answer, text => { step.answer = text; }));
       const progress = snapshot.stepProgress.find(row => row.flashcardId === original?.id && row.stepId === step.id);
       section.append(node('p', `Mastery: ${progress?.mastery ?? 0}/10${progress?.mastery === 10 ? ' — KNOWN' : ''}`),
         field('Recall duration in seconds (blank uses session default)', `recall-${index}`, step.recallSeconds ?? '', text => {
@@ -298,7 +317,7 @@ $('backup').onclick = () => run(async () => {
   message('Backup download requested for saved content. Unsaved drafts are not included. Keep and verify the file outside this browser.');
 });
 window.addEventListener('beforeunload', event => { if (dirty || busy || $('paste-dialog').open && $('paste-json').value) { event.preventDefault(); event.returnValue = ''; } });
-window.addEventListener('pagehide', () => db?.close());
+window.addEventListener('pagehide', () => { speechPreview.stop(); db?.close(); });
 window.addEventListener('pageshow', event => {
   if (event.persisted) run(async () => {
     db = await openDatabase(databaseOptions);
@@ -312,5 +331,5 @@ await run(async () => {
   if (testName) { document.querySelector('h1').textContent = 'My library — disposable test database'; for (const id of ['data-link', 'mastery-link', 'player-link']) $(id).href += `?test=${encodeURIComponent(testName)}`; }
   databaseOptions = { name: testName || undefined, onBlocked: error, onVersionChange: reason => { db = undefined; controls(); error(reason); } };
   db = await openDatabase(databaseOptions);
-  await load(); message('Library ready. Changes stay on this browser until you export a backup.');
+  await load(); readSpeechPreferences(snapshot.settings); message('Library ready. Changes stay on this browser until you export a backup.');
 });

@@ -14,8 +14,8 @@ Android offers one-touch PLAY: restore device-local choices, prepare automatical
 
 1. Expand **Choose a Session**, choose **REVIEW**, then the **States** series. The page initially uses REVIEW, All series, a 7-day lookahead, and no shuffle.
 2. Choose **Max Deferred** to include non-KNOWN cards even if their 15-minute due time has not arrived. This does not reset their dates. If Delaware is KNOWN, use **AUDIT** instead; AUDIT speaks its final retrieval step only. REVIEW never includes KNOWN material.
-3. Check the voice. **Google UK English Male** is selected when available; otherwise choose an English fallback. **Refresh voices** helps when Chrome loads its inventory late. Start remains unavailable without an English voice.
-4. Set the default recall pause (for example, 4 seconds) and speech rate (for example, 0.9). Each saved per-step recall override takes precedence; zero means no additional recall delay.
+3. Check the voice. Your device-local choice is restored when Chrome discovers it; if unavailable, SR uses **Google UK English Male** or another English fallback without forgetting your preference. **Refresh voices** helps when Chrome loads its inventory late. Start remains unavailable without an English voice.
+4. Set the default recall pause (for example, 4 seconds) and speech rate (for example, 0.9). Voice, rate and default recall persist in this browser/profile across restarts; Library Preview shares voice/rate. These settings do not transfer in JSON backups. Each saved per-step recall override takes precedence; zero means no additional recall delay.
 5. Press **Start** once. Listen for each eligible question → full recall pause → complete answer → next step/card. The panel shows mastery and playback controls; questions and answers are spoken without displaying their text. There should be no extra clicks between steps.
 6. Press **Stop** when finished. Before major changes, use **Data & recovery → Save complete JSON backup** and retain a dated copy outside the browser.
 

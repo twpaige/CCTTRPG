@@ -165,6 +165,7 @@ try {
   await page.locator('#repeat-fc').check(); await press('stop'); await ready(); assert(!(await page.locator('#repeat-fc').isChecked()));
   pass('Repeat FC loops, unchecks after card, mutually excludes Repeat Step; Previous FC preserves credit and clears interrupted mastery/repeat');
   await page.evaluate(async name=>{ const {openDatabase}=await import('./js/db.js'); const {Repository}=await import('./js/repository.js'); const db=await openDatabase({name}); try { const repo=new Repository(db); await repo.setSetting('desktopVoice',{name:'Saved English',language:'en-US',voiceURI:'saved'}); await repo.setSetting('rate',1.2); await repo.setSetting('recallSeconds',6); await repo.setSetting('volume',0.7); } finally {db.close();} },name);
+  await page.evaluate(()=>localStorage.removeItem('sr.desktop.speech.v1'));
   const savedSettings=(await read()).settings; await page.reload(); await page.waitForFunction(()=>!document.getElementById('settings').disabled);
   await page.evaluate(()=>{testVoices(); testSynth.voices.push({name:'Saved English',lang:'en-US',voiceURI:'saved',localService:true}); testSynth.dispatchEvent(new Event('voiceschanged'));});
   await ready(); assert.equal(await page.locator('#rate').inputValue(),'1.2'); assert.equal(await page.locator('#recall').inputValue(),'6');
