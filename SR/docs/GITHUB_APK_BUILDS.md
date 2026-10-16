@@ -1,6 +1,6 @@
 # SR Android APKs from GitHub
 
-**Current status, Stage 10 (2026-10-16):** signing setup is complete. Transition callback correction APK **0.2.102501** passed build/lint/signing and published-download verification through the existing workflow, correcting the owner-reported chime timeout in 0.2.102401. Preserve that configuration and original certificate; do not repeat key setup. Stage 10 uses the same workflow/identity for authored native listening. See [current results and release](TEST_RESULTS.md) and [installation/listening/phone checks](ANDROID_LISTENING.md). The original Stage 2.5 setup record below is historical, including its initially blocked run.
+**Current status, Stage 10 (2026-10-16):** signing setup is complete. Quick Listen APK **0.2.102601** passed build/lint/signing and published-download verification through the existing workflow. It includes the prior transition callback correction. Preserve that configuration and original certificate; do not repeat key setup. Stage 10 uses the same workflow/identity for authored native listening. See [current results and release](TEST_RESULTS.md) and [installation/listening/phone checks](ANDROID_LISTENING.md). The original Stage 2.5 setup record below is historical, including its initially blocked run.
 
 After the one-time signing setup, GitHub builds the app and you install updates directly from your phone's browser. No Android Studio, USB cable, Play Store, paid service, or local build is needed for routine updates. This is Stage 2.5 only; the app and its application ID remain unchanged.
 
