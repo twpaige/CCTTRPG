@@ -2,6 +2,8 @@
 
 Temporary page: [Chime Laboratory](https://crownandcall.com/SR/chime-lab.html).
 
+**2026-10-16 production update:** the owner approved wood and two-note with fixed settings, now integrated into both players; see [PLAYBACK.md](PLAYBACK.md). The laboratory page/code remains unchanged. Adjusting laboratory selections does not configure production playback.
+
 Stop REVIEW in other tabs before auditioning. Use a comfortable device/earbud volume. Each category has eight synthesized candidates: glass, wood, silver, two-note, marimba, wind, felt piano and electronic. The flashcard defaults are lower and longer, with only a small increase in level.
 
 1. Press **Play** beside a candidate to audition it. This does not select it.
@@ -18,7 +20,7 @@ Pitch is the base frequency in Hz (220–660); volume is a bounded relative perc
 
 The copied format identifies the synthesis recipe as `sr-chime-lab-v1`. It is a selection note, not an SR backup/import format. Choices and adjustments are held only in page memory.
 
-## Future transition rules — documentation only, pending approval
+## Original proposed transition rules
 
 - Play the step cue between steps within a flashcard.
 - At a flashcard boundary, the flashcard cue replaces the step cue. Never play both.
@@ -29,7 +31,7 @@ The copied format identifies the synthesis recipe as `sr-chime-lab-v1`. It is a 
 - Use equivalent approved sounds on desktop and Android.
 - A cue indicates a transition, not a completed review or another learning event.
 
-These rules are not integrated into REVIEW, AUDIT or Android. Owner sound selection and explicit integration authorization are still required.
+The owner subsequently authorized production integration with hardcoded settings and no preference controls. The optional device-local preference proposal remains future work only. The rules here do not authorize further changes from this experimental page.
 
 ## Verification
 
