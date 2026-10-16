@@ -1,5 +1,15 @@
 # SR — Test results
 
+## Production transition chimes — 2026-10-16
+
+Owner-approved `sr-chime-lab-v1` settings are hardcoded for desktop REVIEW/AUDIT and native Android: wood / two-note, both 330 Hz, volume 32, duration 0.72 s, decay 69, silence before 0.27 s and after 0.18 s. The laboratory page and synthesis source remain intact. Desktop reuses that synthesis; Android bundles two 48 kHz mono PCM resources rendered from it and plays them as earcons in the existing native TTS queue. [Android's earcon API](https://developer.android.com/reference/android/speech/tts/TextToSpeech#playEarcon(java.lang.String,int,android.os.Bundle,java.lang.String)) shares utterance callbacks with the existing executor; no new audio framework or WebView dependency was introduced.
+
+Transitions compare actual source/destination identities after selection/refresh. Within-card changes use wood; cross-card changes use only two-note. Automatic and manual navigation share the rule. Start, Stop and ordinary speech Pause/Resume add no cue. Pause during a cue cancels it; Resume retries only the cue before its target question. Chime completion never invokes learning-completion handling. Existing recall, scheduling/mastery, replay credit protection, native batching/focus/notifications, playlist announcements, database/backup format, application ID and origin are unchanged.
+
+**481/481 local automated scenarios PASS:** all prior 445 regressions, 12 laboratory checks, and 24 new focused checks (10 desktop transition, 8 native transition, 2 waveform-equivalence, 4 production browser). Coverage includes automatic/manual forward/back boundaries, filtered/KNOWN destinations, repeat and AUDIT refresh, no initial/final cue, no ordinary Resume cue, cancellation/stale callbacks/rapid navigation, audio retry, no overlap or extra receipts, native playlist announcements and 1,000-card/5,000-step batching regressions. Native WAV output matches the actual browser recipe within two 16-bit quantization units, with exact 1.17-second duration and approved silence boundaries. Browser tests use real Web Audio and disposable IndexedDB; speech and native host audio are simulated. Android build/lint, signing, release and live deployment evidence will be recorded after the workflow completes.
+
+Physical Samsung/Bluetooth sound quality, routing, interruption timing and in-place update retention remain owner verification. The release checklist is in [ANDROID_LISTENING.md](ANDROID_LISTENING.md); user-facing behavior is in [PLAYBACK.md](PLAYBACK.md).
+
 ## Chime Laboratory — 2026-10-16
 
 Standalone sound-selection page at `SR/chime-lab.html`, with eight step and eight flashcard variants, independent controls, comparison, a spoken sample, Stop and compact JSON settings copy. Only new laboratory files and documentation were added. Existing speech preferences are reused; no production REVIEW/AUDIT, IndexedDB, backup, Android or scheduling code changed. No APK release.

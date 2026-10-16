@@ -18,6 +18,8 @@ public final class PlaybackEngine {
         void ended();
         default boolean canBegin() { return true; }
         default void started(String unitId) { }
+        default boolean supportsChimes() { return false; }
+        default void chime(String kind, long token) { throw new UnsupportedOperationException("No chime audio adapter"); }
     }
     private final Host host;
     private List<Unit> units = java.util.Collections.emptyList();
@@ -26,6 +28,8 @@ public final class PlaybackEngine {
     private long token, deadline, remaining;
     private boolean began, repeat;
     private boolean announcePasses;
+    private String lastUnit, lastCard, chime;
+    private boolean transitionChecked;
     private final java.util.ArrayDeque<String> announcements = new java.util.ArrayDeque<>();
     public boolean announcing() { return !announcements.isEmpty(); }
 
@@ -33,6 +37,7 @@ public final class PlaybackEngine {
     public Action action() {
         if (!status.equals("playing") && !status.equals("paused")) return null;
         if (announcing()) return new Action("speak", announcements.peek(), 0, "Status");
+        if (chime != null) return new Action("chime", "", 1170, "Transition");
         return unitIndex < units.size() ? units.get(unitIndex).actions().get(actionIndex) : null;
     }
     public String unitName() { try { return unitIndex < units.size() ? units.get(unitIndex).name() : ""; } catch (RuntimeException error) { return "Unavailable"; } }
@@ -51,6 +56,7 @@ public final class PlaybackEngine {
         invalidate(); units = plan; unitIndex = actionIndex = 0;
         announcements.clear(); announcements.addAll(intro); this.announcePasses = announcePasses;
         began = false; this.repeat = repeat;
+        lastUnit = lastCard = chime = null; transitionChecked = false;
         status = paused ? "paused" : "playing"; message = "";
         if (paused) { remaining = plan.isEmpty() ? 0 : plan.get(0).actions().get(0).milliseconds(); host.changed(); }
         else execute(false);
@@ -69,6 +75,14 @@ public final class PlaybackEngine {
         if (unitIndex >= units.size()) { status = "finished"; invalidate(); host.changed(); host.ended(); return; }
         if (!began) {
             if (!host.canBegin()) { status = "paused"; message = "Open SR to save completed steps, then Resume. A mastery change requires a fresh Start."; host.changed(); return; }
+            Unit next = units.get(unitIndex);
+            if (!transitionChecked) {
+                transitionChecked = true;
+                if (host.supportsChimes() && lastUnit != null && (!lastUnit.equals(next.id()) || !lastCard.equals(next.cardId())))
+                    chime = lastCard.equals(next.cardId()) ? "step" : "card";
+            }
+            if (chime != null) { long current = ++token; host.changed(); host.chime(chime, current); return; }
+            lastUnit = next.id(); lastCard = next.cardId();
             host.started(units.get(unitIndex).id()); began = true;
         }
         Action action = action();
@@ -88,10 +102,12 @@ public final class PlaybackEngine {
         // Invalidate first, so duplicate onDone cannot complete a unit twice.
         invalidate();
         if (announcing()) { announcements.remove(); execute(false); return; }
+        if (chime != null) { chime = null; execute(false); return; }
         if (actionIndex + 1 == units.get(unitIndex).actions().size()) {
             try { host.completed(units.get(unitIndex).id()); }
             catch (RuntimeException error) { fail("Could not retain completion: " + error.getMessage()); return; }
             actionIndex = 0; unitIndex++; began = false;
+            transitionChecked = false;
         } else actionIndex++;
         execute(false);
     }
@@ -127,16 +143,18 @@ public final class PlaybackEngine {
         } else target += direction;
         if (target < 0) return;
         invalidate(); announcements.clear(); unitIndex = target;
+        chime = null; transitionChecked = false;
         actionIndex = 0; began = false; message = "";
         if (unitIndex >= units.size() && repeat) { unitIndex = 0; if (announcePasses) announcements.add("Replaying playlist."); }
         if (unitIndex >= units.size()) { status = "finished"; host.changed(); host.ended(); }
         else if (paused) { status = "paused"; host.changed(); }
         else execute(false);
     }
-    public void stop() { invalidate(); announcements.clear(); status = "stopped"; message = ""; host.changed(); host.ended(); }
+    public void stop() { invalidate(); announcements.clear(); chime = null; lastUnit = lastCard = null; status = "stopped"; message = ""; host.changed(); host.ended(); }
     public void revise(List<Unit> next, int afterId) {
         if (!status.equals("paused")) throw new IllegalStateException("Pause before updating a session.");
         invalidate(); announcements.clear(); units = next;
+        chime = null; transitionChecked = false;
         int low = 0, high = units.size();
         while (low < high) { int middle = low + (high - low) / 2; if (Integer.parseInt(units.get(middle).id()) <= afterId) low = middle + 1; else high = middle; }
         unitIndex = low;

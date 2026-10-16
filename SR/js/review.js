@@ -7,13 +7,13 @@ const defaultClock = {
 // One pending action at a time. Every replacement invalidates its old continuation.
 export class ReviewController {
   constructor(cards, speech, { clock = defaultClock, onChange = () => {}, onEvent = () => {},
-    prepareStep, completeStep, refreshRepeat, discardStep = () => {}, nextCycle, segment = text => [text], recall = (_step, settings) => settings.recallMs } = {}) {
+    prepareStep, completeStep, refreshRepeat, transition, discardStep = () => {}, nextCycle, segment = text => [text], recall = (_step, settings) => settings.recallMs } = {}) {
     this.cards = cards;
     this.speech = speech;
     this.clock = clock;
     this.onChange = onChange;
     this.onEvent = onEvent;
-    this.hooks = { prepareStep, completeStep, refreshRepeat, discardStep, nextCycle, segment, recall };
+    this.hooks = { prepareStep, completeStep, refreshRepeat, transition, discardStep, nextCycle, segment, recall };
     this.part = 0;
     this.status = 'idle';
     this.phase = 'question';
@@ -65,6 +65,7 @@ export class ReviewController {
     this.cardIndex = 0;
     this.stepIndex = 0;
     this.repeatCurrent = this.repeatCard = false;
+    this.lastSpokenStep = undefined;
     this._newStep();
     this.error = '';
     this.status = 'playing';
@@ -153,6 +154,7 @@ export class ReviewController {
   }
 
   _newStep() {
+    this.transitionChecked = false;
     this.hooks.discardStep();
     this.context = undefined;
     this.work = undefined;
@@ -245,8 +247,26 @@ export class ReviewController {
       }, Math.min(this.remainingMs, 2147483647));
       return;
     }
+    if (this.phase === 'question' && this.part === 0 && !this.transitionChecked) {
+      this.transitionChecked = true;
+      const from = this.lastSpokenStep, to = this.snapshot;
+      if (this.hooks.transition && from && (from.cardId !== to.card.id || from.stepId !== to.step.id)) {
+        this.chimeKind = from.cardId === to.card.id ? 'step' : 'card';
+        this.phase = 'chime';
+      }
+    }
     this.abort = new AbortController();
+    if (this.phase === 'chime') {
+      this._publish('chime-requested');
+      const signal = this.abort.signal, kind = this.chimeKind;
+      Promise.resolve().then(() => this.hooks.transition(kind, { signal })).then(result => {
+        if (!stillCurrent() || result !== 'ended') return;
+        this.abort = null; this.phase = 'question'; this._execute();
+      }).catch(error => { if (stillCurrent()) this._error(error); });
+      return;
+    }
     const step = this.cards[this.cardIndex].steps[this.stepIndex];
+    if (this.phase === 'question') this.lastSpokenStep = { cardId: this.cards[this.cardIndex].id, stepId: step.id };
     const parts = this.parts ??= this.hooks.segment(step[this.phase]);
     this._publish(`${this.phase}-requested`);
     this.speech.speak(parts[this.part], { ...this.settings, signal: this.abort.signal }).then(result => {

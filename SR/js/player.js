@@ -6,6 +6,8 @@ import { playbackStatus } from './player-status.js';
 import { englishVoices, selectVoice, voiceKey, watchVoices, PREFERRED_VOICE } from './voices.js';
 import { INTERVAL_LABELS, selectReview, selectAudit } from './scheduler.js';
 import { readSpeechPreferences, saveSpeechPreferences, preferredVoice } from './speech-preferences.js';
+import { TransitionChimes } from './transition-chimes.js';
+const chimes = new TransitionChimes();
 const $ = id => document.getElementById(id);
 let db, session, library, inventory = [], busy = false, watcher, countdown, displayedToken, displayedProgress;
 let savedNotice, noticeTimer;
@@ -144,9 +146,9 @@ $('voice').onchange = () => {
   if (voice) speechPreferences.voice = { name: voice.name, language: voice.lang, voiceURI: voice.voiceURI };
   rememberSpeech();
 };
-$('start').onclick = () => run(async () => { await session.start(options()); if (session.options) $('session-panel').open = false; });
+$('start').onclick = () => run(async () => { await chimes.unlock(); await session.start(options()); if (session.options) $('session-panel').open = false; });
 $('pause').onclick = () => session.pause();
-$('resume').onclick = () => { $('error').textContent = ''; session.resume(); };
+$('resume').onclick = () => run(async () => { await chimes.unlock(); session.resume(); });
 $('skip').onclick = () => { $('error').textContent = ''; session.skip(); };
 $('skip-step').onclick = () => { $('error').textContent = ''; session.skipStep(); };
 $('previous-step').onclick = () => { $('error').textContent = ''; session.previousStep(); };
@@ -154,7 +156,7 @@ $('previous-fc').onclick = () => { $('error').textContent = ''; session.previous
 $('repeat-step').onchange = () => session.setRepeat($('repeat-step').checked);
 $('repeat-fc').onchange = () => session.setRepeatCard($('repeat-fc').checked);
 $('stop').onclick = () => run(async () => { await session.stop(); await load(); });
-$('restart').onclick = () => run(async () => { await session.restart(); $('session-panel').open = false; });
+$('restart').onclick = () => run(async () => { await chimes.unlock(); await session.restart(); $('session-panel').open = false; });
 $('reload').onclick = () => run(load);
 for (const [id, type] of [['reset', 'resetCard'], ['reset-final', 'resetFinal'], ['reset-objective', 'resetObjective']])
   $(id).onclick = () => run(() => session.special(type, message => confirm(message)));
@@ -166,7 +168,7 @@ await run(async () => {
   if (name !== null && !/^SRLearning-test-[a-zA-Z0-9-]+$/.test(name)) throw new Error('Invalid isolated test database name.');
   if (name) { document.querySelector('h1').textContent += ' — disposable test library'; for (const id of ['library-link', 'mastery-link', 'data-link']) $(id).href += `?test=${encodeURIComponent(name)}`; }
   db = await openDatabase({ name: name || undefined, onBlocked: error, onVersionChange: reason => { void session?.stop(); db = undefined; error(reason); render(); } });
-  session = new StudySession(db, new BrowserSpeech(globalThis.speechSynthesis, globalThis.SpeechSynthesisUtterance), { onChange: render });
+  session = new StudySession(db, new BrowserSpeech(globalThis.speechSynthesis, globalThis.SpeechSynthesisUtterance), { onChange: render, transition: (kind, options) => chimes.play(kind, options) });
   await load();
   speechPreferences = readSpeechPreferences(library.settings);
   $('recall').value = speechPreferences.recall; $('rate').value = speechPreferences.rate;

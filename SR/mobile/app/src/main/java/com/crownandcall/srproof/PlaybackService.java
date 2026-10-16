@@ -150,6 +150,10 @@ public final class PlaybackService extends Service implements PlaybackEngine.Hos
         selectedVoice = choice.getName();
         if (tts.setSpeechRate(plan.rate) != TextToSpeech.SUCCESS || tts.setPitch(1f) != TextToSpeech.SUCCESS) { engine.fail("TTS settings were rejected."); return; }
         tts.setAudioAttributes(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build());
+        if (tts.addEarcon("sr-step", getPackageName(), R.raw.sr_step) != TextToSpeech.SUCCESS
+            || tts.addEarcon("sr-card", getPackageName(), R.raw.sr_card) != TextToSpeech.SUCCESS) {
+            engine.fail("Transition sounds could not be loaded. Stop and try again."); return;
+        }
         tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
             @Override public void onStart(String id) { }
             @Override public void onDone(String id) { control.post(() -> { if (!destroyed) engine.done(Long.parseLong(id)); }); }
@@ -206,6 +210,14 @@ public final class PlaybackService extends Service implements PlaybackEngine.Hos
         }
     }
     @Override public long now() { return SystemClock.elapsedRealtime(); }
+    @Override public boolean supportsChimes() { return true; }
+    @Override public void chime(String kind, long token) {
+        // Earcons share the existing TTS queue, media routing, focus and cancellation.
+        // The WAV includes the approved leading/trailing silence; onDone gates speech.
+        actions.postDelayed(() -> engine.failed(token, "Transition sound timed out. Resume retries."), 15000);
+        if (tts.playEarcon("sr-" + kind, TextToSpeech.QUEUE_FLUSH, null, Long.toString(token)) == TextToSpeech.ERROR)
+            engine.failed(token, "Transition sound could not play. Resume retries.");
+    }
     @Override public void speak(String text, long token) {
         if (text.trim().isEmpty()) { actions.post(() -> engine.done(token)); return; }
         if (text.length() > TextToSpeech.getMaxSpeechInputLength()) { engine.failed(token, "Text exceeds this TTS engine's input limit."); return; }

@@ -26,6 +26,23 @@ Previous Step goes to the preceding eligible step in the retained sequence, incl
 
 Stage 10 remains ACTIVE; Stage 7 SUPERSEDED; Stages 8, 9 and 11 ON HOLD. No new framework, cloud API, backend or recovery journal. The earlier prepare/play architecture below remains internal implementation context; current operation uses a single PLAY.
 
+## Approved transition chimes
+
+The native executor plays warm wood within a flashcard and the two-note cue across flashcards, including automatic replay and manual Next/Previous. These replace one another at a boundary; no spoken next-step/card phrase is added. Existing playlist announcements are preserved. Chimes run entirely in the native TTS audio queue, using two bundled mono 48 kHz PCM WAV resources rendered from the approved laboratory synthesis. Each includes 270 ms silence + 720 ms tone + 180 ms silence, with pitch 330 Hz, volume 32% and decay 69%. They do not depend on the WebView, consume completion-queue entries, change batching, or create learning events.
+
+The existing TTS progress listener gates the next question on earcon completion; the same stop, audio-focus, media routing, watchdog and notification paths apply. Pause during a chime cancels it; Resume retries the cue before speaking the target question. Resume during ordinary speech has no new chime. Rapid navigation cancels stale cues. Initial Start and Stop are silent except for the existing playlist announcements. Settings are fixed for this release; there are no chime controls or new database/backup fields.
+
+Owner Samsung verification for this release:
+
+1. Install the new signed APK over the existing app without uninstalling. Confirm the existing library, native voice and rate survive.
+2. Through Bluetooth earbuds, play multi-step/multi-card REVIEW and AUDIT. Check warm wood within a card, two-note across cards, never both, comfortable volume and no clipped beginning/tail.
+3. Check Next/Previous Step and FC, including filtered/KNOWN gaps and a mastery change that prunes prepared material. Each actual destination gets the right cue with no unfinished-answer credit.
+4. Pause and Stop during the leading silence, tone and trailing silence. Confirm prompt silence, no delayed question after Stop, and one cue retry on Resume. Pause/Resume ordinary speech must not add a cue.
+5. Lock the phone and run across native batches and full-session replay. Check start/completion/replay announcements, notification Pause/Resume/Skip, audio-focus loss and Bluetooth disconnect. No cue should overlap question/answer speech.
+6. Reopen the app and confirm progress reconciliation, repeat-pass credit protection, JSON export/import safeguards and manual transfer still work. Compare perceived sound against the desktop player with the same earbuds; OS/device media volume can differ.
+
+Automated waveform and transition checks cannot certify physical routing, earbud sound quality or OEM focus behavior.
+
 ## Controls and mastery
 
 - **Pause / Resume:** retain the prepared session and position. Resume repeats an interrupted speech segment; recall resumes its remaining time. Exact long passages are segmented for TTS, with possible small native TTS gaps. A 120-second stalled-segment watchdog reports an error without guessing completion.

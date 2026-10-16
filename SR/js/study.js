@@ -20,9 +20,10 @@ export function speechParts(text, limit = 400) {
 
 // Storage/policy adapter for the one existing speech controller, not another audio loop.
 export class StudySession {
-  constructor(db, speech, { onChange = () => {}, clock, now = () => Date.now(), rng = Math.random } = {}) {
+  constructor(db, speech, { onChange = () => {}, transition, clock, now = () => Date.now(), rng = Math.random } = {}) {
     this.db = db; this.speech = speech; this.onChange = onChange; this.clock = clock; this.now = now; this.rng = rng;
     this.completion = new StepCompletionController(db);
+    this.transition = transition;
     this.operations = new Set(); this.epoch = 0; this.starting = false;
   }
   track(promise) {
@@ -72,6 +73,7 @@ export class StudySession {
       };
       this.controller = new ReviewController(this.select(snapshot), this.speech, {
         clock: this.clock,
+        transition: this.transition,
         segment: speechParts,
         recall: (step, settings) => recallSeconds(step, settings.recallMs / 1000) * 1000,
         discardStep: () => this.completion.interrupt(),
