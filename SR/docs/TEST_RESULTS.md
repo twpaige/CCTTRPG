@@ -8,7 +8,13 @@ The minimal production change supplies the same token in the parameter Bundle an
 
 The new framework-contract test compiles the production service's chime and cancel method bodies against an Android API double that models the actual Bundle lookup and queued asynchronous callbacks, using the real native executor. It **failed before the fix** with “Earcon callback ID is missing from the parameter Bundle”; **9/9 cases pass after correction**. Cases cover consecutive steps, flashcard boundaries, Bluetooth-style delayed callback delivery, Pause/Resume with stale callbacks, Stop before queued completion delivery, unchanged timeout and retry, navigation, enqueue failure and duplicate completion. Previous tests directly simulated executor completion and missed this platform-contract error. These tests are not a physical Samsung reproduction or Bluetooth certification.
 
-**490/490 local automated scenarios PASS**: all prior 481 scenarios plus the nine new callback-contract cases. Full browser/storage/recovery/editor/mastery/desktop/native regression suites, release-safety checks, native batching stress, and unchanged waveform equivalence checks passed. Build/lint, signing and publication evidence follows after the existing release workflow completes. Remaining owner check: update in place and repeat Psalm 23 across consecutive steps/card boundaries, Bluetooth/locked-screen playback and Pause/Resume/Stop during transitions.
+**490/490 local automated scenarios PASS**: all prior 481 scenarios plus the nine new callback-contract cases. Full browser/storage/recovery/editor/mastery/desktop/native regression suites, release-safety checks, native batching stress, and unchanged waveform equivalence checks passed.
+
+Implementation `d9aec5f26980659ce2e33df649fd5f0a41e4eea9` pushed to origin/main. [Android workflow 38916945811](https://github.com/twpaige/CCTTRPG/actions/runs/38916945811) passed cloud regressions, Android release build/lint, signing/upgrade-identity verification and published-download verification. Corrected signed APK **0.2.102501**: [download](https://github.com/twpaige/CCTTRPG/releases/download/sr-android-102501/SR.apk).
+
+Independent download SHA-256 matches metadata: `daed51494b4e932957fa34d173179ab02533a5ca10bbdd5919d46369837411da`. The downloaded APK's certificate remains `ee98699416f616b1707fee62d4311a9de26c30c848b6abd6206112db01f0f0cb`; application ID remains `com.crownandcall.srproof`, origin remains `https://sr.invalid/`. Both packaged WAVs byte-match the approved source renders and APK 0.2.102401. No desktop or learning-data changes.
+
+Remaining owner check: install **0.2.102501** over the existing app without uninstalling, then repeat Psalm 23 across consecutive steps/card boundaries, Bluetooth/locked-screen playback and Pause/Resume/Stop during transitions. Physical Samsung confirmation remains pending.
 
 ## Production transition chimes — 2026-10-16
 
