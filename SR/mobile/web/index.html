@@ -21,7 +21,8 @@
 <details id="voice-panel"><summary>Voice &amp; Recall</summary><fieldset id="voice-settings" disabled><legend class="sr-only">Voice and recall settings</legend>
 <label>Offline English voice<select id="voice"><option value="">Automatic offline English</option></select></label><button id="refresh">Refresh voices</button><p id="voice-message" class="note"></p>
 <label>Speaking rate<input id="rate" type="number" min="0.5" max="2" step="0.1" value="0.9"></label>
-<label>Default recall seconds<input id="recall" type="number" min="0" step="any" value="4"></label><p class="note">Saved per-step recall overrides this default.</p></fieldset></details>
+<label>Default recall seconds<input id="recall" type="number" min="0" step="any" value="4"></label>
+<label><input id="quick-listen" type="checkbox"> Quick Listen (2s)</label><p class="note">Quick Listen overrides all recall pauses for the next playlist. When off, saved per-step recall overrides the default.</p></fieldset></details>
 <details id="data-panel"><summary>Data &amp; JSON Recovery</summary><p><a id="data" href="data/index.html">Open JSON import, export &amp; backups</a></p><button id="save-progress">Save pending progress / retry</button><p id="platform" class="note"></p></details>
 <dialog id="confirmation"><form method="dialog"><h2>Confirm mastery change</h2><p id="confirmation-text"></p><div class="toolbar"><button value="cancel">Cancel</button><button value="confirm">Confirm</button></div></form></dialog>
 </main><script type="module" src="mobile.js"></script></body></html>

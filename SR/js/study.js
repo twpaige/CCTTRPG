@@ -75,7 +75,7 @@ export class StudySession {
         clock: this.clock,
         transition: this.transition,
         segment: speechParts,
-        recall: (step, settings) => recallSeconds(step, settings.recallMs / 1000) * 1000,
+        recall: (step, settings) => recallSeconds(step, settings.recallMs / 1000, settings.quickListen) * 1000,
         discardStep: () => this.completion.interrupt(),
         prepareStep: state => {
           const prior = [...this.operations], generation = this.completion.generation;

@@ -13,7 +13,7 @@ const yieldUI = () => new Promise(resolve => setTimeout(resolve, 0));
 function settings() {
   for (const id of ['recall', 'rate', 'days']) if (!$(id).reportValidity() || $(id).value === '') throw new Error('Enter valid listening settings.');
   return { mode: $('mode').value, seriesId: $('series').value, window: { type: $('window').value, days: Number($('days').value) },
-    random: $('random').checked, recall: Number($('recall').value), rate: Number($('rate').value), voiceName: $('voice').value };
+    random: $('random').checked, quickListen: $('quick-listen').checked, recall: Number($('recall').value), rate: Number($('rate').value), voiceName: $('voice').value };
 }
 function remember() { savePreferences(localStorage, settings()); }
 function preview() {
@@ -109,7 +109,7 @@ for (const [id, command] of [['previous-fc', 'PREVIOUS_FC'], ['previous-step', '
 $('refresh').onclick = () => native.refresh();
 $('save-progress').onclick = () => run(drain);
 $('data').onclick = event => { const s = state(); if (busy || s.prepared || s.serviceRunning || s.queuedCount) { event.preventDefault(); $('error').textContent = 'Stop playback and save pending progress before opening Data.'; } };
-for (const id of ['mode', 'series', 'window', 'days', 'random', 'recall', 'rate', 'voice']) $(id).onchange = () => {
+for (const id of ['mode', 'series', 'window', 'days', 'random', 'recall', 'quick-listen', 'rate', 'voice']) $(id).onchange = () => {
   preferences.seriesId = $('series').value; preferences.voiceName = $('voice').value;
   try { remember(); preview(); } catch (error) { $('error').textContent = 'Could not save listening settings: ' + error.message; }
 };
@@ -160,6 +160,7 @@ try {
   if (!native) throw new Error('Open this listening page inside the Android application.');
   $('mode').value = preferences.mode; $('window').value = preferences.window.type; $('days').value = preferences.window.days; $('random').checked = preferences.random;
   $('rate').value = preferences.rate; $('recall').value = preferences.recall;
+  $('quick-listen').checked = preferences.quickListen;
   if (preferences.voiceName) { $('voice').append(option(preferences.voiceName, preferences.voiceName)); $('voice').value = preferences.voiceName; }
   db = await openDatabase({ onBlocked: message => { $('error').textContent = message; }, onVersionChange: message => { db = undefined; $('error').textContent = message; render(); } });
   await drain(); await reload(); render();

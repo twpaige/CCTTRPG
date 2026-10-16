@@ -2,6 +2,13 @@
 
 Open **[https://crownandcall.com/SR/](https://crownandcall.com/SR/)** in the **same desktop Chrome profile** where you created States/Delaware. Close old SR tabs and reload once after the update. The player uses the existing library; do not clear site data, import sample data, or reset your cards to enable playback. The editor is now the **Library editor** link at `/SR/library.html`.
 
+## Quick Listen (2s) — 2026-10-16
+
+Enable **Quick Listen (2s)** beside Recall pause in **Choose a Session** (Android: **Voice & Recall**) before starting. Every question-to-answer recall pause then lasts exactly two seconds, including steps authored with zero, short or long pauses. Turn it off to use each step's authored recall duration, or the device default when unspecified.
+
+The checkbox defaults to off and persists in existing browser/device-local preferences across restarts. It is excluded from library JSON; importing a backup does not change it or the authored durations. The selection is captured at Start/preparation and cannot be changed during playback. Stop before choosing a different value. Android writes the resolved waits into its prepared native playlist, including all batches and repetitions; no WebView wake-up is required.
+
+Quick Listen is a timing option in both REVIEW and AUDIT. Eligibility, mastery, completion credit and scheduling rules are unchanged. Pause/Resume retains the remaining recall time. Chimes, navigation and audio-focus behavior are unchanged.
 ## Owner verification and current limits (2026-10-13)
 
 The owner successfully played a newly authored Delaware flashcard on the home desktop using the live player, hearing all eligible steps in order with correct question/recall/answer timing and automatic progression. They then verified the expected next-review date changes on the Mastery page. **Core desktop audio REVIEW and scheduling are owner-verified; remaining detailed G6 checks are not yet all signed off.** The home library is separate from the earlier daytime-computer library. Back up each library before transferring JSON; importing is not automatic synchronization. Stage 10 now implements [authored Android listening](ANDROID_LISTENING.md); its new physical-device acceptance remains open.

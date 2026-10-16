@@ -234,6 +234,17 @@ try {
   if (process.env.SR_NATIVE_SCREENSHOT) { await page.reload(); await ready(); await page.screenshot({ path: process.env.SR_NATIVE_SCREENSHOT, fullPage: true }); }
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)); assert.deepEqual(errors, []);
   pass('390px controls fit without uncaught JavaScript errors');
+  await page.locator('#voice-panel').evaluate(el => { el.open = true; });
+  assert.equal(await page.locator('#quick-listen').isChecked(), false);
+  await page.locator('#quick-listen').check(); await prepare();
+  assert.ok((await page.evaluate(() => nativeTest.plan().units)).every(row => row.recallMs === 2000));
+  assert.ok(await page.locator('#quick-listen').isDisabled());
+  await stop(); await page.locator('#voice-panel').evaluate(el => { el.open = true; });
+  await page.locator('#quick-listen').uncheck(); await prepare();
+  const ordinary = await page.evaluate(() => nativeTest.plan().units), authored = await read();
+  for (const row of ordinary) assert.equal(row.recallMs, (authored.flashcards.find(c => c.id === row.cardId).steps.find(s => s.id === row.stepId).recallSeconds ?? 12) * 1000);
+  await stop(); await page.locator('#voice-panel').evaluate(el => { el.open = true; }); await page.locator('#quick-listen').check();
+  pass('Quick Listen UI bakes two seconds into native preparation, locks active changes and restores authored/default waits when OFF');
   await context.close();
   context = await chromium.launchPersistentContext(profile, { headless: true, executablePath: process.env.SR_BROWSER || undefined, viewport: { width: 390, height: 900 } });
   page = await context.newPage();
@@ -244,6 +255,7 @@ try {
   assert.equal(await page.locator('#series').inputValue(), 'states'); assert.equal(await page.locator('#window').inputValue(), 'max');
   assert.equal(await page.locator('#rate').inputValue(), '1.1'); assert.equal(await page.locator('#recall').inputValue(), '12');
   assert.equal(await page.locator('#voice').inputValue(), 'Offline test'); assert(await page.locator('#random').isChecked());
+  assert.ok(await page.locator('#quick-listen').isChecked());
   pass('Preferences survive an actual isolated browser-process restart without automatic speech');
   console.log(results.length + '/' + results.length + ' native integration domain tests + ' + count + '/' + count + ' mobile UI tests passed. Bridge/audio simulated; IndexedDB real.');
 } finally { await context?.close(); await rm(profile, { recursive: true, force: true }); }

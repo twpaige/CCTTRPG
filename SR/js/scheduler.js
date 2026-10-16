@@ -56,8 +56,8 @@ export function auditCursor() {
   let index = 0, stopped = false;
   return { stop() { stopped = true; }, next(units) { if (stopped || !units.length) return null; const unit = units[index % units.length]; index++; return unit; } };
 }
-export function recallSeconds(step, sessionDefault) {
-  const value = step.recallSeconds ?? sessionDefault;
+export function recallSeconds(step, sessionDefault, quickListen = false) {
+  const value = quickListen === true ? 2 : step.recallSeconds ?? sessionDefault;
   if (!Number.isFinite(value) || value < 0 || value * 1000 > Number.MAX_SAFE_INTEGER) throw new Error('Invalid recall duration.');
   return value;
 }

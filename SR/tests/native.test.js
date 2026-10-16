@@ -139,7 +139,7 @@ test('Playlist reuse remains valid over time only while library, choices and eli
 });
 test('Device-local preferences round-trip every choice without touching the library schema', () => {
   const rows = new Map(), storage = { getItem: key => rows.get(key), setItem: (key, value) => rows.set(key, value) };
-  const choices = { mode: 'AUDIT', seriesId: 'states', window: { type: 'max', days: 14 }, random: true, voiceName: 'offline', rate: 1.2, recall: 90 };
+  const choices = { mode: 'AUDIT', seriesId: 'states', window: { type: 'max', days: 14 }, random: true, quickListen: true, voiceName: 'offline', rate: 1.2, recall: 90 };
   savePreferences(storage, choices); equal(readPreferences(storage), choices); check(rows.size === 1);
   equal(normalize({ rate: NaN, recall: -1, window: { type: 'invalid', days: 0 } }), normalize());
 });

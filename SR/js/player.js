@@ -50,7 +50,7 @@ function options() {
   if (!Number.isFinite(rate) || rate < 0.5 || rate > 2) throw new Error('Speech rate must be from 0.5 to 2.');
   if (!Number.isFinite(recallMs) || recallMs < 0 || recallMs > Number.MAX_SAFE_INTEGER) throw new Error('Enter a finite, nonnegative recall duration.');
   return { mode: $('mode').value, seriesId: $('series').value || undefined, window: { type: $('window').value, days: Number($('days').value) },
-    random: $('random').checked, voice: selectVoice(inventory, $('voice').value), rate, recallMs };
+    random: $('random').checked, quickListen: $('quick-listen').checked, voice: selectVoice(inventory, $('voice').value), rate, recallMs };
 }
 function preview() {
   const audit = $('mode').value === 'AUDIT';
@@ -136,11 +136,12 @@ function rememberSpeech() {
   try {
     const settings = options();
     speechPreferences.rate = settings.rate; speechPreferences.recall = settings.recallMs / 1000;
+    speechPreferences.quickListen = settings.quickListen;
     saveSpeechPreferences(speechPreferences);
   } catch (reason) { error(reason); }
   preview(); render();
 }
-for (const id of ['recall', 'rate']) $(id).onchange = rememberSpeech;
+for (const id of ['recall', 'rate', 'quick-listen']) $(id).onchange = rememberSpeech;
 $('voice').onchange = () => {
   const voice = selectVoice(inventory, $('voice').value);
   if (voice) speechPreferences.voice = { name: voice.name, language: voice.lang, voiceURI: voice.voiceURI };
@@ -172,6 +173,7 @@ await run(async () => {
   await load();
   speechPreferences = readSpeechPreferences(library.settings);
   $('recall').value = speechPreferences.recall; $('rate').value = speechPreferences.rate;
+  $('quick-listen').checked = speechPreferences.quickListen;
   if (!globalThis.speechSynthesis) throw new Error('Native browser speech is unavailable. Use desktop Chrome.');
   watcher = watchVoices(speechSynthesis, ({ voices, waiting }) => {
     inventory = voices;

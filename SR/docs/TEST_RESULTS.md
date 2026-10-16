@@ -1,5 +1,14 @@
 # SR — Test results
 
+## Quick Listen (2s) — 2026-10-16
+
+Added an off-by-default checkbox beside recall settings on desktop and Android. The existing device-local preference records retain it across restart; JSON exports/imports do not transfer it. The shared recall calculation overrides every authored/default pause with two seconds only when enabled. Desktop captures the option at Start; Android writes resolved waits into every prepared native batch. No database migration, authored-content change, new mode, native audio redesign or mastery/scheduling change.
+
+**500/500 local automated checks PASS**: prior 490 plus nine focused Quick Listen groups and one mobile UI preparation check. Focused coverage includes 20 REVIEW/AUDIT × ON/OFF × authored 0/3/60/300/missing timing combinations, device fallback, frozen active settings, Pause/Resume remaining time, independent local preferences, reload and actual browser-process restart, backup exclusion/import preservation, unchanged content and no interrupted-step credit. Four actual JavaScript-generated plans also run through the production Java Plan/PlaybackEngine, verifying every native wait, interruption and single completion receipt. Mobile UI PLAY verifies both override and authored/default prepared units.
+
+Existing storage/recovery/editor/mastery/study/native regressions, native batching stress, earcon callback/interruption tests, release checks and chime waveform equivalence passed. Desktop Chrome and 390px Android WebView-layout checks passed using isolated test profiles. Speech/native bridge are simulated; no physical Samsung result is claimed.
+
+Release workflow, live-site verification and signed APK evidence will be recorded after publication. Physical Samsung checks remain pending; see [ANDROID_LISTENING.md](ANDROID_LISTENING.md). Usage is documented in [PLAYBACK.md](PLAYBACK.md).
 ## Android transition completion callback correction — 2026-10-16
 
 Owner-reported regression in **0.2.102401**, Samsung / Psalm 23: the first step and chime are audible, then progression hangs until “Transition sound timed out. Resume retries.” Investigation found a callback-ID contract mismatch: SR supplied only the separate `playEarcon` ID with a null Bundle. [AOSP TextToSpeechService](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/main/core/java/android/speech/tts/TextToSpeechService.java) uses `AudioSpeechItem.getUtteranceId()` to read `Engine.KEY_PARAM_UTTERANCE_ID` from the Bundle, and suppresses success callbacks when that ID is null. This explains an audible completed chime with no executor advancement; increasing the timeout would not fix it.

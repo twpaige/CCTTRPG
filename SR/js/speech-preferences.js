@@ -7,7 +7,8 @@ export function readSpeechPreferences(legacy = {}) {
   const preferences = {
     voice: value.voice && typeof value.voice.name === 'string' && typeof value.voice.language === 'string' ? value.voice : null,
     rate: Number.isFinite(value.rate) && value.rate >= .5 && value.rate <= 2 ? value.rate : .9,
-    recall: Number.isFinite(value.recall) && value.recall >= 0 && value.recall * 1000 <= Number.MAX_SAFE_INTEGER ? value.recall : 4
+    recall: Number.isFinite(value.recall) && value.recall >= 0 && value.recall * 1000 <= Number.MAX_SAFE_INTEGER ? value.recall : 4,
+    quickListen: value.quickListen === true
   };
   if (!saved) { try { saveSpeechPreferences(preferences); } catch { /* Playback still works without persistence. */ } }
   return preferences;
