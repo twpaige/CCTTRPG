@@ -1,5 +1,13 @@
 # SR — Test results
 
+## Chime Laboratory — 2026-10-16
+
+Standalone sound-selection page at `SR/chime-lab.html`, with eight step and eight flashcard variants, independent controls, comparison, a spoken sample, Stop and compact JSON settings copy. Only new laboratory files and documentation were added. Existing speech preferences are reused; no production REVIEW/AUDIT, IndexedDB, backup, Android or scheduling code changed. No APK release.
+
+**206/206 relevant automated scenarios PASS:** 12 focused laboratory checks, 33 speech tests, 68 editor/preview/preferences scenarios, and 71 desktop study domain + 22 desktop UI scenarios. Focused checks cover all 16 actual synthesized waveforms (finite, non-silent, bounded peak, silent tail), input bounds, settings/copy/fallback, comparison cleanup, speech order/preferred voice/rate, cancellation during speech/recall/pre-tone silence/tone/pending AudioContext resume, switching without overlap, narrow layout, no IndexedDB access and missing Web Audio. Speech and clipboard are simulated; real Web Audio renders tones. Desktop/narrow Chrome screenshots inspected. This is a relevant regression subset, not a rerun of all native/recovery suites.
+
+Owner listening/earbud comfort and final sound selections remain pending. See [CHIME_LAB.md](CHIME_LAB.md) for usage and future transition rules, recorded as documentation only.
+
 ## Website speech Preview and device-local preferences — 2026-10-16
 
 Per-question/answer Preview speaks current unsaved text with the desktop speech adapter, short utterance segmentation and shared voice/rate. Same-button Stop and switching cancel unfinished speech; switching retains the existing library Web Lock to avoid a release/reacquire race. REVIEW/Preview exclude one another without cancelling the active owner. No recall, save, mastery or scheduling action occurs. Navigation and editor actions stop Preview.

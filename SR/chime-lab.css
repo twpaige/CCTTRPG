@@ -1,0 +1,15 @@
+.lab-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.2rem; }
+.lab-grid section, .settings-summary { padding: 1rem; background: white; border: 1px solid #d5ddd1; border-radius: .6rem; }
+.candidate { display: flex; align-items: center; gap: .6rem; padding: .55rem 0; border-bottom: 1px solid #dce3d7; }
+.candidate label { margin: 0; flex: 1; font-weight: 400; }
+.candidate input[type=radio] { display: inline; width: auto; margin: 0 .5rem 0 0; }
+.candidate button { padding: .3rem .65rem; }
+.adjustments { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem 1rem; margin-top: 1rem; }
+.adjustments label { font-size: .9rem; margin: 0; }
+.adjustments input { padding: 0; }
+.lab-actions { position: sticky; top: 0; background: #f3f5f0; padding: .6rem 0; z-index: 1; }
+.lab-actions .toolbar { margin-bottom: .5rem; }
+#status { margin: 0; }
+.settings-summary { margin-top: 1.2rem; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .85rem; }
+@media (max-width: 700px) { .lab-grid { grid-template-columns: 1fr; } }

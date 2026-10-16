@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; base-uri 'none'">
+<title>SR — Chime Laboratory</title><link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="chime-lab.css"></head>
+<body><header><p class="eyebrow">SR · SOUND SELECTION ONLY</p><h1>Chime Laboratory</h1>
+<p>Gentle punctuation for listening. Choose a short step cue and a distinct flashcard cue.</p>
+<a href="index.html">Return to SR</a></header>
+<main><p class="note">Temporary audition page. Stop REVIEW in other tabs before testing. Start with a comfortable device volume. These sounds do not save progress or change your library. Selections last until you reload; copy them to keep them.</p>
+<div class="lab-actions"><div class="toolbar"><button id="compare" class="primary" data-audio>Compare selected sounds</button><button id="sequence" data-audio>Test Listening Sequence</button><button id="stop" class="danger">Stop</button></div><p id="status" role="status">Ready to listen.</p><p id="error" role="alert"></p></div>
+<div id="choices" class="lab-grid"></div>
+<section class="settings-summary"><h2>Selected settings</h2><p>Play auditions a candidate. Select keeps it for comparison and the sample sequence. Adjustments apply to that category.</p>
+<button id="copy">Copy Selected Chime Settings</button><pre id="selected" tabindex="0" aria-label="Selected chime settings"></pre></section>
+<p class="note">The sample uses your desktop voice and rate when available, with a short 1-second recall pause. Sound quality is for you to judge through your usual earbuds.</p>
+<a href="docs/CHIME_LAB.md">Laboratory guide and future transition rules</a></main><script type="module" src="js/chime-lab.js"></script></body></html>
