@@ -8,6 +8,8 @@ Standalone sound-selection page at `SR/chime-lab.html`, with eight step and eigh
 
 Owner listening/earbud comfort and final sound selections remain pending. See [CHIME_LAB.md](CHIME_LAB.md) for usage and future transition rules, recorded as documentation only.
 
+Implementation `087e555a7d1f687f33ecc1bf380247f1b0905cf5` pushed to origin/main. [Pages deployment 38906182479](https://github.com/twpaige/CCTTRPG/actions/runs/38906182479) succeeded. All **12 focused checks passed again against the live page in desktop Chrome**, using an isolated browser context, real synthesized waveforms and simulated speech/clipboard. [Android workflow 38906182562](https://github.com/twpaige/CCTTRPG/actions/runs/38906182562) skipped under `[web-only]`; no APK published.
+
 ## Website speech Preview and device-local preferences — 2026-10-16
 
 Per-question/answer Preview speaks current unsaved text with the desktop speech adapter, short utterance segmentation and shared voice/rate. Same-button Stop and switching cancel unfinished speech; switching retains the existing library Web Lock to avoid a release/reacquire race. REVIEW/Preview exclude one another without cancelling the active owner. No recall, save, mastery or scheduling action occurs. Navigation and editor actions stop Preview.
