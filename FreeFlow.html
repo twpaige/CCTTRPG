@@ -11,6 +11,7 @@
   .shell{width:min(900px,calc(100% - 32px));margin:0 auto;padding:48px 0 64px}
   header{text-align:center;margin-bottom:28px}
   h1{font:300 clamp(36px,7vw,64px)/1.15 system-ui,sans-serif;letter-spacing:.12em;margin:0}
+  .version{color:#777;font:12px system-ui,sans-serif;letter-spacing:.06em;margin:6px 0 0}
   .tagline{color:var(--muted);font:14px system-ui,sans-serif;margin:12px 0 0}
   .notice{margin:22px 0;padding:10px 14px;border:1px solid #665638;color:#e3d0a8;background:#241f17;text-align:center;font-size:13px}
   .nav{display:flex;justify-content:center;gap:8px;margin:0 0 20px}
@@ -44,7 +45,7 @@
 </head>
 <body>
 <main class="shell">
-  <header><h1>FreeFlow</h1><p class="tagline">A space to write without looking back.</p></header>
+  <header><h1>FreeFlow</h1><p class="version">Version 0.2.1</p><p class="tagline">A space to write without looking back.</p></header>
   <div class="notice" role="status">FRAMEWORK PREVIEW — Nothing is saved. Writing disappears when you reload or close this page.</div>
   <nav class="nav" aria-label="Views">
     <button id="writeTab" aria-pressed="true">Write</button>
@@ -190,6 +191,26 @@
     render();
   }
   ['maxBuffer','chunkSize','idleSeconds'].forEach(id=>$(id).addEventListener('input',settings));
+  // Restore writing focus after a completed pointer interaction, not while dragging.
+  function restoreWritingFocus(){
+    if(phase === 'ACTIVE' && view === 'write' && document.hasFocus()){
+      editor.focus({preventScroll:true});
+      caretToEnd();
+    }
+  }
+  document.addEventListener('pointerup', e => {
+    if(phase !== 'ACTIVE' || view !== 'write') return;
+    // Wait until click/default focus handling has completed.
+    setTimeout(restoreWritingFocus, 0);
+  });
+  // Keyboard-driven slider adjustments retain focus until the user releases the key.
+  ['maxBuffer','chunkSize','idleSeconds'].forEach(id => {
+    $(id).addEventListener('keyup', e => {
+      if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(e.key)){
+        restoreWritingFocus();
+      }
+    });
+  });
   setInterval(()=>{if(phase === 'ACTIVE'){remaining = Math.max(0,deadline-Date.now()); if(remaining === 0) expire(); else render();}},150);
   window.addEventListener('beforeunload',e=>{if(phase === 'ACTIVE' && fullText().length){e.preventDefault();e.returnValue='';}});
   settings();
