@@ -20,8 +20,8 @@
   button[aria-pressed="true"]{border-color:#eee;background:#333}
   .topline{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;color:var(--muted);font-size:13px}
   .status{color:var(--ink)}
-  .editor{display:block;width:100%;height:290px;resize:vertical;padding:20px;background:var(--panel);color:var(--ink);border:1px solid var(--line);outline:none;font:18px/1.7 ui-monospace,Consolas,monospace}
-  .editor:focus{border-color:#888}
+  .editor{display:block;width:100%;height:290px;resize:vertical;padding:20px;background:var(--panel);color:var(--ink);border:1px solid transparent;outline:none;font:18px/1.7 ui-monospace,Consolas,monospace}
+  .editor:focus{border-color:transparent}
   .editor::selection{background:transparent;color:inherit}
   .editor:disabled{opacity:.7;cursor:default}
   .hint{min-height:24px;color:var(--muted);font-size:13px;margin:12px 0 20px}
