@@ -52,7 +52,7 @@
 </head>
 <body>
 <main class="shell">
-  <header><h1>FreeFlow</h1><p class="version">Version 0.3.0</p><p class="tagline">A space to write without looking back.</p></header>
+  <header><h1>FreeFlow</h1><p class="version">Version 0.3.1</p><p class="tagline">A space to write without looking back.</p></header>
   <div class="notice" role="status">FRAMEWORK PREVIEW — Nothing is saved. Writing disappears when you reload or close this page.</div>
   <nav class="nav" aria-label="Views">
     <button id="writeTab" aria-pressed="true">Write</button>
@@ -74,7 +74,7 @@
       <h2>Session settings</h2>
       <div class="controls">
         <label>Visible buffer: <output id="maxLabel">50</output> characters<input id="maxBuffer" type="range" min="50" max="500" step="10" value="50"></label>
-        <label>Rollover chunk: <output id="chunkLabel">20</output> characters<input id="chunkSize" type="range" min="10" max="100" step="10" value="20"></label>
+        <label>Rollover chunk: <output id="chunkLabel">20</output> characters<input id="chunkSize" type="range" min="1" max="100" step="1" value="20"></label>
         <label>Idle timeout: <output id="idleLabel">60</output> seconds<input id="idleSeconds" type="range" min="2" max="120" step="1" value="60"></label>
       </div>
     </div>
