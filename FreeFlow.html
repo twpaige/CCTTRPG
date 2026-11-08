@@ -22,6 +22,7 @@
   .status{color:var(--ink)}
   .editor{display:block;width:100%;height:290px;resize:vertical;padding:20px;background:var(--panel);color:var(--ink);border:1px solid var(--line);outline:none;font:18px/1.7 ui-monospace,Consolas,monospace}
   .editor:focus{border-color:#888}
+  .editor::selection{background:transparent;color:inherit}
   .editor:disabled{opacity:.7;cursor:default}
   .hint{min-height:24px;color:var(--muted);font-size:13px;margin:12px 0 20px}
   .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0}
@@ -50,8 +51,8 @@
     <button id="archiveTab" aria-pressed="false">Archive</button>
   </nav>
   <section id="writeView" aria-label="Writing">
-    <div class="topline"><span id="state" class="status">READY</span><span id="timer">Idle timer: —</span><span id="bufferStatus">Visible: 0 / 250</span></div>
-    <textarea id="editor" class="editor" disabled spellcheck="false" placeholder="Press Enter to begin a session…" aria-label="FreeFlow writing area"></textarea>
+    <div class="topline"><span id="state" class="status">READY</span><span id="timer">Idle timer: —</span><span id="bufferStatus">Visible: 0 / 50</span></div>
+    <textarea id="editor" class="editor" disabled spellcheck="false" autocorrect="off" autocapitalize="off" autocomplete="off" placeholder="Press Enter to begin a session…" aria-label="FreeFlow writing area"></textarea>
     <p id="hint" class="hint">Press Enter to begin. During a session, Enter clears the visible buffer without ending the session.</p>
     <div class="stats" aria-label="Session statistics">
       <div class="stat"><strong id="chars">0</strong><span>Characters</span></div>
@@ -61,8 +62,8 @@
     <div class="settings">
       <h2>Session settings</h2>
       <div class="controls">
-        <label>Visible buffer: <output id="maxLabel">250</output> characters<input id="maxBuffer" type="range" min="50" max="500" step="25" value="250"></label>
-        <label>Rollover chunk: <output id="chunkLabel">50</output> characters<input id="chunkSize" type="range" min="10" max="100" step="10" value="50"></label>
+        <label>Visible buffer: <output id="maxLabel">50</output> characters<input id="maxBuffer" type="range" min="50" max="500" step="10" value="50"></label>
+        <label>Rollover chunk: <output id="chunkLabel">20</output> characters<input id="chunkSize" type="range" min="10" max="100" step="10" value="20"></label>
         <label>Idle timeout: <output id="idleLabel">60</output> seconds<input id="idleSeconds" type="range" min="2" max="120" step="1" value="60"></label>
       </div>
     </div>
@@ -81,7 +82,7 @@
   const $ = id => document.getElementById(id);
   const editor = $('editor');
   let phase = 'READY', committed = '', startedAt = 0, expiredAt = 0, deadline = 0, remaining = 0, lastText = '';
-  let maxBuffer = 250, chunkSize = 50, idleSeconds = 60, view = 'write';
+  let maxBuffer = 50, chunkSize = 20, idleSeconds = 60, view = 'write';
   const formatTime = ms => { const s = Math.max(0, Math.floor(ms / 1000)); return String(Math.floor(s / 60)).padStart(2,'0') + ':' + String(s % 60).padStart(2,'0'); };
   const countWords = text => (text.trim().match(/\S+/g) || []).length;
   function fullText(){ return committed + editor.value; }
@@ -99,7 +100,7 @@
     $('archiveView').classList.toggle('hidden',view !== 'archive');
     editor.disabled = phase !== 'ACTIVE';
     editor.placeholder = phase === 'EXPIRED' ? 'EXPIRED — Press Enter for a new session…' : phase === 'READY' ? 'Press Enter to begin a session…' : '';
-    $('hint').textContent = phase === 'ACTIVE' ? 'Keep writing. Enter clears the visible buffer; the session continues. Nothing is saved in this preview.' : phase === 'EXPIRED' ? 'Session expired. Final statistics are frozen. Press Enter to begin a new session.' : 'Press Enter to begin a session. Archive is available before or after writing.';
+    $('hint').textContent = phase === 'ACTIVE' ? 'Forward-only: no corrections, cursor movement or pasting. Enter clears the buffer. Nothing is saved in this preview.' : phase === 'EXPIRED' ? 'Session expired. Final statistics are frozen. Press Enter to begin a new session.' : 'Press Enter to begin a session. Archive is available before or after writing.';
   }
   function begin(){
     committed = ''; editor.value = ''; lastText = ''; startedAt = Date.now(); expiredAt = 0; phase = 'ACTIVE'; deadline = Date.now() + idleSeconds * 1000; remaining = idleSeconds * 1000; view = 'write'; render(); editor.focus();
@@ -119,17 +120,60 @@
     }
     lastText = editor.value;
   }
-  editor.addEventListener('input',() => {
+  // Forward-only editing: all writing is append-only; no cursor repositioning.
+  function caretToEnd(){
     if(phase !== 'ACTIVE') return;
-    if(editor.value !== lastText){
-      rollover(); deadline = Date.now() + idleSeconds * 1000; remaining = idleSeconds * 1000; render();
+    const end = editor.value.length;
+    editor.setSelectionRange(end,end);
+  }
+  editor.addEventListener('beforeinput', e => {
+    if(phase !== 'ACTIVE') { e.preventDefault(); return; }
+    const type = e.inputType || '';
+    if(type !== 'insertText' && type !== 'insertCompositionText'){
+      e.preventDefault(); return;
     }
+    // Replace any accidental selection with a collapsed caret at the end.
+    caretToEnd();
+  });
+  editor.addEventListener('input', () => {
+    if(phase !== 'ACTIVE') return;
+    // Browser input events are checked against the last accepted buffer.
+    // Restore the buffer if a browser editing action removed existing text.
+    if(!editor.value.startsWith(lastText)){
+      editor.value = lastText; caretToEnd(); return;
+    }
+    if(editor.value !== lastText){
+      rollover(); deadline = Date.now() + idleSeconds * 1000;
+      remaining = idleSeconds * 1000; render();
+    }
+    caretToEnd();
   });
   editor.addEventListener('keydown', e => {
-    if(e.key === 'Enter' && !e.isComposing){
-      e.preventDefault(); if(phase === 'ACTIVE'){commitAll(); deadline = Date.now() + idleSeconds * 1000; remaining = idleSeconds * 1000; render();}
+    if(phase !== 'ACTIVE') return;
+    if(e.key === 'Enter'){
+      e.preventDefault();
+      if(!e.repeat && !e.isComposing){
+        commitAll(); deadline = Date.now() + idleSeconds * 1000;
+        remaining = idleSeconds * 1000; render(); caretToEnd();
+      }
+      return;
     }
+    const forbidden = ['Backspace','Delete','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown','Insert'];
+    if(forbidden.includes(e.key) || e.ctrlKey || e.metaKey || (e.altKey && !e.getModifierState('AltGraph'))){
+      // Leave Tab available for keyboard navigation out of the editor.
+      e.preventDefault(); return;
+    }
+    caretToEnd();
   });
+  editor.addEventListener('paste',e=>e.preventDefault());
+  editor.addEventListener('drop',e=>e.preventDefault());
+  editor.addEventListener('dragstart',e=>e.preventDefault());
+  editor.addEventListener('cut',e=>e.preventDefault());
+  editor.addEventListener('copy',e=>e.preventDefault());
+  editor.addEventListener('select',caretToEnd);
+  editor.addEventListener('mouseup',caretToEnd);
+  editor.addEventListener('focus',caretToEnd);
+  editor.addEventListener('touchend',caretToEnd);
   document.addEventListener('keydown',e => {
     if(e.key === 'Enter' && !e.repeat && !e.isComposing && (phase === 'READY' || phase === 'EXPIRED') && view === 'write' && !['BUTTON','INPUT'].includes(document.activeElement.tagName)){
       e.preventDefault(); begin();
