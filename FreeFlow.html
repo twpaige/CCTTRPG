@@ -21,7 +21,14 @@
   button[aria-pressed="true"]{border-color:#eee;background:#333}
   .topline{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;color:var(--muted);font-size:13px}
   .status{color:var(--ink)}
-  .editor{display:block;width:100%;height:290px;resize:vertical;padding:20px;background:var(--bg);color:var(--ink);border:1px solid transparent;outline:none;font:18px/1.7 ui-monospace,Consolas,monospace}
+  .writing-surface{position:relative;height:290px;background:var(--bg);overflow:hidden;cursor:text}
+  .writing-display{position:absolute;inset:0;padding:20px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-all;font:18px/1.7 ui-monospace,Consolas,monospace;pointer-events:none;scrollbar-width:none}
+  .writing-display::-webkit-scrollbar{display:none}
+  .writing-display .ghost{color:transparent}
+  .writing-display .caret{display:inline-block;width:2px;height:1.1em;vertical-align:-.18em;background:var(--ink);animation:blink 1s step-end infinite}
+  @keyframes blink{50%{opacity:0}}
+  .writing-display .placeholder{color:#666}
+  .editor{position:absolute;inset:0;opacity:0;caret-color:transparent;display:block;width:100%;height:290px;resize:vertical;padding:20px;background:var(--bg);color:var(--ink);border:1px solid transparent;outline:none;font:18px/1.7 ui-monospace,Consolas,monospace}
   .editor:focus{border-color:transparent}
   .editor::selection{background:transparent;color:inherit}
   .editor:disabled{opacity:.7;cursor:default}
@@ -40,12 +47,12 @@
   .archive input{width:100%;padding:10px;background:#111;color:#eee;border:1px solid #555;font:inherit}
   .hidden{display:none!important}
   .footer{color:#777;text-align:center;font-size:12px;margin-top:32px}
-  @media(max-width:560px){.shell{padding-top:28px}.controls{grid-template-columns:1fr}.editor{height:250px;padding:14px}.stat{padding:10px 4px}.stat strong{font-size:20px}}
+  @media(max-width:560px){.writing-surface{height:250px}.writing-display{padding:14px}.shell{padding-top:28px}.controls{grid-template-columns:1fr}.editor{height:250px;padding:14px}.stat{padding:10px 4px}.stat strong{font-size:20px}}
 </style>
 </head>
 <body>
 <main class="shell">
-  <header><h1>FreeFlow</h1><p class="version">Version 0.2.1</p><p class="tagline">A space to write without looking back.</p></header>
+  <header><h1>FreeFlow</h1><p class="version">Version 0.3.0</p><p class="tagline">A space to write without looking back.</p></header>
   <div class="notice" role="status">FRAMEWORK PREVIEW — Nothing is saved. Writing disappears when you reload or close this page.</div>
   <nav class="nav" aria-label="Views">
     <button id="writeTab" aria-pressed="true">Write</button>
@@ -53,7 +60,10 @@
   </nav>
   <section id="writeView" aria-label="Writing">
     <div class="topline"><span id="state" class="status">READY</span><span id="timer">Idle timer: —</span><span id="bufferStatus">Visible: 0 / 50</span></div>
-    <textarea id="editor" class="editor" disabled spellcheck="false" autocorrect="off" autocapitalize="off" autocomplete="off" placeholder="Press Enter to begin a session…" aria-label="FreeFlow writing area"></textarea>
+    <div class="writing-surface" id="writingSurface">
+      <div class="writing-display" id="writingDisplay" aria-hidden="true"></div>
+      <textarea id="editor" class="editor" disabled spellcheck="false" autocorrect="off" autocapitalize="off" autocomplete="off" aria-label="FreeFlow writing area"></textarea>
+    </div>
     <p id="hint" class="hint">Press Enter to begin. During a session, Enter clears the visible buffer without ending the session.</p>
     <div class="stats" aria-label="Session statistics">
       <div class="stat"><strong id="chars">0</strong><span>Characters</span></div>
@@ -82,6 +92,64 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const editor = $('editor');
+  const display = $('writingDisplay');
+  let visual = []; // Display-only cells. Rolled-off characters become invisible spaces.
+  let visibleStart = 0;
+  const GHOST = '\u00a0';
+  function updateDisplay(){
+    const fragment = document.createDocumentFragment();
+    if(phase === 'ACTIVE'){
+      const ghost = document.createElement('span');
+      ghost.className = 'ghost';
+      // Preserve visual character positions even after old text rolls out.
+      const visible = document.createElement('span');
+      let ghostText = '', visibleText = '';
+      for(const cell of visual){
+        if(cell.hidden){ghostText += cell.char === '\n' ? '\n' : GHOST; }
+        else { visibleText += cell.char; }
+      }
+      // Build spans in original order, so ghosted cells retain their exact positions.
+      let group = '', hidden = null;
+      const flush = () => {
+        if(!group) return;
+        const node = document.createElement('span');
+        if(hidden) node.className = 'ghost';
+        node.textContent = group;
+        fragment.appendChild(node); group = '';
+      };
+      for(const cell of visual){
+        if(hidden !== null && hidden !== cell.hidden) flush();
+        hidden = cell.hidden;
+        group += cell.hidden && cell.char !== '\n' ? GHOST : cell.char;
+      }
+      flush();
+      const caret = document.createElement('span'); caret.className = 'caret';
+      fragment.appendChild(caret);
+    }else{
+      const hint = document.createElement('span'); hint.className = 'placeholder';
+      hint.textContent = phase === 'EXPIRED' ? 'EXPIRED — Press Enter for a new session…' : 'Press Enter to begin a session…';
+      fragment.appendChild(hint);
+    }
+    display.replaceChildren(fragment);
+    display.scrollTop = display.scrollHeight;
+  }
+  function addVisual(text){
+    for(const char of text) visual.push({char,hidden:false});
+    // Bound the visual DOM history while preserving recent layout and scroll.
+    if(visual.length > 6000){
+      const cut = Math.max(0, visual.length - 3000);
+      const newline = visual.findIndex((cell,i)=>i>=cut && cell.char==='\n');
+      const n = newline >= 0 ? newline+1 : cut;
+      visual.splice(0,n); visibleStart = Math.max(0,visibleStart-n);
+    }
+  }
+  function hideVisual(count){
+    let hidden = 0;
+    for(let i=visibleStart;i<visual.length && hidden<count;i++){
+      if(!visual[i].hidden){visual[i].hidden=true;hidden++;}
+      visibleStart=i+1;
+    }
+  }
   let phase = 'READY', committed = '', startedAt = 0, expiredAt = 0, deadline = 0, remaining = 0, lastText = '';
   let maxBuffer = 50, chunkSize = 20, idleSeconds = 60, view = 'write';
   const formatTime = ms => { const s = Math.max(0, Math.floor(ms / 1000)); return String(Math.floor(s / 60)).padStart(2,'0') + ':' + String(s % 60).padStart(2,'0'); };
@@ -100,13 +168,13 @@
     $('writeView').classList.toggle('hidden',view !== 'write');
     $('archiveView').classList.toggle('hidden',view !== 'archive');
     editor.disabled = phase !== 'ACTIVE';
-    editor.placeholder = phase === 'EXPIRED' ? 'EXPIRED — Press Enter for a new session…' : phase === 'READY' ? 'Press Enter to begin a session…' : '';
+    updateDisplay();
     $('hint').textContent = phase === 'ACTIVE' ? 'Forward-only: no corrections, cursor movement or pasting. Enter clears the buffer. Nothing is saved in this preview.' : phase === 'EXPIRED' ? 'Session expired. Final statistics are frozen. Press Enter to begin a new session.' : 'Press Enter to begin a session. Archive is available before or after writing.';
   }
   function begin(){
-    committed = ''; editor.value = ''; lastText = ''; startedAt = Date.now(); expiredAt = 0; phase = 'ACTIVE'; deadline = Date.now() + idleSeconds * 1000; remaining = idleSeconds * 1000; view = 'write'; render(); editor.focus();
+    committed = ''; editor.value = ''; lastText = ''; visual = []; visibleStart = 0; startedAt = Date.now(); expiredAt = 0; phase = 'ACTIVE'; deadline = Date.now() + idleSeconds * 1000; remaining = idleSeconds * 1000; view = 'write'; render(); editor.focus();
   }
-  function commitAll(){ committed += editor.value; editor.value = ''; lastText = ''; }
+  function commitAll(){ committed += editor.value; editor.value = ''; lastText = ''; visual = []; visibleStart = 0; updateDisplay(); }
   function expire(){
     if(phase !== 'ACTIVE') return;
     commitAll(); expiredAt = Date.now(); phase = 'EXPIRED'; remaining = 0; render();
@@ -115,6 +183,7 @@
     while(editor.value.length > maxBuffer){
       const amount = Math.min(chunkSize,editor.value.length);
       committed += editor.value.slice(0,amount);
+      hideVisual(amount);
       const pos = editor.selectionStart, end = editor.selectionEnd;
       editor.value = editor.value.slice(amount);
       editor.setSelectionRange(Math.max(0,pos-amount),Math.max(0,end-amount));
@@ -144,6 +213,7 @@
       editor.value = lastText; caretToEnd(); return;
     }
     if(editor.value !== lastText){
+      addVisual(editor.value.slice(lastText.length));
       rollover(); deadline = Date.now() + idleSeconds * 1000;
       remaining = idleSeconds * 1000; render();
     }
@@ -175,6 +245,7 @@
   editor.addEventListener('mouseup',caretToEnd);
   editor.addEventListener('focus',caretToEnd);
   editor.addEventListener('touchend',caretToEnd);
+  $('writingSurface').addEventListener('click',restoreWritingFocus);
   document.addEventListener('keydown',e => {
     if(e.key === 'Enter' && !e.repeat && !e.isComposing && (phase === 'READY' || phase === 'EXPIRED') && view === 'write' && !['BUTTON','INPUT'].includes(document.activeElement.tagName)){
       e.preventDefault(); begin();
@@ -214,6 +285,7 @@
   setInterval(()=>{if(phase === 'ACTIVE'){remaining = Math.max(0,deadline-Date.now()); if(remaining === 0) expire(); else render();}},150);
   window.addEventListener('beforeunload',e=>{if(phase === 'ACTIVE' && fullText().length){e.preventDefault();e.returnValue='';}});
   settings();
+  updateDisplay();
 })();
 </script>
 </body>
