@@ -1,23 +1,155 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>FreeFlow — Coming Soon</title>
-  <style>
-    :root { color-scheme: dark; }
-    * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #111; color: #eee; font: 16px/1.6 system-ui, sans-serif; }
-    main { padding: 2rem; text-align: center; }
-    h1 { margin: 0 0 .6rem; font-size: clamp(2.5rem, 8vw, 5rem); font-weight: 300; letter-spacing: .12em; }
-    p { margin: 0; color: #aaa; }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FreeFlow</title>
+<style>
+  :root{color-scheme:dark;--bg:#111;--panel:#181818;--line:#383838;--ink:#eee;--muted:#aaa}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--ink);font:15px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace}
+  .shell{width:min(900px,calc(100% - 32px));margin:0 auto;padding:48px 0 64px}
+  header{text-align:center;margin-bottom:28px}
+  h1{font:300 clamp(36px,7vw,64px)/1.15 system-ui,sans-serif;letter-spacing:.12em;margin:0}
+  .tagline{color:var(--muted);font:14px system-ui,sans-serif;margin:12px 0 0}
+  .notice{margin:22px 0;padding:10px 14px;border:1px solid #665638;color:#e3d0a8;background:#241f17;text-align:center;font-size:13px}
+  .nav{display:flex;justify-content:center;gap:8px;margin:0 0 20px}
+  button{font:inherit;color:var(--ink);background:#222;border:1px solid #555;border-radius:3px;padding:8px 14px;cursor:pointer}
+  button:hover:not(:disabled){background:#333}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  button[aria-pressed="true"]{border-color:#eee;background:#333}
+  .topline{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;color:var(--muted);font-size:13px}
+  .status{color:var(--ink)}
+  .editor{display:block;width:100%;height:290px;resize:vertical;padding:20px;background:var(--panel);color:var(--ink);border:1px solid var(--line);outline:none;font:18px/1.7 ui-monospace,Consolas,monospace}
+  .editor:focus{border-color:#888}
+  .editor:disabled{opacity:.7;cursor:default}
+  .hint{min-height:24px;color:var(--muted);font-size:13px;margin:12px 0 20px}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0}
+  .stat{border:1px solid var(--line);padding:14px;text-align:center;background:var(--panel)}
+  .stat strong{display:block;font-size:24px;font-weight:400;font-variant-numeric:tabular-nums}
+  .stat span{color:var(--muted);font-size:12px}
+  .settings{border-top:1px solid var(--line);margin-top:24px;padding-top:20px}
+  .settings h2,.archive h2{font-size:16px;font-weight:400;margin:0 0 12px}
+  .controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+  label{display:block;color:var(--muted);font-size:13px}
+  input[type=range]{width:100%;accent-color:#ccc;margin:10px 0}
+  .archive{border:1px solid var(--line);background:var(--panel);padding:24px;min-height:280px}
+  .archive p{color:var(--muted)}
+  .archive input{width:100%;padding:10px;background:#111;color:#eee;border:1px solid #555;font:inherit}
+  .hidden{display:none!important}
+  .footer{color:#777;text-align:center;font-size:12px;margin-top:32px}
+  @media(max-width:560px){.shell{padding-top:28px}.controls{grid-template-columns:1fr}.editor{height:250px;padding:14px}.stat{padding:10px 4px}.stat strong{font-size:20px}}
+</style>
 </head>
 <body>
-  <main>
-    <h1>FreeFlow</h1>
-    <p>A space to write without looking back.</p>
-    <p>Development has begun.</p>
-  </main>
+<main class="shell">
+  <header><h1>FreeFlow</h1><p class="tagline">A space to write without looking back.</p></header>
+  <div class="notice" role="status">FRAMEWORK PREVIEW — Nothing is saved. Writing disappears when you reload or close this page.</div>
+  <nav class="nav" aria-label="Views">
+    <button id="writeTab" aria-pressed="true">Write</button>
+    <button id="archiveTab" aria-pressed="false">Archive</button>
+  </nav>
+  <section id="writeView" aria-label="Writing">
+    <div class="topline"><span id="state" class="status">READY</span><span id="timer">Idle timer: —</span><span id="bufferStatus">Visible: 0 / 250</span></div>
+    <textarea id="editor" class="editor" disabled spellcheck="false" placeholder="Press Enter to begin a session…" aria-label="FreeFlow writing area"></textarea>
+    <p id="hint" class="hint">Press Enter to begin. During a session, Enter clears the visible buffer without ending the session.</p>
+    <div class="stats" aria-label="Session statistics">
+      <div class="stat"><strong id="chars">0</strong><span>Characters</span></div>
+      <div class="stat"><strong id="words">0</strong><span>Words</span></div>
+      <div class="stat"><strong id="elapsed">00:00</strong><span>Elapsed</span></div>
+    </div>
+    <div class="settings">
+      <h2>Session settings</h2>
+      <div class="controls">
+        <label>Visible buffer: <output id="maxLabel">250</output> characters<input id="maxBuffer" type="range" min="50" max="500" step="25" value="250"></label>
+        <label>Rollover chunk: <output id="chunkLabel">50</output> characters<input id="chunkSize" type="range" min="10" max="100" step="10" value="50"></label>
+        <label>Idle timeout: <output id="idleLabel">60</output> seconds<input id="idleSeconds" type="range" min="2" max="120" step="1" value="60"></label>
+      </div>
+    </div>
+  </section>
+  <section id="archiveView" class="archive hidden" aria-label="Archive">
+    <h2>Archive</h2>
+    <input aria-label="Search sessions" placeholder="Search saved writing (coming later)" disabled>
+    <p>Once local file access is implemented, your dated session files and full-text search will appear here.</p>
+    <p>This view will be read-only. No files are currently being created.</p>
+  </section>
+  <p class="footer">Single-file HTML · Local file storage and personal records are coming later</p>
+</main>
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const editor = $('editor');
+  let phase = 'READY', committed = '', startedAt = 0, expiredAt = 0, deadline = 0, remaining = 0, lastText = '';
+  let maxBuffer = 250, chunkSize = 50, idleSeconds = 60, view = 'write';
+  const formatTime = ms => { const s = Math.max(0, Math.floor(ms / 1000)); return String(Math.floor(s / 60)).padStart(2,'0') + ':' + String(s % 60).padStart(2,'0'); };
+  const countWords = text => (text.trim().match(/\S+/g) || []).length;
+  function fullText(){ return committed + editor.value; }
+  function render(){
+    $('state').textContent = phase;
+    $('timer').textContent = phase === 'ACTIVE' ? 'Idle timer: ' + Math.ceil(remaining / 1000) + 's' : phase === 'EXPIRED' ? 'Idle timer: EXPIRED' : 'Idle timer: —';
+    $('bufferStatus').textContent = 'Visible: ' + editor.value.length + ' / ' + maxBuffer;
+    $('chars').textContent = fullText().length.toLocaleString();
+    $('words').textContent = countWords(fullText()).toLocaleString();
+    $('elapsed').textContent = formatTime(phase === 'READY' ? 0 : (phase === 'EXPIRED' ? expiredAt : Date.now()) - startedAt);
+    $('archiveTab').disabled = phase === 'ACTIVE';
+    $('writeTab').setAttribute('aria-pressed',String(view === 'write'));
+    $('archiveTab').setAttribute('aria-pressed',String(view === 'archive'));
+    $('writeView').classList.toggle('hidden',view !== 'write');
+    $('archiveView').classList.toggle('hidden',view !== 'archive');
+    editor.disabled = phase !== 'ACTIVE';
+    editor.placeholder = phase === 'EXPIRED' ? 'EXPIRED — Press Enter for a new session…' : phase === 'READY' ? 'Press Enter to begin a session…' : '';
+    $('hint').textContent = phase === 'ACTIVE' ? 'Keep writing. Enter clears the visible buffer; the session continues. Nothing is saved in this preview.' : phase === 'EXPIRED' ? 'Session expired. Final statistics are frozen. Press Enter to begin a new session.' : 'Press Enter to begin a session. Archive is available before or after writing.';
+  }
+  function begin(){
+    committed = ''; editor.value = ''; lastText = ''; startedAt = Date.now(); expiredAt = 0; phase = 'ACTIVE'; deadline = Date.now() + idleSeconds * 1000; remaining = idleSeconds * 1000; view = 'write'; render(); editor.focus();
+  }
+  function commitAll(){ committed += editor.value; editor.value = ''; lastText = ''; }
+  function expire(){
+    if(phase !== 'ACTIVE') return;
+    commitAll(); expiredAt = Date.now(); phase = 'EXPIRED'; remaining = 0; render();
+  }
+  function rollover(){
+    while(editor.value.length > maxBuffer){
+      const amount = Math.min(chunkSize,editor.value.length);
+      committed += editor.value.slice(0,amount);
+      const pos = editor.selectionStart, end = editor.selectionEnd;
+      editor.value = editor.value.slice(amount);
+      editor.setSelectionRange(Math.max(0,pos-amount),Math.max(0,end-amount));
+    }
+    lastText = editor.value;
+  }
+  editor.addEventListener('input',() => {
+    if(phase !== 'ACTIVE') return;
+    if(editor.value !== lastText){
+      rollover(); deadline = Date.now() + idleSeconds * 1000; remaining = idleSeconds * 1000; render();
+    }
+  });
+  editor.addEventListener('keydown', e => {
+    if(e.key === 'Enter' && !e.isComposing){
+      e.preventDefault(); if(phase === 'ACTIVE'){commitAll(); deadline = Date.now() + idleSeconds * 1000; remaining = idleSeconds * 1000; render();}
+    }
+  });
+  document.addEventListener('keydown',e => {
+    if(e.key === 'Enter' && !e.repeat && !e.isComposing && (phase === 'READY' || phase === 'EXPIRED') && view === 'write' && !['BUTTON','INPUT'].includes(document.activeElement.tagName)){
+      e.preventDefault(); begin();
+    }
+  });
+  $('writeTab').addEventListener('click',()=>{view='write';render();});
+  $('archiveTab').addEventListener('click',()=>{if(phase !== 'ACTIVE'){view='archive';render();}});
+  function settings(){
+    maxBuffer = +$('maxBuffer').value;
+    chunkSize = Math.min(+$('chunkSize').value,maxBuffer);
+    idleSeconds = +$('idleSeconds').value;
+    $('maxLabel').textContent = maxBuffer; $('chunkLabel').textContent = chunkSize; $('idleLabel').textContent = idleSeconds;
+    if(phase === 'ACTIVE'){rollover(); deadline = Date.now() + idleSeconds * 1000; remaining = idleSeconds * 1000;}
+    render();
+  }
+  ['maxBuffer','chunkSize','idleSeconds'].forEach(id=>$(id).addEventListener('input',settings));
+  setInterval(()=>{if(phase === 'ACTIVE'){remaining = Math.max(0,deadline-Date.now()); if(remaining === 0) expire(); else render();}},150);
+  window.addEventListener('beforeunload',e=>{if(phase === 'ACTIVE' && fullText().length){e.preventDefault();e.returnValue='';}});
+  settings();
+})();
+</script>
 </body>
 </html>
