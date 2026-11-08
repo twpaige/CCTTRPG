@@ -24,7 +24,6 @@
   .writing-surface{position:relative;height:290px;background:var(--bg);overflow:hidden;cursor:text}
   .writing-display{position:absolute;inset:0;padding:20px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-all;font:18px/1.7 ui-monospace,Consolas,monospace;pointer-events:none;scrollbar-width:none}
   .writing-display::-webkit-scrollbar{display:none}
-  .writing-display .ghost{color:transparent}
   .writing-display .caret{display:inline-block;width:2px;height:1.1em;vertical-align:-.18em;background:var(--ink);animation:blink 1s step-end infinite}
   @keyframes blink{50%{opacity:0}}
   .writing-display .placeholder{color:#666}
@@ -52,7 +51,7 @@
 </head>
 <body>
 <main class="shell">
-  <header><h1>FreeFlow</h1><p class="version">Version 0.3.1</p><p class="tagline">A space to write without looking back.</p></header>
+  <header><h1>FreeFlow</h1><p class="version">Version 0.3.2</p><p class="tagline">A space to write without looking back.</p></header>
   <div class="notice" role="status">FRAMEWORK PREVIEW — Nothing is saved. Writing disappears when you reload or close this page.</div>
   <nav class="nav" aria-label="Views">
     <button id="writeTab" aria-pressed="true">Write</button>
@@ -73,7 +72,7 @@
     <div class="settings">
       <h2>Session settings</h2>
       <div class="controls">
-        <label>Visible buffer: <output id="maxLabel">50</output> characters<input id="maxBuffer" type="range" min="50" max="500" step="10" value="50"></label>
+        <label>Visible buffer: <output id="maxLabel">50</output> characters<input id="maxBuffer" type="range" min="1" max="500" step="1" value="50"></label>
         <label>Rollover chunk: <output id="chunkLabel">20</output> characters<input id="chunkSize" type="range" min="1" max="100" step="1" value="20"></label>
         <label>Idle timeout: <output id="idleLabel">60</output> seconds<input id="idleSeconds" type="range" min="2" max="120" step="1" value="60"></label>
       </div>
@@ -93,36 +92,20 @@
   const $ = id => document.getElementById(id);
   const editor = $('editor');
   const display = $('writingDisplay');
-  let visual = []; // Display-only cells. Rolled-off characters become invisible spaces.
+  let visual = []; // Display-only cells. Rolled-off characters are scrambled once.
   let visibleStart = 0;
-  const GHOST = '\u00a0';
+  const SCRAMBLE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  function scrambledChar(char){
+    // Preserve whitespace and line breaks to keep layout stable.
+    return /\\s/.test(char) ? char : SCRAMBLE[Math.floor(Math.random() * SCRAMBLE.length)];
+  }
   function updateDisplay(){
     const fragment = document.createDocumentFragment();
     if(phase === 'ACTIVE'){
-      const ghost = document.createElement('span');
-      ghost.className = 'ghost';
-      // Preserve visual character positions even after old text rolls out.
-      const visible = document.createElement('span');
-      let ghostText = '', visibleText = '';
-      for(const cell of visual){
-        if(cell.hidden){ghostText += cell.char === '\n' ? '\n' : GHOST; }
-        else { visibleText += cell.char; }
-      }
-      // Build spans in original order, so ghosted cells retain their exact positions.
-      let group = '', hidden = null;
-      const flush = () => {
-        if(!group) return;
-        const node = document.createElement('span');
-        if(hidden) node.className = 'ghost';
-        node.textContent = group;
-        fragment.appendChild(node); group = '';
-      };
-      for(const cell of visual){
-        if(hidden !== null && hidden !== cell.hidden) flush();
-        hidden = cell.hidden;
-        group += cell.hidden && cell.char !== '\n' ? GHOST : cell.char;
-      }
-      flush();
+      // Scramble only the visual copy; editor and committed text stay original.
+      const text = document.createElement('span');
+      text.textContent = visual.map(cell => cell.hidden ? cell.scrambled : cell.char).join('');
+      fragment.appendChild(text);
       const caret = document.createElement('span'); caret.className = 'caret';
       fragment.appendChild(caret);
     }else{
@@ -134,7 +117,7 @@
     display.scrollTop = display.scrollHeight;
   }
   function addVisual(text){
-    for(const char of text) visual.push({char,hidden:false});
+    for(const char of text) visual.push({char,hidden:false,scrambled:null});
     // Bound the visual DOM history while preserving recent layout and scroll.
     if(visual.length > 6000){
       const cut = Math.max(0, visual.length - 3000);
@@ -146,7 +129,7 @@
   function hideVisual(count){
     let hidden = 0;
     for(let i=visibleStart;i<visual.length && hidden<count;i++){
-      if(!visual[i].hidden){visual[i].hidden=true;hidden++;}
+      if(!visual[i].hidden){visual[i].hidden=true;visual[i].scrambled=scrambledChar(visual[i].char);hidden++;}
       visibleStart=i+1;
     }
   }
