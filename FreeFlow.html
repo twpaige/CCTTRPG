@@ -46,9 +46,9 @@ label{font-size:13px;color:var(--muted)}input[type=range]{width:100%;accent-colo
 </style>
 </head>
 <body><main class="shell">
-<header><h1>FreeFlow</h1><p class="version">Version 0.4.6</p><p class="tagline">A space to write without looking back.</p></header>
+<header><h1>FreeFlow</h1><p class="version">Version 0.5.0</p><p class="tagline">A space to write without looking back.</p></header>
 <div id="notice" class="notice hidden" role="status" aria-live="polite"></div>
-<nav class="nav"><button id="writeTab" aria-pressed="true">Write</button><button id="archiveTab" aria-pressed="false">Archive</button><button id="sessionButton" disabled>Begin Session</button><button id="retryButton" class="hidden">Retry Save</button></nav>
+<nav class="nav"><button id="writeTab" aria-pressed="true">Write</button><button id="archiveTab" aria-pressed="false">Archive</button><button id="sessionButton" disabled>Begin Session</button><button id="retryButton" class="hidden">Retry Save</button><button id="recoveryButton" class="hidden">Download Recovery Copy</button></nav>
 <section id="writeView">
 <div class="topline"><span id="state">READY</span><span id="timer">Idle timer: —</span><span id="bufferStatus">Visible: 0 / 50</span></div>
 <div class="writing-surface" id="writingSurface"><div id="writingDisplay" class="writing-display" aria-hidden="true"></div>
@@ -84,6 +84,8 @@ let settings={...DEFAULTS}, records={longest:null,mostCharacters:null,totalSessi
 let folder=null, sessionsFolder=null, sessionFile=null, sessionName='', phase='READY', view='write';
 let text='', committedLength=0, visual=[], visibleStart=0, startedAt=0, expiredAt=0, deadline=0, remaining=0, lastText='';
 let saveBusy=false, dirty=false, saveError=null, ending=false, settingsBusy=false, settingsDirty=false;
+let segmentHasInput=false, lastSavedText='', recoveryTimer=null, orphanRecovery=null;
+const RECOVERY_KEY='freeflow-emergency-draft-v1';
 let filesCache=[], archiveMatches=[], archivePage=1, archiveRenderId=0;
 const PAGE_SIZE=10;
 const ALPHABET='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -138,12 +140,13 @@ function render(){
  $('sessionButton').textContent=phase==='ACTIVE'?'End Session':phase==='EXPIRED'?'New Session':'Begin Session';
  $('sessionButton').disabled=!folder||!['READY','ACTIVE','EXPIRED'].includes(phase);
  $('retryButton').classList.toggle('hidden',phase!=='ERROR');
+ $('recoveryButton').classList.toggle('hidden',!(text&&['ACTIVE','ERROR','ENDING'].includes(phase))&&!orphanRecovery);
  $('archiveTab').disabled=['ACTIVE','ERROR','ENDING'].includes(phase);
  $('writeTab').setAttribute('aria-pressed',String(view==='write'));
  $('archiveTab').setAttribute('aria-pressed',String(view==='archive'));
  $('writeView').classList.toggle('hidden',view!=='write');$('archiveView').classList.toggle('hidden',view!=='archive');
  editor.disabled=phase!=='ACTIVE';
- $('hint').textContent=phase==='ACTIVE'?'Forward-only. Enter adds two line breaks and clears the buffer; Enter again on an empty buffer ends the session.':phase==='ERROR'?'Saving failed. Your complete writing is still in memory. Retry before leaving.':phase==='ENDING'?'Finishing and saving session…':phase==='EXPIRED'?'Final statistics are frozen. Enter begins a new session.':folder?'Press Enter or Begin Session to start writing.':'Select a writable folder, then press Enter or Begin Session.';
+ $('hint').textContent=phase==='ACTIVE'?'Forward-only. Enter saves the segment; Enter again without new typing ends the session.':phase==='ERROR'?'Save failed. Retry or download a recovery copy; your writing is retained.':phase==='ENDING'?'Finishing and saving session…':phase==='EXPIRED'?'Final statistics are frozen. Enter begins a new session.':folder?'Press Enter or Begin Session to start writing.':'Select a writable folder, then press Enter or Begin Session.';
  $('maxLabel').textContent=settings.maxBuffer;$('chunkLabel').textContent=settings.chunkSize;$('idleLabel').textContent=settings.idleSeconds;
  $('records').textContent='Best characters: '+(records.mostCharacters?records.mostCharacters.value.toLocaleString()+' ('+records.mostCharacters.date+')':'—')+' · Longest: '+(records.longest?fmt(records.longest.value)+' ('+records.longest.date+')':'—')+' · Sessions: '+records.totalSessions;
  displayWriting();
@@ -231,6 +234,7 @@ async function reconnect(){
 }
 async function begin(){
  if(!folder||!['READY','EXPIRED'].includes(phase))return;
+ if(orphanRecovery){message('Download the interrupted-session recovery copy before starting another session.');render();return;}
  $('sessionButton').disabled=true;
  try{
   if(!await verifyFolder(folder,true))throw Error('Folder is not writable.');
@@ -241,7 +245,7 @@ async function begin(){
     catch(e){if(e.name==='NotFoundError')break;throw e;}}
   sessionFile=await sessionsFolder.getFileHandle(candidate,{create:true});
   const writable=await sessionFile.createWritable();await writable.write('');await writable.close();
-  sessionName=candidate;text='';committedLength=0;visual=[];visibleStart=0;lastText='';editor.value='';
+  sessionName=candidate;text='';lastSavedText='';segmentHasInput=false;committedLength=0;visual=[];visibleStart=0;lastText='';editor.value='';
   saveError=null;dirty=false;ending=false;startedAt=Date.now();expiredAt=0;
   deadline=Date.now()+settings.idleSeconds*1000;remaining=settings.idleSeconds*1000;
   phase='ACTIVE';view='write';message('Writing to Sessions/'+candidate);render();focusEditor();
@@ -252,9 +256,34 @@ function rollover(){
   const amount=Math.min(settings.chunkSize,editor.value.length);
   committedLength+=amount;maskOld(amount);
   editor.value=editor.value.slice(amount);
-  dirty=true;
  }
  lastText=editor.value;
+}
+// Visual rollover never writes a session file. Only Enter/end/timeout do.
+function persistRecovery(){
+ try{
+  if(['ACTIVE','ERROR','ENDING'].includes(phase)&&sessionName){
+   localStorage.setItem(RECOVERY_KEY,JSON.stringify({name:sessionName,text,startedAt}));
+  }else if(!orphanRecovery)localStorage.removeItem(RECOVERY_KEY);
+ }catch(e){message('Browser recovery backup unavailable: '+e.message);}
+}
+function scheduleRecovery(){
+ if(recoveryTimer)return;
+ recoveryTimer=setTimeout(()=>{recoveryTimer=null;persistRecovery();},1500);
+}
+function downloadRecovery(){
+ const data=orphanRecovery||{name:sessionName,text};
+ if(!data||!data.text)return;
+ const url=URL.createObjectURL(new Blob([data.text],{type:'text/plain;charset=utf-8'}));
+ const a=document.createElement('a');a.href=url;a.download='FreeFlow_RECOVERY_'+(data.name||'session')+'.txt';
+ document.body.appendChild(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),60000);
+ if(orphanRecovery){orphanRecovery=null;try{localStorage.removeItem(RECOVERY_KEY);}catch(e){}render();}
+}
+function requestSave(finalSave=false){
+ if(finalSave){ending=true;phase='ENDING';}
+ dirty=true;persistRecovery();render();
+ if(!saveBusy)void saveSession();
 }
 async function saveSession(){
  if(saveBusy||!sessionFile)return;
@@ -262,47 +291,45 @@ async function saveSession(){
  try{
   while(dirty){
    dirty=false;
-   // Rewriting the complete current session is deliberate: File System Access
-   // createWritable() is atomic-on-close, not an append stream. Never lose a
-   // previously saved prefix, even with a 1-character rollover.
    const snapshot=text;
    const stream=await sessionFile.createWritable({keepExistingData:false});
    try{await stream.write(snapshot);await stream.close();}
    catch(e){try{await stream.abort();}catch(_){}throw e;}
+   const actual=await (await sessionFile.getFile()).text();
+   if(actual!==snapshot)throw Error('Saved file verification mismatch');
+   lastSavedText=snapshot;
+   persistRecovery();
   }
+  saveError=null;
   if(ending)await finish();
+  else if(phase==='ERROR'){phase='ACTIVE';deadline=Date.now()+settings.idleSeconds*1000;remaining=settings.idleSeconds*1000;render();focusEditor();}
  }catch(e){
-  dirty=true;saveError=e;phase='ERROR';ending=false;
-  message('SAVE FAILED: '+e.message+' — writing paused; text retained in memory.');
-  render();
- }finally{saveBusy=false;}
+  dirty=true;saveError=e;phase='ERROR';
+  // Preserve ending: retry must only end if the original save was final.
+  persistRecovery();message('SAVE FAILED: '+e.message+' — text retained; retry or download recovery copy.');render();
+ }finally{saveBusy=false;if(dirty&&phase!=='ERROR')void saveSession();}
 }
-function scheduleSave(){dirty=true;void saveSession();}
 async function retry(){
- if(phase!=='ERROR')return;
+ if(phase!=='ERROR'||saveBusy)return;
  try{
   if(!await verifyFolder(folder,true))throw Error('Write access not granted.');
-  saveError=null;phase='ENDING';ending=true;render();
-  scheduleSave();
+  saveError=null;phase=ending?'ENDING':'ERROR';
+  requestSave(ending);
  }catch(e){message('Retry failed: '+e.message);}
 }
 async function finish(){
  if(!ending||dirty)return;
- // Called only after the session snapshot is successfully closed.
  expiredAt=Date.now();ending=false;phase='EXPIRED';editor.value='';visual=[];visibleStart=0;
  const date=new Date(startedAt).toLocaleString(),duration=expiredAt-startedAt;
  records.totalSessions++;records.totalCharacters+=text.length;
  if(!records.mostCharacters||text.length>records.mostCharacters.value)records.mostCharacters={value:text.length,date};
  if(!records.longest||duration>records.longest.value)records.longest={value:duration,date};
- await queueRecords();
- message('Session saved: Sessions/'+sessionName+'. Press Enter to begin again.');
- render();
+ persistRecovery();await queueRecords();
+ message('Session saved and verified: Sessions/'+sessionName);render();
 }
 function expire(){
  if(phase!=='ACTIVE')return;
- // Finish via the same safe save path for timeout, empty Enter, and End Session.
- committedLength=text.length;editor.value='';lastText='';phase='ENDING';ending=true;
- dirty=true;render();void saveSession();
+ requestSave(true);
 }
 editor.addEventListener('beforeinput',e=>{
  if(phase!=='ACTIVE'){e.preventDefault();return;}
@@ -313,21 +340,21 @@ editor.addEventListener('input',()=>{
  if(phase!=='ACTIVE')return;
  if(!editor.value.startsWith(lastText)){editor.value=lastText;caretEnd();return;}
  const added=editor.value.slice(lastText.length);
- if(added){text+=added;addVisual(added);rollover();deadline=Date.now()+settings.idleSeconds*1000;remaining=settings.idleSeconds*1000;render();if(dirty)void saveSession();}
+ if(added){text+=added;segmentHasInput=true;addVisual(added);rollover();deadline=Date.now()+settings.idleSeconds*1000;remaining=settings.idleSeconds*1000;scheduleRecovery();render();}
  caretEnd();
 });
 editor.addEventListener('keydown',e=>{
  if(phase!=='ACTIVE')return;
  if(e.key==='Enter'){e.preventDefault();if(!e.repeat&&!e.isComposing){
-  if(editor.value.length===0){
+  if(!segmentHasInput){
    // The second Enter, with no new text since the prior commit, ends the session.
    expire();
   }else{
    // A forced save separates writing segments with exactly two line feeds.
-   text+='\n\n';committedLength=text.length;
+   text+='\n\n';committedLength=text.length;segmentHasInput=false;
    editor.value='';lastText='';visual=[];visibleStart=0;
    deadline=Date.now()+settings.idleSeconds*1000;remaining=settings.idleSeconds*1000;
-   scheduleSave();render();
+   requestSave(false);render();
   }
  }return;}
  if(['Backspace','Delete','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown','Insert'].includes(e.key)||e.ctrlKey||e.metaKey||(e.altKey&&!e.getModifierState('AltGraph'))){e.preventDefault();return;}
@@ -341,6 +368,7 @@ document.addEventListener('keydown',e=>{
 });
 $('sessionButton').addEventListener('click',()=>{if(phase==='ACTIVE')expire();else void begin();});
 $('retryButton').addEventListener('click',()=>void retry());
+$('recoveryButton').addEventListener('click',downloadRecovery);
 $('connect').addEventListener('click',()=>void connect());
 $('writeTab').addEventListener('click',()=>{view='write';render();});
 $('archiveTab').addEventListener('click',()=>{if(['READY','EXPIRED'].includes(phase)){view='archive';render();void loadArchive();}});
@@ -348,7 +376,6 @@ function settingsChanged(){
  for(const id of ['maxBuffer','chunkSize','idleSeconds'])settings[id]=+$(id).value;
  if(phase==='ACTIVE'){
   rollover();deadline=Date.now()+settings.idleSeconds*1000;remaining=settings.idleSeconds*1000;
-  if(dirty)void saveSession();
  }
  render();void queueRecords();
 }
@@ -436,8 +463,12 @@ setInterval(()=>{if(phase==='ACTIVE'){
  if(remaining===0)expire();else render();
 }},150);
 window.addEventListener('beforeunload',e=>{
- if(['ACTIVE','ERROR','ENDING'].includes(phase)){e.preventDefault();e.returnValue='';}
+ if(['ACTIVE','ERROR','ENDING'].includes(phase)){persistRecovery();e.preventDefault();e.returnValue='';}
 });
+try{
+ const saved=JSON.parse(localStorage.getItem(RECOVERY_KEY)||'null');
+ if(saved&&saved.text){orphanRecovery=saved;message('Interrupted session found. Download its recovery copy before starting a new session.');}
+}catch(e){}
 render();void reconnect();
 })();
 </script></body></html>
