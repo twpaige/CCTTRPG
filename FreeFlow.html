@@ -28,7 +28,7 @@ button:hover:not(:disabled){background:#333}
 .stat{border:1px solid var(--line);background:var(--panel);padding:12px;text-align:center}
 .stat strong{display:block;font-size:23px;font-weight:400}.stat span{font-size:12px;color:var(--muted)}
 .settings{padding-top:4px;margin-top:12px}
-h2{font-size:16px;font-weight:400}.controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.controls label{min-width:0}
+h2{font-size:16px;font-weight:400}.controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.controls label{min-width:0}
 label{font-size:13px;color:var(--muted)}input[type=range]{width:100%;accent-color:#ccc;display:block;margin:10px 0}
 .archive{border:1px solid var(--line);padding:18px;background:var(--panel);min-height:250px}
 .archive input{background:#111;color:#eee;border:1px solid #555;font:inherit;width:100%;padding:10px}
@@ -46,7 +46,7 @@ label{font-size:13px;color:var(--muted)}input[type=range]{width:100%;accent-colo
 </style>
 </head>
 <body><main class="shell">
-<header><h1>FreeFlow</h1><p class="version">Version 0.5.2</p><p class="tagline">A space to write without looking back.</p></header>
+<header><h1>FreeFlow</h1><p class="version">Version 0.5.3</p><p class="tagline">A space to write without looking back.</p></header>
 <div id="notice" class="notice hidden" role="status" aria-live="polite"></div>
 <nav class="nav"><button id="writeTab" aria-pressed="true">Write</button><button id="archiveTab" aria-pressed="false">Archive</button><button id="sessionButton" disabled>Begin Session</button><button id="retryButton" class="hidden">Retry Save</button><button id="recoveryButton" class="hidden">Copy</button></nav>
 <section id="writeView">
@@ -58,7 +58,6 @@ label{font-size:13px;color:var(--muted)}input[type=range]{width:100%;accent-colo
 <div class="stats"><div class="stat"><strong id="chars">0</strong><span>Characters</span></div><div class="stat"><strong id="words">0</strong><span>Words</span></div><div class="stat"><strong id="elapsed">00:00</strong><span>Elapsed</span></div></div>
 <div class="settings"><div class="controls">
 <label>Visible buffer: <output id="maxLabel">50</output> characters<input id="maxBuffer" type="range" min="1" max="500" step="1" value="50"></label>
-<label>Rollover chunk: <output id="chunkLabel">20</output> characters<input id="chunkSize" type="range" min="1" max="100" step="1" value="20"></label>
 <label>Idle timeout: <output id="idleLabel">60</output> seconds<input id="idleSeconds" type="range" min="2" max="120" step="1" value="60"></label>
 </div><p id="records" class="hint">Personal records appear after a completed session.</p></div>
 </section>
@@ -79,7 +78,7 @@ label{font-size:13px;color:var(--muted)}input[type=range]{width:100%;accent-colo
 'use strict';
 const $=id=>document.getElementById(id);
 const editor=$('editor'), display=$('writingDisplay');
-const DEFAULTS={maxBuffer:50,chunkSize:20,idleSeconds:60};
+const DEFAULTS={maxBuffer:50,idleSeconds:60};
 let settings={...DEFAULTS}, records={longest:null,mostCharacters:null,totalSessions:0,totalCharacters:0};
 let folder=null, sessionsFolder=null, sessionFile=null, sessionName='', phase='READY', view='write';
 let text='', committedLength=0, visual=[], visibleStart=0, startedAt=0, expiredAt=0, deadline=0, remaining=0, lastText='';
@@ -148,7 +147,7 @@ function render(){
  // Keep the invisible editor focusable in READY and EXPIRED so Enter can begin.
  editor.disabled=!['READY','ACTIVE','EXPIRED'].includes(phase);
  $('hint').textContent=phase==='ACTIVE'?'Forward-only. Enter saves the segment; Enter again without new typing ends the session.':phase==='ERROR'?'Save failed. Retry or copy your writing; your writing is retained.':phase==='ENDING'?'Finishing and saving session…':phase==='EXPIRED'?'Final statistics are frozen. Enter begins a new session.':folder?'Press Enter or Begin Session to start writing.':'Select a writable folder, then press Enter or Begin Session.';
- $('maxLabel').textContent=settings.maxBuffer;$('chunkLabel').textContent=settings.chunkSize;$('idleLabel').textContent=settings.idleSeconds;
+ $('maxLabel').textContent=settings.maxBuffer;$('idleLabel').textContent=settings.idleSeconds;
  $('records').textContent='Best characters: '+(records.mostCharacters?records.mostCharacters.value.toLocaleString()+' ('+records.mostCharacters.date+')':'—')+' · Longest: '+(records.longest?fmt(records.longest.value)+' ('+records.longest.date+')':'—')+' · Sessions: '+records.totalSessions;
  displayWriting();
 }
@@ -200,10 +199,10 @@ async function loadRecords(){
  try{
   const file=await folder.getFileHandle('records.json');
   const parsed=JSON.parse(await (await file.getFile()).text());
-  if(parsed.settings)settings={...DEFAULTS,...parsed.settings};
+  if(parsed.settings)settings={...DEFAULTS,maxBuffer:parsed.settings.maxBuffer??DEFAULTS.maxBuffer,idleSeconds:parsed.settings.idleSeconds??DEFAULTS.idleSeconds};
   if(parsed.records)records={...records,...parsed.records};
  }catch(e){if(e.name!=='NotFoundError')throw e;}
- for(const id of ['maxBuffer','chunkSize','idleSeconds'])$(id).value=settings[id];
+ for(const id of ['maxBuffer','idleSeconds'])$(id).value=settings[id];
 }
 async function writeRecords(){
  if(!folder)return;
@@ -262,7 +261,7 @@ async function begin(){
 }
 function rollover(){
  while(editor.value.length>settings.maxBuffer){
-  const amount=Math.min(settings.chunkSize,editor.value.length);
+  const amount=1;
   committedLength+=amount;maskOld(amount);
   editor.value=editor.value.slice(amount);
  }
@@ -280,16 +279,24 @@ function scheduleRecovery(){
  if(recoveryTimer)return;
  recoveryTimer=setTimeout(()=>{recoveryTimer=null;persistRecovery();},1500);
 }
+let copyFeedbackTimer=null;
+function showCopyFeedback(label){
+ const button=$('recoveryButton');
+ if(copyFeedbackTimer){clearTimeout(copyFeedbackTimer);copyFeedbackTimer=null;}
+ button.textContent=label;
+ copyFeedbackTimer=setTimeout(()=>{button.textContent='Copy';copyFeedbackTimer=null;},2000);
+}
 async function copyRecovery(){
  const data=orphanRecovery||{name:sessionName,text};
  if(!data||!data.text)return;
  try{
   await navigator.clipboard.writeText(data.text);
+  showCopyFeedback('Copied!');
   message('Recovery text copied to clipboard.');
-  // Keep the browser recovery backup until the session is safely completed.
-  // For an interrupted session, release the startup block only after a successful copy.
+  // Keep the recovery text in browser storage until the session is saved.
   if(orphanRecovery){orphanRecovery=null;render();}
  }catch(e){
+  showCopyFeedback('Copy Failed');
   message('Clipboard copy failed: '+e.message+'. Your recovery text is still retained.');
  }
 }
@@ -392,13 +399,13 @@ $('connect').addEventListener('click',()=>void connect());
 $('writeTab').addEventListener('click',()=>{view='write';render();restoreWriteFocus();});
 $('archiveTab').addEventListener('click',()=>{if(['READY','EXPIRED'].includes(phase)){view='archive';render();void loadArchive();}});
 function settingsChanged(){
- for(const id of ['maxBuffer','chunkSize','idleSeconds'])settings[id]=+$(id).value;
+ for(const id of ['maxBuffer','idleSeconds'])settings[id]=+$(id).value;
  if(phase==='ACTIVE'){
   rollover();deadline=Date.now()+settings.idleSeconds*1000;remaining=settings.idleSeconds*1000;
  }
  render();void queueRecords();
 }
-for(const id of ['maxBuffer','chunkSize','idleSeconds']){
+for(const id of ['maxBuffer','idleSeconds']){
  $(id).addEventListener('input',settingsChanged);
  $(id).addEventListener('keyup',e=>{if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(e.key))focusEditor();});
 }
