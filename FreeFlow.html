@@ -46,7 +46,7 @@ label{font-size:13px;color:var(--muted)}input[type=range]{width:100%;accent-colo
 </style>
 </head>
 <body><main class="shell">
-<header><h1>FreeFlow</h1><p class="version">Version 0.5.0</p><p class="tagline">A space to write without looking back.</p></header>
+<header><h1>FreeFlow</h1><p class="version">Version 0.5.1</p><p class="tagline">A space to write without looking back.</p></header>
 <div id="notice" class="notice hidden" role="status" aria-live="polite"></div>
 <nav class="nav"><button id="writeTab" aria-pressed="true">Write</button><button id="archiveTab" aria-pressed="false">Archive</button><button id="sessionButton" disabled>Begin Session</button><button id="retryButton" class="hidden">Retry Save</button><button id="recoveryButton" class="hidden">Download Recovery Copy</button></nav>
 <section id="writeView">
@@ -145,14 +145,23 @@ function render(){
  $('writeTab').setAttribute('aria-pressed',String(view==='write'));
  $('archiveTab').setAttribute('aria-pressed',String(view==='archive'));
  $('writeView').classList.toggle('hidden',view!=='write');$('archiveView').classList.toggle('hidden',view!=='archive');
- editor.disabled=phase!=='ACTIVE';
+ // Keep the invisible editor focusable in READY and EXPIRED so Enter can begin.
+ editor.disabled=!['READY','ACTIVE','EXPIRED'].includes(phase);
  $('hint').textContent=phase==='ACTIVE'?'Forward-only. Enter saves the segment; Enter again without new typing ends the session.':phase==='ERROR'?'Save failed. Retry or download a recovery copy; your writing is retained.':phase==='ENDING'?'Finishing and saving session…':phase==='EXPIRED'?'Final statistics are frozen. Enter begins a new session.':folder?'Press Enter or Begin Session to start writing.':'Select a writable folder, then press Enter or Begin Session.';
  $('maxLabel').textContent=settings.maxBuffer;$('chunkLabel').textContent=settings.chunkSize;$('idleLabel').textContent=settings.idleSeconds;
  $('records').textContent='Best characters: '+(records.mostCharacters?records.mostCharacters.value.toLocaleString()+' ('+records.mostCharacters.date+')':'—')+' · Longest: '+(records.longest?fmt(records.longest.value)+' ('+records.longest.date+')':'—')+' · Sessions: '+records.totalSessions;
  displayWriting();
 }
-function caretEnd(){if(phase==='ACTIVE'){let n=editor.value.length;editor.setSelectionRange(n,n);}}
-function focusEditor(){if(phase==='ACTIVE'&&view==='write'&&document.hasFocus()){editor.focus({preventScroll:true});caretEnd();}}
+function caretEnd(){if(!editor.disabled){let n=editor.value.length;editor.setSelectionRange(n,n);}}
+function focusEditor(){
+ if(view==='write'&&!editor.disabled&&document.hasFocus()){
+  editor.focus({preventScroll:true});caretEnd();
+ }
+}
+function restoreWriteFocus(){
+ // Allow the clicked control to finish its default action before restoring focus.
+ setTimeout(focusEditor,0);
+}
 function idb(){
  return new Promise((resolve,reject)=>{
   const request=indexedDB.open('freeflow-folder-v1',1);
@@ -344,6 +353,11 @@ editor.addEventListener('input',()=>{
  caretEnd();
 });
 editor.addEventListener('keydown',e=>{
+ if(['READY','EXPIRED'].includes(phase)){
+  e.preventDefault();
+  if(e.key==='Enter'&&!e.repeat&&!e.isComposing)void begin();
+  return;
+ }
  if(phase!=='ACTIVE')return;
  if(e.key==='Enter'){e.preventDefault();if(!e.repeat&&!e.isComposing){
   if(!segmentHasInput){
@@ -364,13 +378,14 @@ for(const type of ['paste','drop','dragstart','cut','copy'])editor.addEventListe
 for(const type of ['select','mouseup','focus','touchend'])editor.addEventListener(type,caretEnd);
 $('writingSurface').addEventListener('click',focusEditor);
 document.addEventListener('keydown',e=>{
- if(e.key==='Enter'&&!e.repeat&&!e.isComposing&&['READY','EXPIRED'].includes(phase)&&view==='write'&&!['BUTTON','INPUT'].includes(document.activeElement.tagName)){e.preventDefault();void begin();}
+ if(e.target===editor)return;
+ if(e.key==='Enter'&&!e.repeat&&!e.isComposing&&['READY','EXPIRED'].includes(phase)&&view==='write'&&!['BUTTON','INPUT','TEXTAREA'].includes(document.activeElement.tagName)){e.preventDefault();void begin();}
 });
 $('sessionButton').addEventListener('click',()=>{if(phase==='ACTIVE')expire();else void begin();});
 $('retryButton').addEventListener('click',()=>void retry());
 $('recoveryButton').addEventListener('click',downloadRecovery);
 $('connect').addEventListener('click',()=>void connect());
-$('writeTab').addEventListener('click',()=>{view='write';render();});
+$('writeTab').addEventListener('click',()=>{view='write';render();restoreWriteFocus();});
 $('archiveTab').addEventListener('click',()=>{if(['READY','EXPIRED'].includes(phase)){view='archive';render();void loadArchive();}});
 function settingsChanged(){
  for(const id of ['maxBuffer','chunkSize','idleSeconds'])settings[id]=+$(id).value;
@@ -383,7 +398,12 @@ for(const id of ['maxBuffer','chunkSize','idleSeconds']){
  $(id).addEventListener('input',settingsChanged);
  $(id).addEventListener('keyup',e=>{if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(e.key))focusEditor();});
 }
-document.addEventListener('pointerup',()=>{if(phase==='ACTIVE')setTimeout(focusEditor,0);});
+document.addEventListener('pointerup',e=>{
+ if(view!=='write'||!['READY','ACTIVE','EXPIRED'].includes(phase))return;
+ // Don't interrupt sliders while dragging; resume writing after release.
+ restoreWriteFocus();
+});
+window.addEventListener('focus',restoreWriteFocus);
 async function loadArchive(){
  if(!sessionsFolder)return;
  $('archiveStatus').textContent='Loading sessions…';
@@ -469,6 +489,6 @@ try{
  const saved=JSON.parse(localStorage.getItem(RECOVERY_KEY)||'null');
  if(saved&&saved.text){orphanRecovery=saved;message('Interrupted session found. Download its recovery copy before starting a new session.');}
 }catch(e){}
-render();void reconnect();
+render();void reconnect().then(restoreWriteFocus);
 })();
 </script></body></html>
