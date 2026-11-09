@@ -46,9 +46,9 @@ label{font-size:13px;color:var(--muted)}input[type=range]{width:100%;accent-colo
 </style>
 </head>
 <body><main class="shell">
-<header><h1>FreeFlow</h1><p class="version">Version 0.5.1</p><p class="tagline">A space to write without looking back.</p></header>
+<header><h1>FreeFlow</h1><p class="version">Version 0.5.2</p><p class="tagline">A space to write without looking back.</p></header>
 <div id="notice" class="notice hidden" role="status" aria-live="polite"></div>
-<nav class="nav"><button id="writeTab" aria-pressed="true">Write</button><button id="archiveTab" aria-pressed="false">Archive</button><button id="sessionButton" disabled>Begin Session</button><button id="retryButton" class="hidden">Retry Save</button><button id="recoveryButton" class="hidden">Download Recovery Copy</button></nav>
+<nav class="nav"><button id="writeTab" aria-pressed="true">Write</button><button id="archiveTab" aria-pressed="false">Archive</button><button id="sessionButton" disabled>Begin Session</button><button id="retryButton" class="hidden">Retry Save</button><button id="recoveryButton" class="hidden">Copy</button></nav>
 <section id="writeView">
 <div class="topline"><span id="state">READY</span><span id="timer">Idle timer: —</span><span id="bufferStatus">Visible: 0 / 50</span></div>
 <div class="writing-surface" id="writingSurface"><div id="writingDisplay" class="writing-display" aria-hidden="true"></div>
@@ -147,7 +147,7 @@ function render(){
  $('writeView').classList.toggle('hidden',view!=='write');$('archiveView').classList.toggle('hidden',view!=='archive');
  // Keep the invisible editor focusable in READY and EXPIRED so Enter can begin.
  editor.disabled=!['READY','ACTIVE','EXPIRED'].includes(phase);
- $('hint').textContent=phase==='ACTIVE'?'Forward-only. Enter saves the segment; Enter again without new typing ends the session.':phase==='ERROR'?'Save failed. Retry or download a recovery copy; your writing is retained.':phase==='ENDING'?'Finishing and saving session…':phase==='EXPIRED'?'Final statistics are frozen. Enter begins a new session.':folder?'Press Enter or Begin Session to start writing.':'Select a writable folder, then press Enter or Begin Session.';
+ $('hint').textContent=phase==='ACTIVE'?'Forward-only. Enter saves the segment; Enter again without new typing ends the session.':phase==='ERROR'?'Save failed. Retry or copy your writing; your writing is retained.':phase==='ENDING'?'Finishing and saving session…':phase==='EXPIRED'?'Final statistics are frozen. Enter begins a new session.':folder?'Press Enter or Begin Session to start writing.':'Select a writable folder, then press Enter or Begin Session.';
  $('maxLabel').textContent=settings.maxBuffer;$('chunkLabel').textContent=settings.chunkSize;$('idleLabel').textContent=settings.idleSeconds;
  $('records').textContent='Best characters: '+(records.mostCharacters?records.mostCharacters.value.toLocaleString()+' ('+records.mostCharacters.date+')':'—')+' · Longest: '+(records.longest?fmt(records.longest.value)+' ('+records.longest.date+')':'—')+' · Sessions: '+records.totalSessions;
  displayWriting();
@@ -243,7 +243,7 @@ async function reconnect(){
 }
 async function begin(){
  if(!folder||!['READY','EXPIRED'].includes(phase))return;
- if(orphanRecovery){message('Download the interrupted-session recovery copy before starting another session.');render();return;}
+ if(orphanRecovery){message('Copy the interrupted-session recovery text before starting another session.');render();return;}
  $('sessionButton').disabled=true;
  try{
   if(!await verifyFolder(folder,true))throw Error('Folder is not writable.');
@@ -280,14 +280,18 @@ function scheduleRecovery(){
  if(recoveryTimer)return;
  recoveryTimer=setTimeout(()=>{recoveryTimer=null;persistRecovery();},1500);
 }
-function downloadRecovery(){
+async function copyRecovery(){
  const data=orphanRecovery||{name:sessionName,text};
  if(!data||!data.text)return;
- const url=URL.createObjectURL(new Blob([data.text],{type:'text/plain;charset=utf-8'}));
- const a=document.createElement('a');a.href=url;a.download='FreeFlow_RECOVERY_'+(data.name||'session')+'.txt';
- document.body.appendChild(a);a.click();a.remove();
- setTimeout(()=>URL.revokeObjectURL(url),60000);
- if(orphanRecovery){orphanRecovery=null;try{localStorage.removeItem(RECOVERY_KEY);}catch(e){}render();}
+ try{
+  await navigator.clipboard.writeText(data.text);
+  message('Recovery text copied to clipboard.');
+  // Keep the browser recovery backup until the session is safely completed.
+  // For an interrupted session, release the startup block only after a successful copy.
+  if(orphanRecovery){orphanRecovery=null;render();}
+ }catch(e){
+  message('Clipboard copy failed: '+e.message+'. Your recovery text is still retained.');
+ }
 }
 function requestSave(finalSave=false){
  if(finalSave){ending=true;phase='ENDING';}
@@ -315,7 +319,7 @@ async function saveSession(){
  }catch(e){
   dirty=true;saveError=e;phase='ERROR';
   // Preserve ending: retry must only end if the original save was final.
-  persistRecovery();message('SAVE FAILED: '+e.message+' — text retained; retry or download recovery copy.');render();
+  persistRecovery();message('SAVE FAILED: '+e.message+' — text retained; retry or copy recovery text.');render();
  }finally{saveBusy=false;if(dirty&&phase!=='ERROR')void saveSession();}
 }
 async function retry(){
@@ -383,7 +387,7 @@ document.addEventListener('keydown',e=>{
 });
 $('sessionButton').addEventListener('click',()=>{if(phase==='ACTIVE')expire();else void begin();});
 $('retryButton').addEventListener('click',()=>void retry());
-$('recoveryButton').addEventListener('click',downloadRecovery);
+$('recoveryButton').addEventListener('click',()=>void copyRecovery());
 $('connect').addEventListener('click',()=>void connect());
 $('writeTab').addEventListener('click',()=>{view='write';render();restoreWriteFocus();});
 $('archiveTab').addEventListener('click',()=>{if(['READY','EXPIRED'].includes(phase)){view='archive';render();void loadArchive();}});
@@ -487,7 +491,7 @@ window.addEventListener('beforeunload',e=>{
 });
 try{
  const saved=JSON.parse(localStorage.getItem(RECOVERY_KEY)||'null');
- if(saved&&saved.text){orphanRecovery=saved;message('Interrupted session found. Download its recovery copy before starting a new session.');}
+ if(saved&&saved.text){orphanRecovery=saved;message('Interrupted session found. Copy its recovery text before starting a new session.');}
 }catch(e){}
 render();void reconnect().then(restoreWriteFocus);
 })();
