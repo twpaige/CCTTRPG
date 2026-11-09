@@ -27,8 +27,8 @@ button:hover:not(:disabled){background:#333}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0}
 .stat{border:1px solid var(--line);background:var(--panel);padding:12px;text-align:center}
 .stat strong{display:block;font-size:23px;font-weight:400}.stat span{font-size:12px;color:var(--muted)}
-.settings{border-top:1px solid var(--line);padding-top:15px;margin-top:22px}
-h2{font-size:16px;font-weight:400}.controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.settings{padding-top:4px;margin-top:12px}
+h2{font-size:16px;font-weight:400}.controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.controls label{min-width:0}
 label{font-size:13px;color:var(--muted)}input[type=range]{width:100%;accent-color:#ccc;display:block;margin:10px 0}
 .archive{border:1px solid var(--line);padding:18px;background:var(--panel);min-height:250px}
 .archive input{background:#111;color:#eee;border:1px solid #555;font:inherit;width:100%;padding:10px}
@@ -42,21 +42,21 @@ label{font-size:13px;color:var(--muted)}input[type=range]{width:100%;accent-colo
 .pager-center output{display:block;font-size:12px;color:var(--muted);margin-top:5px}.entry{display:block;width:100%;text-align:left;margin:5px 0}
 #archiveText{white-space:pre-wrap;overflow-wrap:anywhere;max-height:400px;overflow:auto;border-top:1px solid #444;padding:12px 0;user-select:text}
 .hidden{display:none!important}.footer{color:#777;text-align:center;font-size:12px;margin-top:28px}
-@media(max-width:560px){.writing-surface{height:250px}.writing-display{padding:14px}.controls{grid-template-columns:1fr}.stat strong{font-size:19px}}
+@media(max-width:560px){.writing-surface{height:250px}.writing-display{padding:14px}.controls{gap:8px}.controls label{font-size:11px}.stat strong{font-size:19px}}
 </style>
 </head>
 <body><main class="shell">
-<header><h1>FreeFlow</h1><p class="version">Version 0.4.5</p><p class="tagline">A space to write without looking back.</p></header>
+<header><h1>FreeFlow</h1><p class="version">Version 0.4.6</p><p class="tagline">A space to write without looking back.</p></header>
 <div id="notice" class="notice hidden" role="status" aria-live="polite"></div>
-<nav class="nav"><button id="writeTab" aria-pressed="true">Write</button><button id="archiveTab" aria-pressed="false">Archive</button></nav>
+<nav class="nav"><button id="writeTab" aria-pressed="true">Write</button><button id="archiveTab" aria-pressed="false">Archive</button><button id="sessionButton" disabled>Begin Session</button><button id="retryButton" class="hidden">Retry Save</button></nav>
 <section id="writeView">
 <div class="topline"><span id="state">READY</span><span id="timer">Idle timer: —</span><span id="bufferStatus">Visible: 0 / 50</span></div>
 <div class="writing-surface" id="writingSurface"><div id="writingDisplay" class="writing-display" aria-hidden="true"></div>
 <textarea id="editor" class="editor" disabled spellcheck="false" autocorrect="off" autocapitalize="off" autocomplete="off" aria-label="Forward-only writing"></textarea></div>
 <p class="hint" id="hint"></p>
-<div class="actions"><button id="beginButton" disabled>Begin Session</button><button id="endButton" disabled>End Session</button><button id="retryButton" class="hidden">Retry Save</button></div>
+
 <div class="stats"><div class="stat"><strong id="chars">0</strong><span>Characters</span></div><div class="stat"><strong id="words">0</strong><span>Words</span></div><div class="stat"><strong id="elapsed">00:00</strong><span>Elapsed</span></div></div>
-<div class="settings"><h2>Settings</h2><div class="controls">
+<div class="settings"><div class="controls">
 <label>Visible buffer: <output id="maxLabel">50</output> characters<input id="maxBuffer" type="range" min="1" max="500" step="1" value="50"></label>
 <label>Rollover chunk: <output id="chunkLabel">20</output> characters<input id="chunkSize" type="range" min="1" max="100" step="1" value="20"></label>
 <label>Idle timeout: <output id="idleLabel">60</output> seconds<input id="idleSeconds" type="range" min="2" max="120" step="1" value="60"></label>
@@ -135,16 +135,15 @@ function render(){
  $('elapsed').textContent=fmt(phase==='READY'?0:(phase==='EXPIRED'?expiredAt:Date.now())-startedAt);
  $('folderStatus').textContent=folder?'Folder: '+folder.name:'Folder: Not connected';
  $('connect').disabled=['ACTIVE','ERROR','ENDING'].includes(phase);
- $('beginButton').disabled=!folder||!['READY','EXPIRED'].includes(phase);
- $('beginButton').textContent=phase==='EXPIRED'?'New Session':'Begin Session';
- $('endButton').disabled=phase!=='ACTIVE';
+ $('sessionButton').textContent=phase==='ACTIVE'?'End Session':phase==='EXPIRED'?'New Session':'Begin Session';
+ $('sessionButton').disabled=!folder||!['READY','ACTIVE','EXPIRED'].includes(phase);
  $('retryButton').classList.toggle('hidden',phase!=='ERROR');
  $('archiveTab').disabled=['ACTIVE','ERROR','ENDING'].includes(phase);
  $('writeTab').setAttribute('aria-pressed',String(view==='write'));
  $('archiveTab').setAttribute('aria-pressed',String(view==='archive'));
  $('writeView').classList.toggle('hidden',view!=='write');$('archiveView').classList.toggle('hidden',view!=='archive');
  editor.disabled=phase!=='ACTIVE';
- $('hint').textContent=phase==='ACTIVE'?'Forward-only. Enter adds two line breaks and clears the buffer; Enter again on an empty buffer ends the session.':phase==='ERROR'?'Saving failed. Your complete writing is still in memory. Retry before leaving.':phase==='ENDING'?'Finishing and saving session…':phase==='EXPIRED'?'Final statistics are frozen. Enter begins a new session.':'Select a writable folder, then press Enter or Begin Session.';
+ $('hint').textContent=phase==='ACTIVE'?'Forward-only. Enter adds two line breaks and clears the buffer; Enter again on an empty buffer ends the session.':phase==='ERROR'?'Saving failed. Your complete writing is still in memory. Retry before leaving.':phase==='ENDING'?'Finishing and saving session…':phase==='EXPIRED'?'Final statistics are frozen. Enter begins a new session.':folder?'Press Enter or Begin Session to start writing.':'Select a writable folder, then press Enter or Begin Session.';
  $('maxLabel').textContent=settings.maxBuffer;$('chunkLabel').textContent=settings.chunkSize;$('idleLabel').textContent=settings.idleSeconds;
  $('records').textContent='Best characters: '+(records.mostCharacters?records.mostCharacters.value.toLocaleString()+' ('+records.mostCharacters.date+')':'—')+' · Longest: '+(records.longest?fmt(records.longest.value)+' ('+records.longest.date+')':'—')+' · Sessions: '+records.totalSessions;
  displayWriting();
@@ -232,7 +231,7 @@ async function reconnect(){
 }
 async function begin(){
  if(!folder||!['READY','EXPIRED'].includes(phase))return;
- $('beginButton').disabled=true;
+ $('sessionButton').disabled=true;
  try{
   if(!await verifyFolder(folder,true))throw Error('Folder is not writable.');
   const now=new Date();
@@ -340,8 +339,7 @@ $('writingSurface').addEventListener('click',focusEditor);
 document.addEventListener('keydown',e=>{
  if(e.key==='Enter'&&!e.repeat&&!e.isComposing&&['READY','EXPIRED'].includes(phase)&&view==='write'&&!['BUTTON','INPUT'].includes(document.activeElement.tagName)){e.preventDefault();void begin();}
 });
-$('beginButton').addEventListener('click',()=>void begin());
-$('endButton').addEventListener('click',expire);
+$('sessionButton').addEventListener('click',()=>{if(phase==='ACTIVE')expire();else void begin();});
 $('retryButton').addEventListener('click',()=>void retry());
 $('connect').addEventListener('click',()=>void connect());
 $('writeTab').addEventListener('click',()=>{view='write';render();});
