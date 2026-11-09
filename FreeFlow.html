@@ -46,7 +46,7 @@ label{font-size:13px;color:var(--muted)}input[type=range]{width:100%;accent-colo
 </style>
 </head>
 <body><main class="shell">
-<header><h1>FreeFlow</h1><p class="version">Version 0.5.3</p><p class="tagline">A space to write without looking back.</p></header>
+<header><h1>FreeFlow</h1><p class="version">Version 0.5.4</p><p class="tagline">A space to write without looking back.</p></header>
 <div id="notice" class="notice hidden" role="status" aria-live="polite"></div>
 <nav class="nav"><button id="writeTab" aria-pressed="true">Write</button><button id="archiveTab" aria-pressed="false">Archive</button><button id="sessionButton" disabled>Begin Session</button><button id="retryButton" class="hidden">Retry Save</button><button id="recoveryButton" class="hidden">Copy</button></nav>
 <section id="writeView">
@@ -259,11 +259,28 @@ async function begin(){
   phase='ACTIVE';view='write';message('Writing to Sessions/'+candidate);render();focusEditor();
  }catch(e){message('Cannot begin: '+e.message);render();}
 }
+function adjustVisibleBuffer(){
+ // The slider controls the readable suffix of the current writing segment.
+ // Previously masked characters are restored from their original visual chars.
+ // Never alter the original session text or trigger a session-file save.
+ const readableStart=Math.max(0,visual.length-settings.maxBuffer);
+ for(let i=0;i<visual.length;i++){
+  const item=visual[i];
+  if(i<readableStart){
+   if(!item.hidden){item.hidden=true;item.mask=randomChar(item.char);}
+  }else{item.hidden=false;}
+ }
+ visibleStart=readableStart;
+ editor.value=visual.slice(readableStart).map(item=>item.char).join('');
+ lastText=editor.value;
+ caretEnd();
+}
 function rollover(){
+ // Keep one-character-at-a-time masking during normal typing.
  while(editor.value.length>settings.maxBuffer){
-  const amount=1;
-  committedLength+=amount;maskOld(amount);
-  editor.value=editor.value.slice(amount);
+  committedLength++;
+  maskOld(1);
+  editor.value=editor.value.slice(1);
  }
  lastText=editor.value;
 }
@@ -401,7 +418,7 @@ $('archiveTab').addEventListener('click',()=>{if(['READY','EXPIRED'].includes(ph
 function settingsChanged(){
  for(const id of ['maxBuffer','idleSeconds'])settings[id]=+$(id).value;
  if(phase==='ACTIVE'){
-  rollover();deadline=Date.now()+settings.idleSeconds*1000;remaining=settings.idleSeconds*1000;
+  adjustVisibleBuffer();deadline=Date.now()+settings.idleSeconds*1000;remaining=settings.idleSeconds*1000;
  }
  render();void queueRecords();
 }
