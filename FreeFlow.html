@@ -46,7 +46,7 @@ label{font-size:13px;color:var(--muted)}input[type=range]{width:100%;accent-colo
 </style>
 </head>
 <body><main class="shell">
-<header><h1>FreeFlow</h1><p class="version">Version 0.5.4</p><p class="tagline">A space to write without looking back.</p></header>
+<header><h1>FreeFlow</h1><p class="version">Version 0.6.0</p><p class="tagline">A space to write without looking back.</p></header>
 <div id="notice" class="notice hidden" role="status" aria-live="polite"></div>
 <nav class="nav"><button id="writeTab" aria-pressed="true">Write</button><button id="archiveTab" aria-pressed="false">Archive</button><button id="sessionButton" disabled>Begin Session</button><button id="retryButton" class="hidden">Retry Save</button><button id="recoveryButton" class="hidden">Copy</button></nav>
 <section id="writeView">
@@ -71,7 +71,7 @@ label{font-size:13px;color:var(--muted)}input[type=range]{width:100%;accent-colo
 <button id="nextPage" type="button">Next</button>
 </div>
 <div id="archiveText"></div></section>
-<p class="footer">Single HTML file · Local text sessions · No server storage · <button id="connect" class="footer-folder" type="button"><span id="folderStatus">Folder: Not connected</span></button></p>
+<p class="footer">Single HTML file · Master text + archived sessions · No server storage · <button id="connect" class="footer-folder" type="button"><span id="folderStatus">Folder: Not connected</span></button></p>
 </main>
 <script>
 (() => {
@@ -80,7 +80,8 @@ const $=id=>document.getElementById(id);
 const editor=$('editor'), display=$('writingDisplay');
 const DEFAULTS={maxBuffer:50,idleSeconds:60};
 let settings={...DEFAULTS}, records={longest:null,mostCharacters:null,totalSessions:0,totalCharacters:0};
-let folder=null, sessionsFolder=null, sessionFile=null, sessionName='', phase='READY', view='write';
+let folder=null, sessionsFolder=null, archivedFolder=null, sessionFile=null, sessionName='', phase='READY', view='write';
+let archivingBusy=false, archiveIssue='';
 let text='', committedLength=0, visual=[], visibleStart=0, startedAt=0, expiredAt=0, deadline=0, remaining=0, lastText='';
 let saveBusy=false, dirty=false, saveError=null, ending=false, settingsBusy=false, settingsDirty=false;
 let segmentHasInput=false, lastSavedText='', recoveryTimer=null, orphanRecovery=null;
@@ -137,7 +138,7 @@ function render(){
  $('folderStatus').textContent=folder?'Folder: '+folder.name:'Folder: Not connected';
  $('connect').disabled=['ACTIVE','ERROR','ENDING'].includes(phase);
  $('sessionButton').textContent=phase==='ACTIVE'?'End Session':phase==='EXPIRED'?'New Session':'Begin Session';
- $('sessionButton').disabled=!folder||!['READY','ACTIVE','EXPIRED'].includes(phase);
+ $('sessionButton').disabled=!folder||archivingBusy||!['READY','ACTIVE','EXPIRED'].includes(phase);
  $('retryButton').classList.toggle('hidden',phase!=='ERROR');
  $('recoveryButton').classList.toggle('hidden',!(text&&['ACTIVE','ERROR','ENDING'].includes(phase))&&!orphanRecovery);
  $('archiveTab').disabled=['ACTIVE','ERROR','ENDING'].includes(phase);
@@ -226,9 +227,10 @@ async function connect(){
   const handle=await window.showDirectoryPicker({mode:'readwrite'});
   if(!await verifyFolder(handle,true))throw Error('Write permission was not granted.');
   folder=handle;sessionsFolder=await folder.getDirectoryHandle('Sessions',{create:true});
+  archivedFolder=await sessionsFolder.getDirectoryHandle('Archived',{create:true});
   await loadRecords();await rememberFolder(handle);
-  message('Connected to '+handle.name+'. Sessions and records will be saved locally.');
-  render();
+  message('Connected to '+handle.name+'.');
+  render();await migratePending();
  }catch(e){if(e.name!=='AbortError')message('Folder connection failed: '+e.message);}
 }
 async function reconnect(){
@@ -237,11 +239,60 @@ async function reconnect(){
   // Do not request permission on page load: browsers require user interaction.
   if(!await verifyFolder(handle,false)){message('Previously selected folder found. Click Choose / Reconnect Folder to grant access.');return;}
   folder=handle;sessionsFolder=await folder.getDirectoryHandle('Sessions',{create:true});
-  await loadRecords();message('Reconnected to '+handle.name);render();
+  archivedFolder=await sessionsFolder.getDirectoryHandle('Archived',{create:true});
+  await loadRecords();message('Reconnected to '+handle.name);render();await migratePending();
  }catch(e){message('Reconnect folder to continue: '+e.message);}
 }
+
+// The master is a convenient reading copy; each verified session file is the source of truth.
+// Files left in Sessions/ are pending; Archived/ contains successfully incorporated originals.
+async function incorporateSession(name,source){
+ const original=await (await source.getFile()).text();
+ const master=await folder.getFileHandle('FreeFlow.txt',{create:true});
+ const current=await (await master.getFile()).text();
+ const marker='===== FreeFlow Session: '+name+' =====';
+ if(!current.includes(marker)){
+  const entry=(current&&!current.endsWith('\n')?'\n\n':'')+marker+'\n'+original+'\n\n';
+  const size=(await master.getFile()).size;
+  const stream=await master.createWritable({keepExistingData:true});
+  try{await stream.seek(size);await stream.write(entry);await stream.close();}
+  catch(e){try{await stream.abort();}catch(_){}throw e;}
+  const updated=await (await master.getFile()).text();
+  if(updated!==current+entry)throw Error('Master append verification failed for '+name);
+ }
+ // Copy and verify before removing the pending original. A crash can leave a duplicate,
+ // but must never delete the only saved copy of the writing.
+ const destination=await archivedFolder.getFileHandle(name,{create:true});
+ const existing=await (await destination.getFile()).text();
+ if(existing!==original){
+  if(existing)throw Error('Archived filename collision: '+name);
+  const stream=await destination.createWritable({keepExistingData:false});
+  try{await stream.write(original);await stream.close();}
+  catch(e){try{await stream.abort();}catch(_){}throw e;}
+ }
+ if(await (await destination.getFile()).text()!==original)throw Error('Archive verification failed for '+name);
+ await sessionsFolder.removeEntry(name);
+}
+async function migratePending(){
+ if(archivingBusy||!folder||!sessionsFolder||!archivedFolder)return;
+ archivingBusy=true;archiveIssue='';render();
+ let completed=0;
+ try{
+  const pending=[];
+  for await(const [name,handle] of sessionsFolder.entries()){
+   if(handle.kind==='file'&&/^20\d\d-\d\d-\d\d_\d{6}(?:_\d+)?\.txt$/.test(name))pending.push({name,handle});
+  }
+  pending.sort((a,b)=>a.name.localeCompare(b.name));
+  for(const entry of pending){await incorporateSession(entry.name,entry.handle);completed++;}
+  if(completed)message('Added '+completed+' session(s) to FreeFlow.txt and archived originals.');
+ }catch(e){
+  archiveIssue=e.message;
+  message('Archive/master update failed: '+e.message+'. Original session files remain available; reconnect to retry.');
+ }finally{archivingBusy=false;render();}
+}
+
 async function begin(){
- if(!folder||!['READY','EXPIRED'].includes(phase))return;
+ if(!folder||archivingBusy||!['READY','EXPIRED'].includes(phase))return;
  if(orphanRecovery){message('Copy the interrupted-session recovery text before starting another session.');render();return;}
  $('sessionButton').disabled=true;
  try{
@@ -363,6 +414,7 @@ async function finish(){
  if(!records.longest||duration>records.longest.value)records.longest={value:duration,date};
  persistRecovery();await queueRecords();
  message('Session saved and verified: Sessions/'+sessionName);render();
+ await migratePending();
 }
 function expire(){
  if(phase!=='ACTIVE')return;
@@ -437,8 +489,11 @@ async function loadArchive(){
  $('archiveStatus').textContent='Loading sessions…';
  try{
   const files=[];
-  for await(const [name,handle] of sessionsFolder.entries()){
-   if(handle.kind==='file'&&name.endsWith('.txt'))files.push({name,handle});
+  for(const dir of [sessionsFolder,archivedFolder]){
+   if(!dir)continue;
+   for await(const [name,handle] of dir.entries()){
+    if(handle.kind==='file'&&name.endsWith('.txt'))files.push({name,handle});
+   }
   }
   files.sort((a,b)=>b.name.localeCompare(a.name));filesCache=files;
   await searchArchive();
