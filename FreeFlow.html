@@ -37,7 +37,7 @@ label{font-size:13px;color:var(--muted)}input[type=range]{width:100%;accent-colo
 </style>
 </head>
 <body><main class="shell">
-<header><h1>FreeFlow</h1><p class="version">Version 0.4.0</p><p class="tagline">A space to write without looking back.</p></header>
+<header><h1>FreeFlow</h1><p class="version">Version 0.4.1</p><p class="tagline">A space to write without looking back.</p></header>
 <div id="notice" class="notice" role="status">Connect a local folder to begin. FreeFlow saves your writing on this computer.</div>
 <div class="folderbar"><button id="connect">Choose / Reconnect Folder</button><span id="folderStatus">No folder connected</span></div>
 <nav class="nav"><button id="writeTab" aria-pressed="true">Write</button><button id="archiveTab" aria-pressed="false">Archive</button></nav>
@@ -46,7 +46,7 @@ label{font-size:13px;color:var(--muted)}input[type=range]{width:100%;accent-colo
 <div class="writing-surface" id="writingSurface"><div id="writingDisplay" class="writing-display" aria-hidden="true"></div>
 <textarea id="editor" class="editor" disabled spellcheck="false" autocorrect="off" autocapitalize="off" autocomplete="off" aria-label="Forward-only writing"></textarea></div>
 <p class="hint" id="hint"></p>
-<div class="actions"><button id="beginButton" disabled>Begin Session</button><button id="retryButton" class="hidden">Retry Save</button></div>
+<div class="actions"><button id="beginButton" disabled>Begin Session</button><button id="endButton" disabled>End Session</button><button id="retryButton" class="hidden">Retry Save</button></div>
 <div class="stats"><div class="stat"><strong id="chars">0</strong><span>Characters</span></div><div class="stat"><strong id="words">0</strong><span>Words</span></div><div class="stat"><strong id="elapsed">00:00</strong><span>Elapsed</span></div></div>
 <div class="settings"><h2>Settings</h2><div class="controls">
 <label>Visible buffer: <output id="maxLabel">50</output> characters<input id="maxBuffer" type="range" min="1" max="500" step="1" value="50"></label>
@@ -116,6 +116,7 @@ function render(){
  $('folderStatus').textContent=folder?'Folder: '+folder.name:'No writable folder connected';
  $('beginButton').disabled=!folder||!['READY','EXPIRED'].includes(phase);
  $('beginButton').textContent=phase==='EXPIRED'?'New Session':'Begin Session';
+ $('endButton').disabled=phase!=='ACTIVE';
  $('retryButton').classList.toggle('hidden',phase!=='ERROR');
  $('archiveTab').disabled=['ACTIVE','ERROR','ENDING'].includes(phase);
  $('connect').disabled=['ACTIVE','ERROR','ENDING'].includes(phase);
@@ -123,7 +124,7 @@ function render(){
  $('archiveTab').setAttribute('aria-pressed',String(view==='archive'));
  $('writeView').classList.toggle('hidden',view!=='write');$('archiveView').classList.toggle('hidden',view!=='archive');
  editor.disabled=phase!=='ACTIVE';
- $('hint').textContent=phase==='ACTIVE'?'Forward-only. Enter commits the visible buffer without ending the session.':phase==='ERROR'?'Saving failed. Your complete writing is still in memory. Retry before leaving.':phase==='ENDING'?'Finishing and saving session…':phase==='EXPIRED'?'Final statistics are frozen. Enter begins a new session.':'Select a writable folder, then press Enter or Begin Session.';
+ $('hint').textContent=phase==='ACTIVE'?'Forward-only. Enter adds two line breaks and clears the buffer; Enter again on an empty buffer ends the session.':phase==='ERROR'?'Saving failed. Your complete writing is still in memory. Retry before leaving.':phase==='ENDING'?'Finishing and saving session…':phase==='EXPIRED'?'Final statistics are frozen. Enter begins a new session.':'Select a writable folder, then press Enter or Begin Session.';
  $('maxLabel').textContent=settings.maxBuffer;$('chunkLabel').textContent=settings.chunkSize;$('idleLabel').textContent=settings.idleSeconds;
  $('records').textContent='Best characters: '+(records.mostCharacters?records.mostCharacters.value.toLocaleString()+' ('+records.mostCharacters.date+')':'—')+' · Longest: '+(records.longest?fmt(records.longest.value)+' ('+records.longest.date+')':'—')+' · Sessions: '+records.totalSessions;
  displayWriting();
@@ -280,7 +281,7 @@ async function finish(){
 }
 function expire(){
  if(phase!=='ACTIVE')return;
- // Save remaining visible text before displaying EXPIRED.
+ // Finish via the same safe save path for timeout, empty Enter, and End Session.
  committedLength=text.length;editor.value='';lastText='';phase='ENDING';ending=true;
  dirty=true;render();void saveSession();
 }
@@ -299,9 +300,16 @@ editor.addEventListener('input',()=>{
 editor.addEventListener('keydown',e=>{
  if(phase!=='ACTIVE')return;
  if(e.key==='Enter'){e.preventDefault();if(!e.repeat&&!e.isComposing){
-  committedLength=text.length;editor.value='';lastText='';visual=[];visibleStart=0;
-  deadline=Date.now()+settings.idleSeconds*1000;remaining=settings.idleSeconds*1000;
-  scheduleSave();render();
+  if(editor.value.length===0){
+   // The second Enter, with no new text since the prior commit, ends the session.
+   expire();
+  }else{
+   // A forced save separates writing segments with exactly two line feeds.
+   text+='\n\n';committedLength=text.length;
+   editor.value='';lastText='';visual=[];visibleStart=0;
+   deadline=Date.now()+settings.idleSeconds*1000;remaining=settings.idleSeconds*1000;
+   scheduleSave();render();
+  }
  }return;}
  if(['Backspace','Delete','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown','Insert'].includes(e.key)||e.ctrlKey||e.metaKey||(e.altKey&&!e.getModifierState('AltGraph'))){e.preventDefault();return;}
  caretEnd();
@@ -313,6 +321,7 @@ document.addEventListener('keydown',e=>{
  if(e.key==='Enter'&&!e.repeat&&!e.isComposing&&['READY','EXPIRED'].includes(phase)&&view==='write'&&!['BUTTON','INPUT'].includes(document.activeElement.tagName)){e.preventDefault();void begin();}
 });
 $('beginButton').addEventListener('click',()=>void begin());
+$('endButton').addEventListener('click',expire);
 $('retryButton').addEventListener('click',()=>void retry());
 $('connect').addEventListener('click',()=>void connect());
 $('writeTab').addEventListener('click',()=>{view='write';render();});
