@@ -14,7 +14,9 @@ header{text-align:center;margin-bottom:22px}h1{font:300 clamp(36px,7vw,64px)/1.1
 button{font:inherit;background:#222;border:1px solid #555;border-radius:3px;color:#eee;padding:7px 13px;cursor:pointer}
 button:disabled{opacity:.4;cursor:not-allowed}button[aria-pressed=true]{border-color:#ddd;background:#333}
 button:hover:not(:disabled){background:#333}
-.folderbar span{color:var(--muted);font-size:13px}
+.footer-folder{background:none;border:0;padding:0;color:#aaa;text-decoration:underline;text-underline-offset:3px;font-size:inherit}
+.footer-folder:hover:not(:disabled){background:none;color:#eee}
+.footer-folder:disabled{opacity:.5}
 .topline{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin:18px 0 10px}
 #state{color:#eee}.writing-surface{position:relative;height:290px;overflow:hidden;cursor:text}
 .writing-display{position:absolute;inset:0;padding:20px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-all;font:18px/1.7 Consolas,monospace;pointer-events:none;scrollbar-width:none}
@@ -44,9 +46,8 @@ label{font-size:13px;color:var(--muted)}input[type=range]{width:100%;accent-colo
 </style>
 </head>
 <body><main class="shell">
-<header><h1>FreeFlow</h1><p class="version">Version 0.4.4</p><p class="tagline">A space to write without looking back.</p></header>
-<div id="notice" class="notice" role="status">Connect a local folder to begin. FreeFlow saves your writing on this computer.</div>
-<div class="folderbar"><button id="connect">Choose / Reconnect Folder</button><span id="folderStatus">No folder connected</span></div>
+<header><h1>FreeFlow</h1><p class="version">Version 0.4.5</p><p class="tagline">A space to write without looking back.</p></header>
+<div id="notice" class="notice hidden" role="status" aria-live="polite"></div>
 <nav class="nav"><button id="writeTab" aria-pressed="true">Write</button><button id="archiveTab" aria-pressed="false">Archive</button></nav>
 <section id="writeView">
 <div class="topline"><span id="state">READY</span><span id="timer">Idle timer: —</span><span id="bufferStatus">Visible: 0 / 50</span></div>
@@ -71,7 +72,7 @@ label{font-size:13px;color:var(--muted)}input[type=range]{width:100%;accent-colo
 <button id="nextPage" type="button">Next</button>
 </div>
 <div id="archiveText"></div></section>
-<p class="footer">Single HTML file · Local text sessions · No server storage</p>
+<p class="footer">Single HTML file · Local text sessions · No server storage · <button id="connect" class="footer-folder" type="button"><span id="folderStatus">Folder: Not connected</span></button></p>
 </main>
 <script>
 (() => {
@@ -90,7 +91,12 @@ const randomChar=c=>/\s/u.test(c)?c:ALPHABET[Math.floor(Math.random()*ALPHABET.l
 const fmt=ms=>{let n=Math.max(0,Math.floor(ms/1000));return String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');};
 const words=s=>(s.trim().match(/\S+/gu)||[]).length;
 const stamp=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'_'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0')+String(d.getSeconds()).padStart(2,'0');
-function message(s){$('notice').textContent=s;}
+function message(s){
+ const notice=$('notice');notice.textContent=s;
+ // Routine connection/save confirmations belong in the footer, not a banner.
+ const isProblem=/failed|error|cannot|not granted|not writable|reconnect folder|use a current|permission/i.test(s);
+ notice.classList.toggle('hidden',!isProblem);
+}
 function displayWriting(){
  const fragment=document.createDocumentFragment();
  if(phase==='ACTIVE'||phase==='ERROR'||phase==='ENDING'){
@@ -127,13 +133,13 @@ function render(){
  $('bufferStatus').textContent='Visible: '+editor.value.length+' / '+settings.maxBuffer;
  $('chars').textContent=text.length.toLocaleString();$('words').textContent=words(text).toLocaleString();
  $('elapsed').textContent=fmt(phase==='READY'?0:(phase==='EXPIRED'?expiredAt:Date.now())-startedAt);
- $('folderStatus').textContent=folder?'Folder: '+folder.name:'No writable folder connected';
+ $('folderStatus').textContent=folder?'Folder: '+folder.name:'Folder: Not connected';
+ $('connect').disabled=['ACTIVE','ERROR','ENDING'].includes(phase);
  $('beginButton').disabled=!folder||!['READY','EXPIRED'].includes(phase);
  $('beginButton').textContent=phase==='EXPIRED'?'New Session':'Begin Session';
  $('endButton').disabled=phase!=='ACTIVE';
  $('retryButton').classList.toggle('hidden',phase!=='ERROR');
  $('archiveTab').disabled=['ACTIVE','ERROR','ENDING'].includes(phase);
- $('connect').disabled=['ACTIVE','ERROR','ENDING'].includes(phase);
  $('writeTab').setAttribute('aria-pressed',String(view==='write'));
  $('archiveTab').setAttribute('aria-pressed',String(view==='archive'));
  $('writeView').classList.toggle('hidden',view!=='write');$('archiveView').classList.toggle('hidden',view!=='archive');
