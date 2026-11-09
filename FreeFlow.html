@@ -17,6 +17,10 @@ button:hover:not(:disabled){background:#333}
 .footer-folder{background:none;border:0;padding:0;color:#aaa;text-decoration:underline;text-underline-offset:3px;font-size:inherit}
 .footer-folder:hover:not(:disabled){background:none;color:#eee}
 .footer-folder:disabled{opacity:.5}
+.master-picker{border:1px solid var(--line);background:var(--panel);padding:15px;margin:12px auto;max-width:500px;text-align:left}
+.master-picker select,.master-picker input{background:#111;color:#eee;border:1px solid #555;font:inherit;padding:7px;width:100%;margin:5px 0 10px}
+.master-picker .actions{justify-content:flex-start;margin:4px 0}
+.footer{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap}
 .topline{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin:18px 0 10px}
 #state{color:#eee}.writing-surface{position:relative;height:290px;overflow:hidden;cursor:text}
 .writing-display{position:absolute;inset:0;padding:20px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-all;font:18px/1.7 Consolas,monospace;pointer-events:none;scrollbar-width:none}
@@ -46,7 +50,7 @@ label{font-size:13px;color:var(--muted)}input[type=range]{width:100%;accent-colo
 </style>
 </head>
 <body><main class="shell">
-<header><h1>FreeFlow</h1><p class="version">Version 0.6.0</p><p class="tagline">A space to write without looking back.</p></header>
+<header><h1>FreeFlow</h1><p class="version">Version 0.7.0</p><p class="tagline">A space to write without looking back.</p></header>
 <div id="notice" class="notice hidden" role="status" aria-live="polite"></div>
 <nav class="nav"><button id="writeTab" aria-pressed="true">Write</button><button id="archiveTab" aria-pressed="false">Archive</button><button id="sessionButton" disabled>Begin Session</button><button id="retryButton" class="hidden">Retry Save</button><button id="recoveryButton" class="hidden">Copy</button></nav>
 <section id="writeView">
@@ -71,7 +75,14 @@ label{font-size:13px;color:var(--muted)}input[type=range]{width:100%;accent-colo
 <button id="nextPage" type="button">Next</button>
 </div>
 <div id="archiveText"></div></section>
-<p class="footer">Single HTML file · Master text + archived sessions · No server storage · <button id="connect" class="footer-folder" type="button"><span id="folderStatus">Folder: Not connected</span></button></p>
+<p class="footer"><span id="copyright"></span> · <button id="connect" class="footer-folder" type="button"><span id="folderStatus">Folder: Not connected</span></button> · <button id="masterButton" class="footer-folder" type="button">Master: <span id="masterStatus">FreeFlow.txt</span></button></p>
+<section id="masterPicker" class="master-picker hidden" aria-label="Choose master file">
+<label for="masterList">Existing master files</label><select id="masterList"></select>
+<div class="actions"><button id="useMaster" type="button">Use Selected</button><button id="cancelMaster" type="button">Cancel</button></div>
+<label for="newMaster">Create a new master file</label><input id="newMaster" type="text" maxlength="120" placeholder="StairScene">
+<button id="createMaster" type="button">Create and Select</button>
+<p class="hint">Master files are stored in the selected FreeFlow folder. Switching is available between sessions.</p>
+</section>
 </main>
 <script>
 (() => {
@@ -81,11 +92,19 @@ const editor=$('editor'), display=$('writingDisplay');
 const DEFAULTS={maxBuffer:50,idleSeconds:60};
 let settings={...DEFAULTS}, records={longest:null,mostCharacters:null,totalSessions:0,totalCharacters:0};
 let folder=null, sessionsFolder=null, archivedFolder=null, sessionFile=null, sessionName='', phase='READY', view='write';
-let archivingBusy=false, archiveIssue='';
+let archivingBusy=false, archiveIssue='', masterName='FreeFlow.txt', sessionMaster='FreeFlow.txt';
 let text='', committedLength=0, visual=[], visibleStart=0, startedAt=0, expiredAt=0, deadline=0, remaining=0, lastText='';
 let saveBusy=false, dirty=false, saveError=null, ending=false, settingsBusy=false, settingsDirty=false;
 let segmentHasInput=false, lastSavedText='', recoveryTimer=null, orphanRecovery=null;
 const RECOVERY_KEY='freeflow-emergency-draft-v1';
+const validMasterName=name=>typeof name==='string'&&name.endsWith('.txt')&&name.length<=124&&name.length>4&&!/[\\/<>:"|?*\x00-\x1f]/.test(name)&&name!=='.txt';
+function normalizeMasterName(raw){
+ const value=raw.trim();
+ const name=/\.txt$/i.test(value)?value.slice(0,-4)+'.txt':value+'.txt';
+ if(!validMasterName(name)||name.startsWith('.'))throw Error('Choose a valid filename (letters, numbers, spaces, hyphens or underscores).');
+ return name;
+}
+$('copyright').textContent='© '+new Date().toLocaleDateString()+' Thomas Paige';
 let filesCache=[], archiveMatches=[], archivePage=1, archiveRenderId=0;
 const PAGE_SIZE=10;
 const ALPHABET='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -136,6 +155,8 @@ function render(){
  $('chars').textContent=text.length.toLocaleString();$('words').textContent=words(text).toLocaleString();
  $('elapsed').textContent=fmt(phase==='READY'?0:(phase==='EXPIRED'?expiredAt:Date.now())-startedAt);
  $('folderStatus').textContent=folder?'Folder: '+folder.name:'Folder: Not connected';
+ $('masterStatus').textContent=masterName;
+ $('masterButton').disabled=!folder||archivingBusy||!['READY','EXPIRED'].includes(phase);
  $('connect').disabled=['ACTIVE','ERROR','ENDING'].includes(phase);
  $('sessionButton').textContent=phase==='ACTIVE'?'End Session':phase==='EXPIRED'?'New Session':'Begin Session';
  $('sessionButton').disabled=!folder||archivingBusy||!['READY','ACTIVE','EXPIRED'].includes(phase);
@@ -202,6 +223,7 @@ async function loadRecords(){
   const parsed=JSON.parse(await (await file.getFile()).text());
   if(parsed.settings)settings={...DEFAULTS,maxBuffer:parsed.settings.maxBuffer??DEFAULTS.maxBuffer,idleSeconds:parsed.settings.idleSeconds??DEFAULTS.idleSeconds};
   if(parsed.records)records={...records,...parsed.records};
+  masterName=validMasterName(parsed.masterName)?parsed.masterName:'FreeFlow.txt';
  }catch(e){if(e.name!=='NotFoundError')throw e;}
  for(const id of ['maxBuffer','idleSeconds'])$(id).value=settings[id];
 }
@@ -209,7 +231,7 @@ async function writeRecords(){
  if(!folder)return;
  const file=await folder.getFileHandle('records.json',{create:true});
  const stream=await file.createWritable();
- try{await stream.write(JSON.stringify({version:1,settings,records},null,2)+'\n');await stream.close();}
+ try{await stream.write(JSON.stringify({version:2,settings,records,masterName},null,2)+'\n');await stream.close();}
  catch(e){try{await stream.abort();}catch(_){}throw e;}
 }
 async function queueRecords(){
@@ -248,7 +270,16 @@ async function reconnect(){
 // Files left in Sessions/ are pending; Archived/ contains successfully incorporated originals.
 async function incorporateSession(name,source){
  const original=await (await source.getFile()).text();
- const master=await folder.getFileHandle('FreeFlow.txt',{create:true});
+ // A sidecar binds a pending session to its master even after a crash or master switch.
+ const sidecarName=name+'.master.json';
+ let target='FreeFlow.txt',sidecar=null;
+ try{
+  sidecar=await sessionsFolder.getFileHandle(sidecarName);
+  const parsed=JSON.parse(await (await sidecar.getFile()).text());
+  if(!validMasterName(parsed.master))throw Error('Invalid master filename in '+sidecarName);
+  target=parsed.master;
+ }catch(e){if(e.name!=='NotFoundError')throw e;}
+ const master=await folder.getFileHandle(target,{create:true});
  const current=await (await master.getFile()).text();
  const marker='===== FreeFlow Session: '+name+' =====';
  if(!current.includes(marker)){
@@ -271,7 +302,20 @@ async function incorporateSession(name,source){
   catch(e){try{await stream.abort();}catch(_){}throw e;}
  }
  if(await (await destination.getFile()).text()!==original)throw Error('Archive verification failed for '+name);
+ if(sidecar){
+  const meta=await (await sidecar.getFile()).text();
+  const archivedMeta=await archivedFolder.getFileHandle(sidecarName,{create:true});
+  const existingMeta=await (await archivedMeta.getFile()).text();
+  if(existingMeta!==meta){
+   if(existingMeta)throw Error('Archived metadata collision: '+sidecarName);
+   const stream=await archivedMeta.createWritable();
+   try{await stream.write(meta);await stream.close();}
+   catch(e){try{await stream.abort();}catch(_){}throw e;}
+  }
+  if(await (await archivedMeta.getFile()).text()!==meta)throw Error('Archive metadata verification failed');
+ }
  await sessionsFolder.removeEntry(name);
+ if(sidecar)await sessionsFolder.removeEntry(sidecarName);
 }
 async function migratePending(){
  if(archivingBusy||!folder||!sessionsFolder||!archivedFolder)return;
@@ -291,6 +335,51 @@ async function migratePending(){
  }finally{archivingBusy=false;render();}
 }
 
+
+async function openMasterPicker(){
+ if(!folder||archivingBusy||!['READY','EXPIRED'].includes(phase))return;
+ try{
+  const names=[];
+  for await(const [name,handle] of folder.entries()){
+   if(handle.kind==='file'&&validMasterName(name))names.push(name);
+  }
+  if(!names.includes(masterName))names.push(masterName);
+  names.sort((a,b)=>a.localeCompare(b));
+  const select=$('masterList');select.replaceChildren();
+  for(const name of names){const option=document.createElement('option');option.value=name;option.textContent=name;select.append(option);}
+  select.value=masterName;
+  $('masterPicker').classList.remove('hidden');
+ }catch(e){message('Cannot list master files: '+e.message);}
+}
+function closeMasterPicker(){$('masterPicker').classList.add('hidden');restoreWriteFocus();}
+async function chooseMaster(name,create){
+ if(!folder||archivingBusy||!['READY','EXPIRED'].includes(phase))return;
+ try{
+  if(!validMasterName(name))throw Error('Invalid master filename.');
+  if(create){
+   try{await folder.getFileHandle(name);throw Error('That file already exists. Select it from the list instead.');}
+   catch(e){if(e.name!=='NotFoundError')throw e;}
+   const file=await folder.getFileHandle(name,{create:true});
+   const stream=await file.createWritable();
+   try{await stream.write('');await stream.close();}
+   catch(e){try{await stream.abort();}catch(_){}throw e;}
+  }else{
+   // An externally renamed file can be reselected; don't create it just by selecting.
+   await folder.getFileHandle(name);
+  }
+  masterName=name;
+  await queueRecords();
+  closeMasterPicker();render();
+ }catch(e){message('Master selection failed: '+e.message);}
+}
+$('masterButton').addEventListener('click',()=>void openMasterPicker());
+$('cancelMaster').addEventListener('click',closeMasterPicker);
+$('useMaster').addEventListener('click',()=>void chooseMaster($('masterList').value,false));
+$('createMaster').addEventListener('click',()=>{
+ try{void chooseMaster(normalizeMasterName($('newMaster').value),true);}
+ catch(e){message('Master creation failed: '+e.message);}
+});
+
 async function begin(){
  if(!folder||archivingBusy||!['READY','EXPIRED'].includes(phase))return;
  if(orphanRecovery){message('Copy the interrupted-session recovery text before starting another session.');render();return;}
@@ -302,12 +391,19 @@ async function begin(){
   // Never overwrite an existing session with the same timestamp.
   while(true){try{await sessionsFolder.getFileHandle(candidate);candidate=base+'_'+i+++'.txt';}
     catch(e){if(e.name==='NotFoundError')break;throw e;}}
+  // Store routing before creating the session, so a failed master append cannot
+  // silently redirect the session after the user changes the selected master.
+  sessionMaster=masterName;
+  const meta=await sessionsFolder.getFileHandle(candidate+'.master.json',{create:true});
+  const metaStream=await meta.createWritable();
+  try{await metaStream.write(JSON.stringify({master:sessionMaster})+'\n');await metaStream.close();}
+  catch(e){try{await metaStream.abort();}catch(_){}throw e;}
   sessionFile=await sessionsFolder.getFileHandle(candidate,{create:true});
   const writable=await sessionFile.createWritable();await writable.write('');await writable.close();
   sessionName=candidate;text='';lastSavedText='';segmentHasInput=false;committedLength=0;visual=[];visibleStart=0;lastText='';editor.value='';
   saveError=null;dirty=false;ending=false;startedAt=Date.now();expiredAt=0;
   deadline=Date.now()+settings.idleSeconds*1000;remaining=settings.idleSeconds*1000;
-  phase='ACTIVE';view='write';message('Writing to Sessions/'+candidate);render();focusEditor();
+  phase='ACTIVE';view='write';message('Writing to '+sessionMaster+' via Sessions/'+candidate);render();focusEditor();
  }catch(e){message('Cannot begin: '+e.message);render();}
 }
 function adjustVisibleBuffer(){
