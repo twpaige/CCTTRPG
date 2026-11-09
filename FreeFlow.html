@@ -50,7 +50,7 @@ label{font-size:13px;color:var(--muted)}input[type=range]{width:100%;accent-colo
 </style>
 </head>
 <body><main class="shell">
-<header><h1>FreeFlow</h1><p class="version">Version 0.7.0</p><p class="tagline">A space to write without looking back.</p></header>
+<header><h1>FreeFlow</h1><p class="version">Version 0.7.1</p><p class="tagline">A space to write without looking back.</p></header>
 <div id="notice" class="notice hidden" role="status" aria-live="polite"></div>
 <nav class="nav"><button id="writeTab" aria-pressed="true">Write</button><button id="archiveTab" aria-pressed="false">Archive</button><button id="sessionButton" disabled>Begin Session</button><button id="retryButton" class="hidden">Retry Save</button><button id="recoveryButton" class="hidden">Copy</button></nav>
 <section id="writeView">
@@ -175,7 +175,7 @@ function render(){
 }
 function caretEnd(){if(!editor.disabled){let n=editor.value.length;editor.setSelectionRange(n,n);}}
 function focusEditor(){
- if(view==='write'&&!editor.disabled&&document.hasFocus()){
+ if(view==='write'&&$('masterPicker').classList.contains('hidden')&&!editor.disabled&&document.hasFocus()){
   editor.focus({preventScroll:true});caretEnd();
  }
 }
@@ -349,6 +349,7 @@ async function openMasterPicker(){
   for(const name of names){const option=document.createElement('option');option.value=name;option.textContent=name;select.append(option);}
   select.value=masterName;
   $('masterPicker').classList.remove('hidden');
+  $('newMaster').focus({preventScroll:true});
  }catch(e){message('Cannot list master files: '+e.message);}
 }
 function closeMasterPicker(){$('masterPicker').classList.add('hidden');restoreWriteFocus();}
