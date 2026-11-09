@@ -30,14 +30,18 @@ h2{font-size:16px;font-weight:400}.controls{display:grid;grid-template-columns:r
 label{font-size:13px;color:var(--muted)}input[type=range]{width:100%;accent-color:#ccc;display:block;margin:10px 0}
 .archive{border:1px solid var(--line);padding:18px;background:var(--panel);min-height:250px}
 .archive input{background:#111;color:#eee;border:1px solid #555;font:inherit;width:100%;padding:10px}
-.archive-list{margin:12px 0;max-height:450px;overflow:auto}.entry{display:block;width:100%;text-align:left;margin:5px 0}
+.archive-list{margin:12px 0;max-height:450px;overflow:auto}
+.pager{display:flex;align-items:center;gap:14px;margin:14px 0;justify-content:space-between}
+.pager-center{flex:1;text-align:center;min-width:90px}
+.pager-center input{display:block;width:100%;padding:0;margin:0;accent-color:#ccc}
+.pager-center output{display:block;font-size:12px;color:var(--muted);margin-top:5px}.entry{display:block;width:100%;text-align:left;margin:5px 0}
 #archiveText{white-space:pre-wrap;overflow-wrap:anywhere;max-height:400px;overflow:auto;border-top:1px solid #444;padding:12px 0;user-select:text}
 .hidden{display:none!important}.footer{color:#777;text-align:center;font-size:12px;margin-top:28px}
 @media(max-width:560px){.writing-surface{height:250px}.writing-display{padding:14px}.controls{grid-template-columns:1fr}.stat strong{font-size:19px}}
 </style>
 </head>
 <body><main class="shell">
-<header><h1>FreeFlow</h1><p class="version">Version 0.4.1</p><p class="tagline">A space to write without looking back.</p></header>
+<header><h1>FreeFlow</h1><p class="version">Version 0.4.2</p><p class="tagline">A space to write without looking back.</p></header>
 <div id="notice" class="notice" role="status">Connect a local folder to begin. FreeFlow saves your writing on this computer.</div>
 <div class="folderbar"><button id="connect">Choose / Reconnect Folder</button><span id="folderStatus">No folder connected</span></div>
 <nav class="nav"><button id="writeTab" aria-pressed="true">Write</button><button id="archiveTab" aria-pressed="false">Archive</button></nav>
@@ -57,6 +61,12 @@ label{font-size:13px;color:var(--muted)}input[type=range]{width:100%;accent-colo
 <section id="archiveView" class="archive hidden"><h2>Archive — read only</h2>
 <input id="search" placeholder="Search all saved sessions or tags such as !Idea" aria-label="Search saved writing">
 <p id="archiveStatus" class="hint"></p><div id="archiveList" class="archive-list"></div>
+<div id="pager" class="pager hidden">
+<button id="previousPage" type="button">Previous</button>
+<div class="pager-center"><input id="pageSlider" type="range" min="1" max="1" step="1" value="1" aria-label="Archive page">
+<output id="pageLabel" for="pageSlider">Page 1 of 1</output></div>
+<button id="nextPage" type="button">Next</button>
+</div>
 <div id="archiveText"></div></section>
 <p class="footer">Single HTML file · Local text sessions · No server storage</p>
 </main>
@@ -70,7 +80,8 @@ let settings={...DEFAULTS}, records={longest:null,mostCharacters:null,totalSessi
 let folder=null, sessionsFolder=null, sessionFile=null, sessionName='', phase='READY', view='write';
 let text='', committedLength=0, visual=[], visibleStart=0, startedAt=0, expiredAt=0, deadline=0, remaining=0, lastText='';
 let saveBusy=false, dirty=false, saveError=null, ending=false, settingsBusy=false, settingsDirty=false;
-let filesCache=[];
+let filesCache=[], archiveMatches=[], archivePage=1;
+const PAGE_SIZE=10;
 const ALPHABET='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 const randomChar=c=>/\s/u.test(c)?c:ALPHABET[Math.floor(Math.random()*ALPHABET.length)];
 const fmt=ms=>{let n=Math.max(0,Math.floor(ms/1000));return String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');};
@@ -351,28 +362,50 @@ async function loadArchive(){
   await searchArchive();
  }catch(e){$('archiveStatus').textContent='Archive error: '+e.message;}
 }
+function renderArchivePage(){
+ const totalPages=Math.max(1,Math.ceil(archiveMatches.length/PAGE_SIZE));
+ archivePage=Math.max(1,Math.min(totalPages,archivePage));
+ const pager=$('pager');
+ pager.classList.toggle('hidden',archiveMatches.length<=PAGE_SIZE);
+ $('pageSlider').max=String(totalPages);
+ $('pageSlider').value=String(archivePage);
+ $('pageLabel').textContent='Page '+archivePage+' of '+totalPages;
+ $('previousPage').disabled=archivePage<=1;
+ $('nextPage').disabled=archivePage>=totalPages;
+ const list=$('archiveList');list.replaceChildren();
+ const entries=archiveMatches.slice((archivePage-1)*PAGE_SIZE,archivePage*PAGE_SIZE);
+ for(const entry of entries){
+  const button=document.createElement('button');
+  button.className='entry';button.textContent=entry.name;
+  button.addEventListener('click',async()=>{
+   try{$('archiveText').textContent=await (await entry.handle.getFile()).text();}
+   catch(e){$('archiveText').textContent='Could not read file: '+e.message;}
+  });
+  list.appendChild(button);
+ }
+}
+let archiveSearchId=0;
 async function searchArchive(){
+ const id=++archiveSearchId;
  const q=$('search').value.toLowerCase().trim(),matches=[];
  $('archiveStatus').textContent='Searching…';
  try{
   for(const entry of filesCache){
+   if(id!==archiveSearchId)return;
    if(!q||entry.name.toLowerCase().includes(q)){matches.push(entry);continue;}
    const contents=await (await entry.handle.getFile()).text();
    if(contents.toLowerCase().includes(q))matches.push(entry);
   }
+  if(id!==archiveSearchId)return;
+  archiveMatches=matches;archivePage=1;
   $('archiveStatus').textContent=matches.length+' of '+filesCache.length+' session(s)';
-  const list=$('archiveList');list.replaceChildren();
-  for(const entry of matches){
-   const button=document.createElement('button');button.className='entry';button.textContent=entry.name;
-   button.addEventListener('click',async()=>{
-    try{$('archiveText').textContent=await (await entry.handle.getFile()).text();}
-    catch(e){$('archiveText').textContent='Could not read file: '+e.message;}
-   });
-   list.appendChild(button);
-  }
-  if(!matches.length)$('archiveText').textContent='';
- }catch(e){$('archiveStatus').textContent='Search error: '+e.message;}
+  $('archiveText').textContent='';
+  renderArchivePage();
+ }catch(e){if(id===archiveSearchId)$('archiveStatus').textContent='Search error: '+e.message;}
 }
+$('previousPage').addEventListener('click',()=>{archivePage--;renderArchivePage();});
+$('nextPage').addEventListener('click',()=>{archivePage++;renderArchivePage();});
+$('pageSlider').addEventListener('input',e=>{archivePage=Number(e.target.value);renderArchivePage();});
 let searchGeneration=0;
 $('search').addEventListener('input',()=>{const n=++searchGeneration;setTimeout(()=>{if(n===searchGeneration)void searchArchive();},250);});
 setInterval(()=>{if(phase==='ACTIVE'){
