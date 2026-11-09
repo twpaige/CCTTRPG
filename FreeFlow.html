@@ -31,6 +31,9 @@ label{font-size:13px;color:var(--muted)}input[type=range]{width:100%;accent-colo
 .archive{border:1px solid var(--line);padding:18px;background:var(--panel);min-height:250px}
 .archive input{background:#111;color:#eee;border:1px solid #555;font:inherit;width:100%;padding:10px}
 .archive-list{margin:12px 0;max-height:450px;overflow:auto}
+.entry{display:flex;align-items:baseline;gap:18px;overflow:hidden}
+.entry-name{flex:0 0 auto;white-space:nowrap}
+.entry-preview{flex:1;min-width:0;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pager{display:flex;align-items:center;gap:14px;margin:14px 0;justify-content:space-between}
 .pager-center{flex:1;text-align:center;min-width:90px}
 .pager-center input{display:block;width:100%;padding:0;margin:0;accent-color:#ccc}
@@ -41,7 +44,7 @@ label{font-size:13px;color:var(--muted)}input[type=range]{width:100%;accent-colo
 </style>
 </head>
 <body><main class="shell">
-<header><h1>FreeFlow</h1><p class="version">Version 0.4.2</p><p class="tagline">A space to write without looking back.</p></header>
+<header><h1>FreeFlow</h1><p class="version">Version 0.4.3</p><p class="tagline">A space to write without looking back.</p></header>
 <div id="notice" class="notice" role="status">Connect a local folder to begin. FreeFlow saves your writing on this computer.</div>
 <div class="folderbar"><button id="connect">Choose / Reconnect Folder</button><span id="folderStatus">No folder connected</span></div>
 <nav class="nav"><button id="writeTab" aria-pressed="true">Write</button><button id="archiveTab" aria-pressed="false">Archive</button></nav>
@@ -80,7 +83,7 @@ let settings={...DEFAULTS}, records={longest:null,mostCharacters:null,totalSessi
 let folder=null, sessionsFolder=null, sessionFile=null, sessionName='', phase='READY', view='write';
 let text='', committedLength=0, visual=[], visibleStart=0, startedAt=0, expiredAt=0, deadline=0, remaining=0, lastText='';
 let saveBusy=false, dirty=false, saveError=null, ending=false, settingsBusy=false, settingsDirty=false;
-let filesCache=[], archiveMatches=[], archivePage=1;
+let filesCache=[], archiveMatches=[], archivePage=1, archiveRenderId=0;
 const PAGE_SIZE=10;
 const ALPHABET='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 const randomChar=c=>/\s/u.test(c)?c:ALPHABET[Math.floor(Math.random()*ALPHABET.length)];
@@ -362,11 +365,19 @@ async function loadArchive(){
   await searchArchive();
  }catch(e){$('archiveStatus').textContent='Archive error: '+e.message;}
 }
+async function firstLinePreview(entry){
+ // Read only the beginning of the file, not the entire session.
+ const file=await entry.handle.getFile();
+ const chunk=await file.slice(0,4096).text();
+ const line=chunk.split(/\r?\n/,1)[0];
+ const chars=Array.from(line);
+ return chars.slice(0,50).join('')+(chars.length>50?'…':'');
+}
 function renderArchivePage(){
+ const generation=++archiveRenderId;
  const totalPages=Math.max(1,Math.ceil(archiveMatches.length/PAGE_SIZE));
  archivePage=Math.max(1,Math.min(totalPages,archivePage));
- const pager=$('pager');
- pager.classList.toggle('hidden',archiveMatches.length<=PAGE_SIZE);
+ $('pager').classList.toggle('hidden',archiveMatches.length<=PAGE_SIZE);
  $('pageSlider').max=String(totalPages);
  $('pageSlider').value=String(archivePage);
  $('pageLabel').textContent='Page '+archivePage+' of '+totalPages;
@@ -375,13 +386,20 @@ function renderArchivePage(){
  const list=$('archiveList');list.replaceChildren();
  const entries=archiveMatches.slice((archivePage-1)*PAGE_SIZE,archivePage*PAGE_SIZE);
  for(const entry of entries){
-  const button=document.createElement('button');
-  button.className='entry';button.textContent=entry.name;
+  const button=document.createElement('button');button.className='entry';
+  const name=document.createElement('span');name.className='entry-name';name.textContent=entry.name;
+  const preview=document.createElement('span');preview.className='entry-preview';preview.textContent='Loading preview…';
+  button.append(name,preview);
   button.addEventListener('click',async()=>{
    try{$('archiveText').textContent=await (await entry.handle.getFile()).text();}
    catch(e){$('archiveText').textContent='Could not read file: '+e.message;}
   });
   list.appendChild(button);
+  void firstLinePreview(entry).then(value=>{
+   if(generation===archiveRenderId)preview.textContent=value;
+  }).catch(()=>{
+   if(generation===archiveRenderId)preview.textContent='Preview unavailable';
+  });
  }
 }
 let archiveSearchId=0;
