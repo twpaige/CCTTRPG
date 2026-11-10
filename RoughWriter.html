@@ -32,6 +32,15 @@ button:hover:not(:disabled){background:#333}
 .stat{border:1px solid var(--line);background:var(--panel);padding:12px;text-align:center}
 .stat strong{display:block;font-size:23px;font-weight:400}.stat span{font-size:12px;color:var(--muted)}
 .settings{padding-top:4px;margin-top:12px}
+.settings{position:relative}.controls label{text-align:center}
+.help-link{position:absolute;left:50%;top:3px;transform:translateX(-50%);background:none;border:0;padding:0 6px;color:#aaa;text-decoration:underline;font-size:13px}
+.help-link:hover:not(:disabled){background:none;color:#eee}
+#records{text-align:center}
+.help-dialog{width:min(600px,calc(100% - 32px));max-height:min(80vh,650px);overflow:auto;background:#191919;color:#eee;border:1px solid #666;border-radius:5px;padding:22px 25px;line-height:1.6}
+.help-dialog::backdrop{background:rgba(0,0,0,.78)}
+.help-dialog h2{margin:0 0 12px}.help-dialog h3{font-size:14px;margin:15px 0 4px}
+.help-dialog p{margin:4px 0 10px}.help-dialog .help-close{float:right}
+@media(max-width:560px){.settings{padding-top:28px}.help-link{top:0}}
 h2{font-size:16px;font-weight:400}.controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.controls label{min-width:0}
 label{font-size:13px;color:var(--muted)}input[type=range]{width:100%;accent-color:#ccc;display:block;margin:10px 0}
 .archive{border:1px solid var(--line);padding:18px;background:var(--panel);min-height:250px}
@@ -57,7 +66,7 @@ label{font-size:13px;color:var(--muted)}input[type=range]{width:100%;accent-colo
 </style>
 </head>
 <body><main class="shell">
-<header><h1>RoughWriter</h1><p class="version">Version 0.7.4</p><p class="tagline">Advance. No retreat. No surrender. Write.</p></header>
+<header><h1>RoughWriter</h1><p class="version">Version 0.7.5</p><p class="tagline">Advance. No retreat. No surrender. Write.</p></header>
 <div id="notice" class="notice hidden" role="status" aria-live="polite"></div>
 <nav class="nav"><button id="writeTab" aria-pressed="true">Write</button><button id="archiveTab" aria-pressed="false">Archive</button><button id="sessionButton" disabled>Begin Session</button><button id="retryButton" class="hidden">Retry Save</button><button id="recoveryButton" class="hidden">Copy</button></nav>
 <section id="writeView">
@@ -67,7 +76,7 @@ label{font-size:13px;color:var(--muted)}input[type=range]{width:100%;accent-colo
 <p class="hint" id="hint"></p>
 
 <div class="stats"><div class="stat"><strong id="chars">0</strong><span>Characters</span></div><div class="stat"><strong id="words">0</strong><span>Words</span></div><div class="stat"><strong id="elapsed">00:00</strong><span>Elapsed</span></div></div>
-<div class="settings"><div class="controls">
+<div class="settings"><button id="helpButton" class="help-link" type="button" aria-label="How to use RoughWriter">&lt;?&gt;</button><div class="controls">
 <label>Visible buffer: <output id="maxLabel">50</output> characters<input id="maxBuffer" type="range" min="1" max="500" step="1" value="50"></label>
 <label>Idle timeout: <output id="idleLabel">60</output> seconds<input id="idleSeconds" type="range" min="2" max="120" step="1" value="60"></label>
 </div><p id="records" class="hint">Personal records appear after a completed session.</p></div>
@@ -91,6 +100,21 @@ label{font-size:13px;color:var(--muted)}input[type=range]{width:100%;accent-colo
 <p class="hint">Master files are stored in the selected writing folder. Switching is available between sessions.</p>
 </section>
 </main>
+<dialog id="helpDialog" class="help-dialog" aria-labelledby="helpTitle">
+<button id="closeHelp" class="help-close" type="button">Close</button>
+<h2 id="helpTitle">RoughWriter — Quick Guide</h2>
+<p><strong>Advance. No retreat. No surrender. Write.</strong> RoughWriter helps you practice getting words down without stopping to revise.</p>
+<h3>Get started</h3>
+<p>Choose / Reconnect Folder in the footer to select a local writing folder and grant write access. Click <strong>Begin Session</strong> and start typing. Your writing is saved as plain text in the folder you choose.</p>
+<h3>Keep moving</h3>
+<p>You cannot edit earlier text during a session. Press <strong>Enter</strong> after writing to commit a segment; press <strong>Enter twice</strong> to end the session. The visible-buffer slider controls how much recent text stays readable. Older text is visually scrambled, not deleted.</p>
+<h3>Pauses and saving</h3>
+<p>The idle-timeout slider sets how long you can pause before the session ends automatically. RoughWriter saves the original session text during writing and at the end. It also keeps a temporary browser recovery copy for interrupted work. If saving fails, use Retry Save or Copy to preserve your words.</p>
+<h3>Where your writing goes</h3>
+<p>Sessions are stored as timestamped text files. Completed sessions are appended to the selected master .txt document, verified, and the individual files are moved to <strong>Sessions/Archived</strong>. The master selector in the footer lets you use an existing master or create a new one between sessions. Your files remain on your own computer or synced folder.</p>
+<h3>Archive and records</h3>
+<p>Use <strong>Archive</strong> to search and read individual sessions, or copy their full text. Delete permanently removes only that individual session file after confirmation; text already appended to the master remains. The statistics show your current session and personal bests.</p>
+</dialog>
 <script>
 (() => {
 'use strict';
@@ -114,6 +138,8 @@ function normalizeMasterName(raw){
 $('copyright').textContent='© '+new Date().toLocaleDateString()+' Thomas Paige';
 let filesCache=[], archiveMatches=[], archivePage=1, archiveRenderId=0;
 const PAGE_SIZE=10;
+$('helpButton').addEventListener('click',()=>{$('helpDialog').showModal();});
+$('closeHelp').addEventListener('click',()=>$('helpDialog').close());
 const ALPHABET='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 const randomChar=c=>/\s/u.test(c)?c:ALPHABET[Math.floor(Math.random()*ALPHABET.length)];
 const fmt=ms=>{let n=Math.max(0,Math.floor(ms/1000));return String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');};
