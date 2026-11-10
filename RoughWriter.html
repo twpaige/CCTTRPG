@@ -66,7 +66,7 @@ label{font-size:13px;color:var(--muted)}input[type=range]{width:100%;accent-colo
 </style>
 </head>
 <body><main class="shell">
-<header><h1>RoughWriter</h1><p class="version">Version 0.7.5</p><p class="tagline">Advance. No retreat. No surrender. Write.</p></header>
+<header><h1>RoughWriter</h1><p class="version">Version 0.7.6</p><p class="tagline">Advance. No retreat. No surrender. Write.</p></header>
 <div id="notice" class="notice hidden" role="status" aria-live="polite"></div>
 <nav class="nav"><button id="writeTab" aria-pressed="true">Write</button><button id="archiveTab" aria-pressed="false">Archive</button><button id="sessionButton" disabled>Begin Session</button><button id="retryButton" class="hidden">Retry Save</button><button id="recoveryButton" class="hidden">Copy</button></nav>
 <section id="writeView">
@@ -126,6 +126,8 @@ let folder=null, sessionsFolder=null, archivedFolder=null, sessionFile=null, ses
 let archivingBusy=false, archiveIssue='', masterName='RoughWriter.txt', sessionMaster='RoughWriter.txt';
 let text='', committedLength=0, visual=[], visibleStart=0, startedAt=0, expiredAt=0, deadline=0, remaining=0, lastText='';
 let saveBusy=false, dirty=false, saveError=null, ending=false, settingsBusy=false, settingsDirty=false;
+let dissolveStarted=0, dissolveOrder=[];
+const DISSOLVE_MS=2000;
 let segmentHasInput=false, lastSavedText='', recoveryTimer=null, orphanRecovery=null;
 const RECOVERY_KEY='roughwriter-emergency-draft-v1';
 const validMasterName=name=>typeof name==='string'&&name.endsWith('.txt')&&name.length<=124&&name.length>4&&!/[\\/<>:"|?*\x00-\x1f]/.test(name)&&name!=='.txt';
@@ -153,7 +155,17 @@ function message(s){
 }
 function displayWriting(){
  const fragment=document.createDocumentFragment();
- if(phase==='ACTIVE'||phase==='ERROR'||phase==='ENDING'){
+ if(phase==='DISSOLVING'){
+   const progress=Math.min(1,(Date.now()-dissolveStarted)/DISSOLVE_MS);
+   const cutoff=Math.floor(progress*dissolveOrder.length);
+   const faded=new Set(dissolveOrder.slice(0,cutoff));
+   for(let i=0;i<visual.length;i++){
+    const item=visual[i],node=document.createElement('span');
+    node.textContent=item.hidden?item.mask:item.char;
+    if(faded.has(i))node.style.opacity='0';
+    fragment.appendChild(node);
+   }
+ }else if(phase==='ACTIVE'||phase==='ERROR'||phase==='ENDING'){
    const node=document.createElement('span');
    node.textContent=visual.map(c=>c.hidden?c.mask:c.char).join('');
    fragment.appendChild(node);
@@ -183,14 +195,14 @@ function maskOld(n){
 }
 function render(){
  $('state').textContent=phase;
- $('timer').textContent=phase==='ACTIVE'?'Idle timer: '+Math.ceil(remaining/1000)+'s':phase==='EXPIRED'?'Idle timer: EXPIRED':'Idle timer: —';
+ $('timer').textContent=phase==='ACTIVE'?'Idle timer: '+Math.ceil(remaining/1000)+'s':phase==='DISSOLVING'?'Idle timer: 0s':phase==='EXPIRED'?'Idle timer: EXPIRED':'Idle timer: —';
  $('bufferStatus').textContent='Visible: '+editor.value.length+' / '+settings.maxBuffer;
  $('chars').textContent=text.length.toLocaleString();$('words').textContent=words(text).toLocaleString();
  $('elapsed').textContent=fmt(phase==='READY'?0:(phase==='EXPIRED'?expiredAt:Date.now())-startedAt);
  $('folderStatus').textContent=folder?'Folder: '+folder.name:'Folder: Not connected';
  $('masterStatus').textContent=masterName;
  $('masterButton').disabled=!folder||archivingBusy||!['READY','EXPIRED'].includes(phase);
- $('connect').disabled=['ACTIVE','ERROR','ENDING'].includes(phase);
+ $('connect').disabled=['ACTIVE','DISSOLVING','ERROR','ENDING'].includes(phase);
  $('sessionButton').textContent=phase==='ACTIVE'?'End Session':phase==='EXPIRED'?'New Session':'Begin Session';
  $('sessionButton').disabled=!folder||archivingBusy||!['READY','ACTIVE','EXPIRED'].includes(phase);
  $('retryButton').classList.toggle('hidden',phase!=='ERROR');
@@ -200,8 +212,8 @@ function render(){
  $('archiveTab').setAttribute('aria-pressed',String(view==='archive'));
  $('writeView').classList.toggle('hidden',view!=='write');$('archiveView').classList.toggle('hidden',view!=='archive');
  // Keep the invisible editor focusable in READY and EXPIRED so Enter can begin.
- editor.disabled=!['READY','ACTIVE','EXPIRED'].includes(phase);
- $('hint').textContent=phase==='ACTIVE'?'Forward-only. Enter saves the segment; Enter again without new typing ends the session.':phase==='ERROR'?'Save failed. Retry or copy your writing; your writing is retained.':phase==='ENDING'?'Finishing and saving session…':phase==='EXPIRED'?'Final statistics are frozen. Enter begins a new session.':folder?'Press Enter or Begin Session to start writing.':'Select a writable folder, then press Enter or Begin Session.';
+ editor.disabled=!['READY','ACTIVE','DISSOLVING','EXPIRED'].includes(phase);
+ $('hint').textContent=phase==='DISSOLVING'?'Keep typing to continue this session…':phase==='ACTIVE'?'Forward-only. Enter saves the segment; Enter again without new typing ends the session.':phase==='ERROR'?'Save failed. Retry or copy your writing; your writing is retained.':phase==='ENDING'?'Finishing and saving session…':phase==='EXPIRED'?'Final statistics are frozen. Enter begins a new session.':folder?'Press Enter or Begin Session to start writing.':'Select a writable folder, then press Enter or Begin Session.';
  $('maxLabel').textContent=settings.maxBuffer;$('idleLabel').textContent=settings.idleSeconds;
  $('records').textContent='Best characters: '+(records.mostCharacters?records.mostCharacters.value.toLocaleString()+' ('+records.mostCharacters.date+')':'—')+' · Longest: '+(records.longest?fmt(records.longest.value)+' ('+records.longest.date+')':'—')+' · Sessions: '+records.totalSessions;
  displayWriting();
@@ -468,7 +480,7 @@ function rollover(){
 // Visual rollover never writes a session file. Only Enter/end/timeout do.
 function persistRecovery(){
  try{
-  if(['ACTIVE','ERROR','ENDING'].includes(phase)&&sessionName){
+  if(['ACTIVE','DISSOLVING','ERROR','ENDING'].includes(phase)&&sessionName){
    localStorage.setItem(RECOVERY_KEY,JSON.stringify({name:sessionName,text,startedAt}));
   }else if(!orphanRecovery)localStorage.removeItem(RECOVERY_KEY);
  }catch(e){message('Browser recovery backup unavailable: '+e.message);}
@@ -548,14 +560,25 @@ async function finish(){
 }
 function expire(){
  if(phase!=='ACTIVE')return;
- requestSave(true);
+ phase='DISSOLVING';dissolveStarted=Date.now();
+ dissolveOrder=Array.from({length:visual.length},(_,i)=>i);
+ for(let i=dissolveOrder.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[dissolveOrder[i],dissolveOrder[j]]=[dissolveOrder[j],dissolveOrder[i]];}
+ persistRecovery();render();
+}
+function interruptDissolve(){
+ if(phase!=='DISSOLVING')return;
+ phase='ACTIVE';dissolveOrder=[];dissolveStarted=0;
+ deadline=Date.now()+settings.idleSeconds*1000;remaining=settings.idleSeconds*1000;
+ render();
 }
 editor.addEventListener('beforeinput',e=>{
+ if(phase==='DISSOLVING')interruptDissolve();
  if(phase!=='ACTIVE'){e.preventDefault();return;}
  if(!['insertText','insertCompositionText'].includes(e.inputType)){e.preventDefault();return;}
  caretEnd();
 });
 editor.addEventListener('input',()=>{
+ if(phase==='DISSOLVING')interruptDissolve();
  if(phase!=='ACTIVE')return;
  if(!editor.value.startsWith(lastText)){editor.value=lastText;caretEnd();return;}
  const added=editor.value.slice(lastText.length);
@@ -568,6 +591,7 @@ editor.addEventListener('keydown',e=>{
   if(e.key==='Enter'&&!e.repeat&&!e.isComposing)void begin();
   return;
  }
+ if(phase==='DISSOLVING'&&e.key.length===1&&!e.ctrlKey&&!e.metaKey&&!e.altKey)interruptDissolve();
  if(phase!=='ACTIVE')return;
  if(e.key==='Enter'){e.preventDefault();if(!e.repeat&&!e.isComposing){
   if(!segmentHasInput){
@@ -724,12 +748,17 @@ $('nextPage').addEventListener('click',()=>{archivePage++;renderArchivePage();})
 $('pageSlider').addEventListener('input',e=>{archivePage=Number(e.target.value);renderArchivePage();});
 let searchGeneration=0;
 $('search').addEventListener('input',()=>{const n=++searchGeneration;setTimeout(()=>{if(n===searchGeneration)void searchArchive();},250);});
-setInterval(()=>{if(phase==='ACTIVE'){
- remaining=Math.max(0,deadline-Date.now());
- if(remaining===0)expire();else render();
-}},150);
+setInterval(()=>{
+ if(phase==='ACTIVE'){
+  remaining=Math.max(0,deadline-Date.now());
+  if(remaining===0)expire();else render();
+ }else if(phase==='DISSOLVING'){
+  if(Date.now()-dissolveStarted>=DISSOLVE_MS){dissolveOrder=[];requestSave(true);}
+  else render();
+ }
+},100);
 window.addEventListener('beforeunload',e=>{
- if(['ACTIVE','ERROR','ENDING'].includes(phase)){persistRecovery();e.preventDefault();e.returnValue='';}
+ if(['ACTIVE','DISSOLVING','ERROR','ENDING'].includes(phase)){persistRecovery();e.preventDefault();e.returnValue='';}
 });
 try{
  const saved=JSON.parse(localStorage.getItem(RECOVERY_KEY)||'null');
