@@ -57,7 +57,7 @@ label{font-size:13px;color:var(--muted)}input[type=range]{width:100%;accent-colo
 </style>
 </head>
 <body><main class="shell">
-<header><h1>RoughWriter</h1><p class="version">Version 0.7.3</p><p class="tagline">Advance. No retreat. No surrender.</p></header>
+<header><h1>RoughWriter</h1><p class="version">Version 0.7.4</p><p class="tagline">Advance. No retreat. No surrender. Write.</p></header>
 <div id="notice" class="notice hidden" role="status" aria-live="polite"></div>
 <nav class="nav"><button id="writeTab" aria-pressed="true">Write</button><button id="archiveTab" aria-pressed="false">Archive</button><button id="sessionButton" disabled>Begin Session</button><button id="retryButton" class="hidden">Retry Save</button><button id="recoveryButton" class="hidden">Copy</button></nav>
 <section id="writeView">
@@ -82,7 +82,7 @@ label{font-size:13px;color:var(--muted)}input[type=range]{width:100%;accent-colo
 <button id="nextPage" type="button">Next</button>
 </div>
 <div id="archiveText"></div></section>
-<p class="footer"><span id="copyright"></span> · <button id="connect" class="footer-folder" type="button"><span id="folderStatus">Folder: Not connected</span></button> · <button id="masterButton" class="footer-folder" type="button">Master: <span id="masterStatus">FreeFlow.txt</span></button></p>
+<p class="footer"><span id="copyright"></span> · <button id="connect" class="footer-folder" type="button"><span id="folderStatus">Folder: Not connected</span></button> · <button id="masterButton" class="footer-folder" type="button">Master: <span id="masterStatus">RoughWriter.txt</span></button></p>
 <section id="masterPicker" class="master-picker hidden" aria-label="Choose master file">
 <label for="masterList">Existing master files</label><select id="masterList"></select>
 <div class="actions"><button id="useMaster" type="button">Use Selected</button><button id="cancelMaster" type="button">Cancel</button></div>
@@ -99,11 +99,11 @@ const editor=$('editor'), display=$('writingDisplay');
 const DEFAULTS={maxBuffer:50,idleSeconds:60};
 let settings={...DEFAULTS}, records={longest:null,mostCharacters:null,totalSessions:0,totalCharacters:0};
 let folder=null, sessionsFolder=null, archivedFolder=null, sessionFile=null, sessionName='', phase='READY', view='write';
-let archivingBusy=false, archiveIssue='', masterName='FreeFlow.txt', sessionMaster='FreeFlow.txt';
+let archivingBusy=false, archiveIssue='', masterName='RoughWriter.txt', sessionMaster='RoughWriter.txt';
 let text='', committedLength=0, visual=[], visibleStart=0, startedAt=0, expiredAt=0, deadline=0, remaining=0, lastText='';
 let saveBusy=false, dirty=false, saveError=null, ending=false, settingsBusy=false, settingsDirty=false;
 let segmentHasInput=false, lastSavedText='', recoveryTimer=null, orphanRecovery=null;
-const RECOVERY_KEY='freeflow-emergency-draft-v1';
+const RECOVERY_KEY='roughwriter-emergency-draft-v1';
 const validMasterName=name=>typeof name==='string'&&name.endsWith('.txt')&&name.length<=124&&name.length>4&&!/[\\/<>:"|?*\x00-\x1f]/.test(name)&&name!=='.txt';
 function normalizeMasterName(raw){
  const value=raw.trim();
@@ -192,7 +192,7 @@ function restoreWriteFocus(){
 }
 function idb(){
  return new Promise((resolve,reject)=>{
-  const request=indexedDB.open('freeflow-folder-v1',1);
+  const request=indexedDB.open('roughwriter-folder-v1',1);
   request.onupgradeneeded=()=>request.result.createObjectStore('handles');
   request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);
  });
@@ -219,9 +219,9 @@ async function verifyFolder(handle,ask){
  if(status!=='granted'&&ask)status=await handle.requestPermission(permission);
  if(status!=='granted')return false;
  // Actually test writing, not just a permission flag.
- const probe=await handle.getFileHandle('.freeflow-write-test.tmp',{create:true});
+ const probe=await handle.getFileHandle('.roughwriter-write-test.tmp',{create:true});
  const stream=await probe.createWritable();await stream.write('ok');await stream.close();
- await handle.removeEntry('.freeflow-write-test.tmp');
+ await handle.removeEntry('.roughwriter-write-test.tmp');
  return true;
 }
 async function loadRecords(){
@@ -230,7 +230,7 @@ async function loadRecords(){
   const parsed=JSON.parse(await (await file.getFile()).text());
   if(parsed.settings)settings={...DEFAULTS,maxBuffer:parsed.settings.maxBuffer??DEFAULTS.maxBuffer,idleSeconds:parsed.settings.idleSeconds??DEFAULTS.idleSeconds};
   if(parsed.records)records={...records,...parsed.records};
-  masterName=validMasterName(parsed.masterName)?parsed.masterName:'FreeFlow.txt';
+  masterName=validMasterName(parsed.masterName)?parsed.masterName:'RoughWriter.txt';
  }catch(e){if(e.name!=='NotFoundError')throw e;}
  for(const id of ['maxBuffer','idleSeconds'])$(id).value=settings[id];
 }
@@ -279,7 +279,7 @@ async function incorporateSession(name,source){
  const original=await (await source.getFile()).text();
  // A sidecar binds a pending session to its master even after a crash or master switch.
  const sidecarName=name+'.master.json';
- let target='FreeFlow.txt',sidecar=null;
+ let target='RoughWriter.txt',sidecar=null;
  try{
   sidecar=await sessionsFolder.getFileHandle(sidecarName);
   const parsed=JSON.parse(await (await sidecar.getFile()).text());
@@ -288,7 +288,7 @@ async function incorporateSession(name,source){
  }catch(e){if(e.name!=='NotFoundError')throw e;}
  const master=await folder.getFileHandle(target,{create:true});
  const current=await (await master.getFile()).text();
- const marker='===== FreeFlow Session: '+name+' =====';
+ const marker='===== RoughWriter Session: '+name+' =====';
  if(!current.includes(marker)){
   const entry=(current&&!current.endsWith('\n')?'\n\n':'')+marker+'\n'+original+'\n\n';
   const size=(await master.getFile()).size;
@@ -335,7 +335,7 @@ async function migratePending(){
   }
   pending.sort((a,b)=>a.name.localeCompare(b.name));
   for(const entry of pending){await incorporateSession(entry.name,entry.handle);completed++;}
-  if(completed)message('Added '+completed+' session(s) to FreeFlow.txt and archived originals.');
+  if(completed)message('Added '+completed+' session(s) to RoughWriter.txt and archived originals.');
  }catch(e){
   archiveIssue=e.message;
   message('Archive/master update failed: '+e.message+'. Original session files remain available; reconnect to retry.');
