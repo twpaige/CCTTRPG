@@ -66,7 +66,7 @@ label{font-size:13px;color:var(--muted)}input[type=range]{width:100%;accent-colo
 </style>
 </head>
 <body><main class="shell">
-<header><h1>RoughWriter</h1><p class="version">Version 0.7.6</p><p class="tagline">Advance. No retreat. No surrender. Write.</p></header>
+<header><h1>RoughWriter</h1><p class="version">Version 0.7.7</p><p class="tagline">Advance. No retreat. No surrender. Write.</p></header>
 <div id="notice" class="notice hidden" role="status" aria-live="polite"></div>
 <nav class="nav"><button id="writeTab" aria-pressed="true">Write</button><button id="archiveTab" aria-pressed="false">Archive</button><button id="sessionButton" disabled>Begin Session</button><button id="retryButton" class="hidden">Retry Save</button><button id="recoveryButton" class="hidden">Copy</button></nav>
 <section id="writeView">
@@ -126,7 +126,7 @@ let folder=null, sessionsFolder=null, archivedFolder=null, sessionFile=null, ses
 let archivingBusy=false, archiveIssue='', masterName='RoughWriter.txt', sessionMaster='RoughWriter.txt';
 let text='', committedLength=0, visual=[], visibleStart=0, startedAt=0, expiredAt=0, deadline=0, remaining=0, lastText='';
 let saveBusy=false, dirty=false, saveError=null, ending=false, settingsBusy=false, settingsDirty=false;
-let dissolveStarted=0, dissolveOrder=[];
+let dissolveStarted=0;
 const DISSOLVE_MS=2000;
 let segmentHasInput=false, lastSavedText='', recoveryTimer=null, orphanRecovery=null;
 const RECOVERY_KEY='roughwriter-emergency-draft-v1';
@@ -154,17 +154,14 @@ function message(s){
  notice.classList.toggle('hidden',!isProblem);
 }
 function displayWriting(){
+ if(phase!=='DISSOLVING')display.style.opacity='1';
  const fragment=document.createDocumentFragment();
  if(phase==='DISSOLVING'){
    const progress=Math.min(1,(Date.now()-dissolveStarted)/DISSOLVE_MS);
-   const cutoff=Math.floor(progress*dissolveOrder.length);
-   const faded=new Set(dissolveOrder.slice(0,cutoff));
-   for(let i=0;i<visual.length;i++){
-    const item=visual[i],node=document.createElement('span');
-    node.textContent=item.hidden?item.mask:item.char;
-    if(faded.has(i))node.style.opacity='0';
-    fragment.appendChild(node);
-   }
+   display.style.opacity=String(1-progress);
+   const node=document.createElement('span');
+   node.textContent=visual.map(c=>c.hidden?c.mask:c.char).join('');
+   fragment.appendChild(node);
  }else if(phase==='ACTIVE'||phase==='ERROR'||phase==='ENDING'){
    const node=document.createElement('span');
    node.textContent=visual.map(c=>c.hidden?c.mask:c.char).join('');
@@ -203,11 +200,11 @@ function render(){
  $('masterStatus').textContent=masterName;
  $('masterButton').disabled=!folder||archivingBusy||!['READY','EXPIRED'].includes(phase);
  $('connect').disabled=['ACTIVE','DISSOLVING','ERROR','ENDING'].includes(phase);
- $('sessionButton').textContent=phase==='ACTIVE'?'End Session':phase==='EXPIRED'?'New Session':'Begin Session';
- $('sessionButton').disabled=!folder||archivingBusy||!['READY','ACTIVE','EXPIRED'].includes(phase);
+ $('sessionButton').textContent=['ACTIVE','DISSOLVING'].includes(phase)?'End Session':phase==='EXPIRED'?'New Session':'Begin Session';
+ $('sessionButton').disabled=!folder||archivingBusy||!['READY','ACTIVE','DISSOLVING','EXPIRED'].includes(phase);
  $('retryButton').classList.toggle('hidden',phase!=='ERROR');
  $('recoveryButton').classList.toggle('hidden',!(text&&['ACTIVE','ERROR','ENDING'].includes(phase))&&!orphanRecovery);
- $('archiveTab').disabled=['ACTIVE','ERROR','ENDING'].includes(phase);
+ $('archiveTab').disabled=['ACTIVE','DISSOLVING','ERROR','ENDING'].includes(phase);
  $('writeTab').setAttribute('aria-pressed',String(view==='write'));
  $('archiveTab').setAttribute('aria-pressed',String(view==='archive'));
  $('writeView').classList.toggle('hidden',view!=='write');$('archiveView').classList.toggle('hidden',view!=='archive');
@@ -561,13 +558,11 @@ async function finish(){
 function expire(){
  if(phase!=='ACTIVE')return;
  phase='DISSOLVING';dissolveStarted=Date.now();
- dissolveOrder=Array.from({length:visual.length},(_,i)=>i);
- for(let i=dissolveOrder.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[dissolveOrder[i],dissolveOrder[j]]=[dissolveOrder[j],dissolveOrder[i]];}
  persistRecovery();render();
 }
 function interruptDissolve(){
  if(phase!=='DISSOLVING')return;
- phase='ACTIVE';dissolveOrder=[];dissolveStarted=0;
+ phase='ACTIVE';dissolveStarted=0;display.style.opacity='1';
  deadline=Date.now()+settings.idleSeconds*1000;remaining=settings.idleSeconds*1000;
  render();
 }
@@ -753,7 +748,7 @@ setInterval(()=>{
   remaining=Math.max(0,deadline-Date.now());
   if(remaining===0)expire();else render();
  }else if(phase==='DISSOLVING'){
-  if(Date.now()-dissolveStarted>=DISSOLVE_MS){dissolveOrder=[];requestSave(true);}
+  if(Date.now()-dissolveStarted>=DISSOLVE_MS){requestSave(true);}
   else render();
  }
 },100);
