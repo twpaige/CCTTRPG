@@ -43,14 +43,21 @@ label{font-size:13px;color:var(--muted)}input[type=range]{width:100%;accent-colo
 .pager{display:flex;align-items:center;gap:14px;margin:14px 0;justify-content:space-between}
 .pager-center{flex:1;text-align:center;min-width:90px}
 .pager-center input{display:block;width:100%;padding:0;margin:0;accent-color:#ccc}
-.pager-center output{display:block;font-size:12px;color:var(--muted);margin-top:5px}.entry{display:block;width:100%;text-align:left;margin:5px 0}
+.pager-center output{display:block;font-size:12px;color:var(--muted);margin-top:5px}.entry{display:block;width:100%;text-align:left;margin:0;min-width:0}
+.archive-row{display:flex;align-items:center;gap:10px;margin:5px 0}
+.archive-row .entry{flex:1}
+.archive-action{background:none;border:0;padding:4px 2px;font-size:12px;text-decoration:underline;text-underline-offset:3px;white-space:nowrap;color:#aaa}
+.archive-action:hover:not(:disabled){background:none;color:#fff}
+.archive-action.delete{color:#b87979}
+.archive-action.delete:hover:not(:disabled){color:#e2a0a0}
+.archive-action:focus-visible{outline:1px solid #ddd;outline-offset:2px}
 #archiveText{white-space:pre-wrap;overflow-wrap:anywhere;max-height:400px;overflow:auto;border-top:1px solid #444;padding:12px 0;user-select:text}
 .hidden{display:none!important}.footer{color:#777;text-align:center;font-size:12px;margin-top:28px}
 @media(max-width:560px){.writing-surface{height:250px}.writing-display{padding:14px}.controls{gap:8px}.controls label{font-size:11px}.stat strong{font-size:19px}}
 </style>
 </head>
 <body><main class="shell">
-<header><h1>FreeFlow</h1><p class="version">Version 0.7.1</p><p class="tagline">A space to write without looking back.</p></header>
+<header><h1>FreeFlow</h1><p class="version">Version 0.7.2</p><p class="tagline">A space to write without looking back.</p></header>
 <div id="notice" class="notice hidden" role="status" aria-live="polite"></div>
 <nav class="nav"><button id="writeTab" aria-pressed="true">Write</button><button id="archiveTab" aria-pressed="false">Archive</button><button id="sessionButton" disabled>Begin Session</button><button id="retryButton" class="hidden">Retry Save</button><button id="recoveryButton" class="hidden">Copy</button></nav>
 <section id="writeView">
@@ -589,7 +596,7 @@ async function loadArchive(){
   for(const dir of [sessionsFolder,archivedFolder]){
    if(!dir)continue;
    for await(const [name,handle] of dir.entries()){
-    if(handle.kind==='file'&&name.endsWith('.txt'))files.push({name,handle});
+    if(handle.kind==='file'&&name.endsWith('.txt'))files.push({name,handle,dir});
    }
   }
   files.sort((a,b)=>b.name.localeCompare(a.name));filesCache=files;
@@ -604,6 +611,34 @@ async function firstLinePreview(entry){
  const chars=Array.from(line);
  return chars.slice(0,50).join('')+(chars.length>50?'…':'');
 }
+async function copyArchiveEntry(entry,button){
+ try{
+  const contents=await (await entry.handle.getFile()).text();
+  await navigator.clipboard.writeText(contents);
+  button.textContent='Copied!';
+  button.style.color='#9ac7a1';
+  setTimeout(()=>{if(button.isConnected){button.textContent='Copy';button.style.color='';}},2000);
+ }catch(e){
+  button.textContent='Copy failed';
+  message('Archive copy failed: '+e.message);
+  setTimeout(()=>{if(button.isConnected)button.textContent='Copy';},2500);
+ }
+}
+async function deleteArchiveEntry(entry){
+ if(!window.confirm('Permanently delete session '+entry.name+'?\\n\\nOnly the individual session file will be deleted. Its text in the master document will remain. This cannot be undone.'))return;
+ try{
+  // Delete only the individual session and its routing metadata, never a master file.
+  await entry.dir.removeEntry(entry.name);
+  try{await entry.dir.removeEntry(entry.name+'.master.json');}
+  catch(e){if(e.name!=='NotFoundError')message('Session deleted, but metadata cleanup failed: '+e.message);}
+  const current=archiveMatches.findIndex(item=>item===entry);
+  if(current>=0)archiveMatches.splice(current,1);
+  filesCache=filesCache.filter(item=>item!==entry);
+  $('archiveText').textContent='';
+  $('archiveStatus').textContent=archiveMatches.length+' of '+filesCache.length+' session(s)';
+  renderArchivePage();
+ }catch(e){message('Archive delete failed: '+e.message);}
+}
 function renderArchivePage(){
  const generation=++archiveRenderId;
  const totalPages=Math.max(1,Math.ceil(archiveMatches.length/PAGE_SIZE));
@@ -617,6 +652,7 @@ function renderArchivePage(){
  const list=$('archiveList');list.replaceChildren();
  const entries=archiveMatches.slice((archivePage-1)*PAGE_SIZE,archivePage*PAGE_SIZE);
  for(const entry of entries){
+  const row=document.createElement('div');row.className='archive-row';
   const button=document.createElement('button');button.className='entry';
   const name=document.createElement('span');name.className='entry-name';name.textContent=entry.name;
   const preview=document.createElement('span');preview.className='entry-preview';preview.textContent='Loading preview…';
@@ -626,7 +662,11 @@ function renderArchivePage(){
    try{$('archiveText').textContent=await (await entry.handle.getFile()).text();}
    catch(e){$('archiveText').textContent='Could not read file: '+e.message;}
   });
-  list.appendChild(button);
+  const copy=document.createElement('button');copy.className='archive-action';copy.type='button';copy.textContent='Copy';copy.setAttribute('aria-label','Copy '+entry.name);
+  copy.addEventListener('click',()=>void copyArchiveEntry(entry,copy));
+  const del=document.createElement('button');del.className='archive-action delete';del.type='button';del.textContent='Delete';del.setAttribute('aria-label','Delete '+entry.name);
+  del.addEventListener('click',()=>void deleteArchiveEntry(entry));
+  row.append(button,copy,del);list.appendChild(row);
   void firstLinePreview(entry).then(value=>{
    if(generation===archiveRenderId)preview.textContent=value;
   }).catch(()=>{
